@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject ProjectCreator="Intel Fortran" Keyword="Console Application" Version="11.0" ProjectIdGuid="{8F521528-418A-4F8B-8A00-1DF28A3801F5}">
+	<Platforms>
+		<Platform Name="Win32"/></Platforms>
+	<Configurations>
+		<Configuration Name="Debug|Win32">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" WarningsAsErrors="true" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release|Win32">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration></Configurations>
+	<Files>
+		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
+		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe">
+		<File RelativePath=".\data\exp120x16_ref\condContornoGeom.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\condContornoHidro.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\data.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\elmnt_geoformation.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\geomechLayers.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\inputDS.dat"/>
+		<File RelativePath=".\data\exp120x16_ref\layer_reference.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\malha.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\mesh_rsrv_outsburden.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\NumericParam.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\hidroGalerkin.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\randfiles.inc"/>
+		<File RelativePath=".\data\exp120x16_ref\SimulatorParam.inc"/></Filter>
+		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\fonte\driverGeocreep.F90"/>
+		<File RelativePath=".\fonte\funcoesDeForma.F90"/>
+		<File RelativePath=".\fonte\geomecanica.F90"/>
+		<File RelativePath=".\fonte\hidrodinamica.F90"/>
+		<File RelativePath=".\fonte\leituraEscrita.F90"/>
+		<File RelativePath=".\fonte\leituraEscritaSimHidroGeoMec.F90"/>
+		<File RelativePath=".\fonte\malha.F90"/>
+		<File RelativePath=".\fonte\mcmc.F90"/>
+		<File RelativePath=".\fonte\mInputReader.F90"/>
+		<File RelativePath=".\fonte\propGeoFisica.F90"/>
+		<File RelativePath=".\fonte\solverGaussSkyline.F90"/>
+		<File RelativePath=".\fonte\solverHypre.F90"/>
+		<File RelativePath=".\fonte\solverPardiso.F90"/>
+		<File RelativePath=".\fonte\transporte.F90"/>
+		<File RelativePath=".\fonte\utilitarios.F90"/>
+		<File RelativePath=".\fonte\variaveisGlobais.F90"/></Filter></Files>
+	<Globals/></VisualStudioProject>
