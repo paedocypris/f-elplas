@@ -1,0 +1,87 @@
+*type_process{
+SOLID_ONLY
+}
+*title{
+EXPER. RESERVOIR + HIERARCHI MESH
+}
+*iprtin{
+         1
+}
+*nsd{
+         2
+}
+*geomech{
+         1
+}
+*irregMesh{
+         0
+}
+*Dirichlet{
+         0
+}
+*Neumann{
+         0
+}
+*I4SeaLoad{
+         0
+}
+*nlvectP{
+         1
+}
+*include{
+hidroGalerkin.inc
+}
+*include{
+malha.inc
+}
+*include{
+condContornoHidro.inc
+}
+*include{
+condContornoGeom.inc
+}
+*ntype{
+         1
+}
+*numat{
+         1
+}
+*nen{
+         4
+}
+*npint{
+         4
+}
+*material_properties{
+         1       1.00e-09  1.00e-09  1.00e+00
+}
+*constant_body_forces{
+       0.0       0.0       0.0
+}
+*include{
+mesh_rsrv_outsburden.inc
+}
+*include{
+layer_reference.inc
+}
+*include{
+elmnt_geoformation.inc
+}
+*include{
+data.inc
+}
+*uinclude{
+randfiles.inc
+}
+*include{
+geomechLayers.inc
+}
+*include{
+NumericParam.inc
+}
+*uinclude{
+mcmc.inc
+}
+*include{
+SimulatorParam.inc
+}
