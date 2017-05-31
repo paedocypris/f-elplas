@@ -1277,14 +1277,14 @@
     END SUBROUTINE
 
     END MODULE mHidrodinamicaRT
-    
-    
-    
+
+
+
     module mHidrodinamicaGalerkin
-    
+
     implicit none
     public montarEstruturasDadosPressaoSkyline, montarSistemaEquacoesPressao, solveGalerkinPressao
-    
+
     !module variables
     integer :: hgNumPassosTempo
     real*8 :: hgTempoTotal
@@ -1292,65 +1292,65 @@
     !various integers
     integer :: hgNeq
     integer :: hgNdof, hgNlvect
-    
+
     !global arrays
     real*8, allocatable :: hgF(:,:)
-    
+
     !flow variables
     real*8 :: hgInitialPressure
     real*8, allocatable :: hgPrevPressure(:,:), hgPressure(:,:)
-    
+
     !data processing arrays
     integer, allocatable :: hgId(:,:), hgLm(:,:,:)
-    
+
     !skyline data
     integer :: hgNalhs
     integer, allocatable :: hgIdiag(:)
     real*8, allocatable :: hgAlhs(:), hgBrhs(:)
-    
-    
+
+
     contains
-    
+
     !subroutines
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine montarEstruturasDadosPressaoSkyline(conecNodaisElem, nen, nel)
     !function imports
     use mMalha, only:formlm
-    
+
     !variable input
     integer :: nen, nel, conecNodaisElem(nen, nel)
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     !generation of lm array
     allocate(hgLm(hgNdof, nen, nel))
     hgLm = 0.0
     call formlm(hgId, conecNodaisElem, hgLm, hgNdof, hgNdof ,nen, nel)
-    
+
     !compute column heights in global left-hand-side matrix
     allocate(hgIdiag(hgNeq))
     hgIdiag = 0.0
     call colht(hgIdiag, hgLm, hgNdof, nen, nel, hgNeq)
-    
+
     !compute diagonal addresses of left-hand-side matrix
     call diag(hgIdiag, hgNeq, hgNalhs)
-    
+
     !initialize alhs
     allocate(hgAlhs(hgNalhs))
     hgAlhs = 0.0
-    
+
     !initialize brhs
     allocate(hgBrhs(hgNeq))
-    
+
     end subroutine montarEstruturasDadosPressaoSkyline
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x)
-    
+
     !variable input
     integer :: curTimeStep, conecNodaisElem(nen,nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp)
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     hgBrhs = 0.0
     if (curTimeStep == 1) then
@@ -1358,10 +1358,10 @@
             call load(hgId, hgF, hgBrhs, hgNdof, nnp, hgNlvect)
             call dirichletConditions(hgId, hgPressure, hgF, hgNdof, nnp, hgNlvect)
         endif
-    endif
-    
+    endif 
+
     call calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x)
-    
+
     end subroutine montarSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -1369,52 +1369,49 @@
     !variable imports
     use mGlobaisEscalares, only: nrowsh, npint, betaCompressibility
     use mGlobaisArranjos,  only: mat, c, grav
-    
+
     !function imports
     use mFuncoesDeForma, only: shlt, shlq, shlq3d
     use mFuncoesDeForma, only: shgq, shg3d
     use mSolverGaussSkyline, only: addlhs, addrhs
     use mMalha, only: local
-    
+
     !variable input
     integer :: curTimeStep, conecNodaisElem(nen,nel), nen, nel, nnp, nsd
     real*8 :: x(nsd, nnp)
-    
+
     !variables
-    real*8 :: pi !pi constant
-    
     integer :: nee ! number of element equations
     real*8 :: elementK(nen, hgNdof * nen), elementF(hgNdof * nen) !element K matrix, element f matrix
     integer :: m !material index
-    
+
     real*8 :: shG(nrowsh,nen,npint), shL(nrowsh,nen,npint) !global shape function with derivative, local shape function with derivative
     real*8 :: det(npint), w(npint) ! jacobian determinant, gauss integration weight
-    
+
     real*8 :: xL(nsd, nnp), pressureL(1, nen), prevPressureL(1, nen) !local position, local pressure, previous local pressure
     real*8 :: kX, kY !x component of permeability, y component of permeability
-    
+
     integer :: ni, nj !node position considering multiple degrees of freedom
     real*8 :: pss
     real*8 :: uup
     real*8 :: djx, djy, djn, dix, diy, din
-    
+
     integer :: curElement, l, i, j ! iterators
     real*8 :: temp1, gf1, gf2, gf3 !temporary variables
-    
+
     logical :: quad, zerodl !is diagonal, is degenerated triange, is zero
-    
+
     real*8 :: deltaT
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     if (nsd > 2) then
         stop 9
     end if
-    
+
     ! set some constants
     nee = hgNdof * nen
-    pi = 4.d00*datan(1.d00)
     deltaT = hgTempoTotal / hgNumPassosTempo
-    
+
     w = 0.0
     shL = 0.0
 
@@ -1422,94 +1419,91 @@
     if(nen==3) call shlt(shL,w,npint,nen)
     if(nen==4) call shlq(shL,w,npint,nen)
     if(nen==8) call shlq3d(shL,w,npint,nen)
-    
+
     do curElement = 1, nel ! foreach element
         !clear stiffness matrix and force array
         elementK=0.0
         elementF=0.0
-        
+
         call local(conecNodaisElem(1,curElement), x, xL, nen, nsd, nsd) !localize coordinates
         call local(conecNodaisElem(1,curElement), hgPressure, pressureL, nen, hgNdof, hgNdof) !localize dirichlet b.c.
         if (hgNumPassosTempo > 1) then
             call local(conecNodaisElem(1,curElement), hgPrevPressure, prevPressureL, nen, hgNdof, hgNdof) !localize dirichlet b.c.
         end if
-        
+
         ! set material index
         m = mat(curElement)
-        
+
         ! check if element has any coalesced nodes
         quad = .true.
         if (nen.eq.4.and.conecNodaisElem(3,curElement).eq.conecNodaisElem(4,curElement)) quad = .false.
-        
+
         ! calculates global derivatives of shape functions and jacobian determinants
         if(nen==3) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
         if(nen==4) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
         if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
-        
+
         ! retrieve permeabilities from material
         kX = c(1,m)
         kY = c(2,m)
-        
+
         do l = 1, npint ! foreach integration point
             temp1 = w(l)*det(l)
-            
+
             gf1 = grav(1)
             gf2 = grav(2)
-            
+
             pss = 0.0
             if (hgNumPassosTempo > 1) then
                 uup = 0.0
                 do j = 1, nen ! foreach node on element
                     uup = uup + shg(3, j, l) * prevPressureL(1, j)
                 end do
+
+                do j = 1, nen !foreach node on element
+                    nj = hgNdof * j
+                    djn = shg(nrowsh,j,l)
+
+                    ! source terms
+                    elementF(nj) = elementF(nj) + (betaCompressibility * djn * uup) * temp1 !B \csi^(n-1)
+                end do
             end if
-            
-            do j = 1, nen !foreach node on element
-                nj = hgNdof * j
-                djx = shg(1,j,l) * temp1
-                djy = shg(2,j,l) * temp1
-                
-                djn = shg(nrowsh,j,l) * temp1
-                
-                ! source terms
-                if(hgNumPassosTempo > 1) elementF(nj) = elementF(nj) + (betaCompressibility * djn * uup) 
+
+            do i = 1, nen
+                do j = 1, nen !for each pair of nodes in the element
+                    nj = hgNdof * j
+                    djx = shg(1, j, l)
+                    djy = shg(2, j, l)
+                    djn = shg(nrowsh, j, l)
+
+                    ni = hgNdof * i
+                    dix = shg(1, i, l)
+                    diy = shg(2, i, l)
+                    din = shg(3, i, l)
+
+                    if(hgNumPassosTempo > 1) then
+                        elementK(nj, ni) = elementK(nj, ni) + deltaT * Kx * dix * djx * temp1 !kn A
+                        elementK(nj, ni) = elementK(nj, ni) + deltaT * Ky * diy * djy * temp1 !kn A
+                        elementK(nj, ni) = elementK(nj, ni) + betaCompressibility * din * djn * temp1 !B
+                    else
+                        elementK(nj, ni) = elementK(nj, ni) + Kx * dix * djx * temp1
+                        elementK(nj, ni) = elementK(nj, ni) + Ky * diy * djy * temp1
+                    endif
+                end do
             end do
         end do
 
-        do i = 1, nen
-            do j = 1, nen !for each pair of nodes in the element
-                nj = hgNdof * j
-                djx = shg(1, j, l) * temp1
-                djy = shg(2, j, l) * temp1
-                djn = shg(nrowsh, j, l) * temp1
-                
-                ni = hgNdof * i
-                dix = shg(1, i, l)
-                diy = shg(2, i, l)
-                din = shg(3, i, l)
-
-                if(hgNumPassosTempo > 1) then
-                    elementK(nj, ni) = elementK(nj, ni) + deltaT * Kx * dix * djx
-                    elementK(nj, ni) = elementK(nj, ni) + deltaT * Ky * diy * djy
-                    elementK(nj, ni) = elementK(nj, ni) + betaCompressibility * din * djn
-                else
-                    elementK(nj, ni) = elementK(nj, ni) + Kx * dix * djx
-                    elementK(nj, ni) = elementK(nj, ni) + Ky * diy * djy
-                endif
-            end do
-        end do
-        
         ! computate dirichlet bc contribution to the system
         call zTest(pressureL, nee, zerodl)
         if(.not.zerodl) then
-            call kdbc(elementK, elementF, pressureL, nee)
+            call kdbc2(elementK,elementF, pressureL, nee, hgLm(1,1,curElement), nel)
         endif
-        
+
         ! assemble element stifness matrix and force array into the global matrixes
-        if(curTimeStep == 1) call addlhs (hgAlhs, elementK, hgLm, hgIdiag, nee, .false., .true.)
-        call addrhs(hgBrhs, elementF, hgLm, nee)
-    end do 
-    
+        if(curTimeStep == 1) call addlhs (hgAlhs, elementK, hgLm(1,1,curElement), hgIdiag, nee, .false., .true.)
+        call addrhs(hgBrhs, elementF, hgLm(1,1,curElement), nee)
+    end do
+
     end subroutine calcCoeficientesSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -1518,15 +1512,15 @@
     use mSolverGaussSkyline, only: factor, back
     !variables input
     integer :: curTimeStep, nnp
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     !solve by LU decomposition
     if (curTimeStep == 1) call factor(hgAlhs, hgIdiag, hgNeq)
     call back(hgAlhs, hgBrhs, hgIdiag, hgNeq)
-    
+
     !store the result
     call btod(hgId, hgPressure, hgBrhs, hgNdof, nnp)
-    
+
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************

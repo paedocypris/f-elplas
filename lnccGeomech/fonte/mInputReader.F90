@@ -378,11 +378,14 @@
 	!! @param   number_of_lines     N�mero de linhas.
 	!! @param   number_of_include   N�mero de ocorr�ncias da palavra include.
 	subroutine analyzeFile(file_name, number_of_lines, number_of_includes)
+    
+    implicit none
+    
 	character(len=200) file_name, file_line
 	integer*4 number_of_lines, number_of_includes
 
 	character(len=50) include_keyword, formated_keyword
-	integer*4 keyword_len, file_channel, success
+	integer*4 keyword_len, lunitInicial, file_channel, success
 
 	include_keyword = "include"
 	keyword_len = len(trim(include_keyword)) + 2

@@ -266,8 +266,8 @@
     !
     !.... remove above card for single-precision operation
     !
-    integer :: id(ndof,*)
-    real*8  :: f(ndof,numnp,*),brhs(*)
+    integer :: id(ndof,numnp)
+    real*8  :: f(ndof,numnp,nlvect),brhs(*)
     integer :: ndof, numnp, nlvect
     !
     integer :: nlv
@@ -303,8 +303,8 @@
     !.... remove above card for single-precision operation
     !
     integer*4:: ndof, numnp, nlvect
-    integer*4:: id(ndof,*)
-    real*8  :: d(ndof,*),f(ndof,numnp,*)
+    integer*4:: id(ndof,numnp)
+    real*8  :: d(ndof,numnp),f(ndof,numnp,nlvect)
     !
     integer*4:: i, j, k, lv
     real*8  :: val
@@ -422,7 +422,7 @@
     return
     end subroutine
 
-    subroutine kdbc2(eleffm,elresf,dl,nee,lmt,nel)
+    subroutine kdbc2(eleffm,elresf,dl,nee,lmt, nel)
     !
     !.... program to adjust load vector for prescribed displacement
     !     boundary condition
@@ -434,16 +434,13 @@
     !
 
     real*8 :: eleffm(nee,*),elresf(*),dl(*),val
-    integer :: nel, nee
-    integer*4, pointer :: lmt(:,:,:)
+    integer :: nee, nel
+    integer*4 :: lmt(nel)
     !
     integer :: i, j, l
-    integer*4:: lm(nee)
-
-    lm(:) =reshape(lmt(:,:,nel),(/nee/));
     !
     do 200 j=1,nee
-        l=lm(j)
+        l=lmt(j)
         !
         val=dl(j)
         !

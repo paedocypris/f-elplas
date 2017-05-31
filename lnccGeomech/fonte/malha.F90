@@ -27,7 +27,7 @@
          REAL(8) :: LEFTLINE, RGHTLINE, FRNTLINE, BACKLINE, BASELINE
 !
          public :: criarListaVizinhos, formlm, renumerarMalha
-         public :: genel, genel1, geneld, geneli, genfl, genfl1
+         public :: genel, genel1, genfl, genfl1
          public :: gensh, gensh1, gensh2, gensh3, igen
          PUBLIC :: FNCPROCESS, FNCINIT, FNCSOLID
 !

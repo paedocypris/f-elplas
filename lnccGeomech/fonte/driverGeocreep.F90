@@ -1840,12 +1840,13 @@
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
     use mHidrodinamicaGalerkin, only:montarSistemaEquacoesPressao
     use mHidrodinamicaGalerkin, only:solveGalerkinPressao
-    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview, escreverArqParaviewIntermed
 
     !variables
     implicit none
     integer :: curTimeStep, i, j
     real*8 :: t, deltaT
+    character(21) :: labelTempo, num
 
     !------------------------------------------------------------------------------------------------------------------------------------
     if(hgNumPassosTempo > 1) then
@@ -1872,15 +1873,17 @@
         !solve
         call solveGalerkinPressao(curTimeStep, numnp)
         
+        !print current solution
+        write(num,'(f12.5)') t / 2592000
+        labelTempo="t="//ADJUSTL(num)
+        call escreverArqParaviewIntermed(ihgPres, hgPressure, hgNdof, numnp, trim(labelTempo), len(trim(labelTempo)))
+        
         ! copy solution to previous array
         do j = 1, numnp
             do i = 1, hgNdof
                 hgPrevPressure(i,j) = hgPressure(i,j)
             end do
         end do
-        
-        !print current solution
-        
     end do
 
     end subroutine processamentoGalerkinElastico

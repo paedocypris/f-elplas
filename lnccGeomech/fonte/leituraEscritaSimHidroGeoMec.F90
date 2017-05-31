@@ -3802,7 +3802,7 @@
     write(arquivo,'(a)')'LOOKUP_TABLE default'
 
     if (tipo == 1) call escreverEscalares(campo, dim1, dim2, rotulo, tamRot, reserv, arquivo)
-    if (tipo == 2) call escreverEscalaresNodais(arquivo ,campo, dim1, dim2, rotulo, tamRot)
+    if (tipo == 2) call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
 
 
     !
@@ -3876,58 +3876,36 @@
     !
     !**** new *******************************************************************
     !
-    subroutine escreverEscalaresNodais(arquivo,v, tam1, tam2, rotulo, tamRot)
-    !
-    use mMalha, only: numelReserv
-    !
+    subroutine escreverEscalaresNodais(v, tam1, tam2, rotulo, tamRot, arquivo)
     implicit none
-    integer, intent(in)  :: arquivo,tam1,tam2
+    integer*4, intent(in)  :: tam1,tam2, arquivo
     real*8, intent(in)   :: v(tam1,tam2)
-    integer :: tamRot
+    integer*4:: tamRot
     character(len=tamRot) :: rotulo
     !
     character(len=tamRot+5) ::  rotuloN
-    integer :: i,j
+    integer*4:: i,j
     character(len=5):: eixo
-    real*8 :: limite,zero
-    !
-    limite=1.e-15
-    zero=0.0d0
+    real*8 :: limite
+
+    limite=1.e-20
     do i=1,tam1
 
         if(i>1) then
             write(eixo,'(i0)') i
-            rotuloN=trim(rotulo)//trim(eixo)
-            write(arquivo,'(3a)')'SCALARS ', trim(rotuloN), ' float '
-            write(arquivo,'(a)')'LOOKUP_TABLE default'
+            if(rotulo.ne.'potencial') then
+                rotuloN=trim(rotulo)//'Dir'//trim(eixo)
+                write(arquivo,'(3a)')'SCALARS ', trim(rotuloN), ' float '
+                write(arquivo,'(a)')'LOOKUP_TABLE default'
+            endif
         endif
-        !
-        if(apenasReservatorio.eqv..true.) then
-            do j=1, tam2
-                if(v(i,j).lt.limite) then
-                    write(arquivo,*) zero
-                else
-                    write(arquivo,*) v(i,j)
-                end if
-            end do
-            !
-        else
-            do j=1, tam2
-                if(tam2<=numelReserv) then
-                    if(v(i,j).lt.limite) then
-                        write(arquivo,*) zero
-                    else
-                        write(arquivo,*) v(i,j)
-                    end if
-                else
-                    write(arquivo,*) zero
-                endif
-            end do
-            !
-        endif
-        !
+
+        do j=1, tam2
+            write(arquivo,*) v(i,j)
+        end do
+
     end do
-    !
+
     end subroutine escreverEscalaresNodais
     !
     !**** new *******************************************************************
@@ -4118,7 +4096,7 @@
     write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' float '
     write(arquivo,'(a)')'LOOKUP_TABLE default'
 
-    call escreverEscalaresNodais(arquivo,campo, dim1, dim2, rotulo, tamRot)
+    call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
 
     end subroutine escreverArqParaviewIntermed
     !
