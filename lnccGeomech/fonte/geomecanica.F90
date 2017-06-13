@@ -70,26 +70,21 @@
     !
     subroutine GEOMECHANIC(fase)
 
-    use mGlobaisEscalares,   only: nnp, nrowsh
     use mGlobaisEscalares,   only: tempoMontagemGeo, tempoSolverGeo
 
-    use mMalha,              only: x, xc, nsd, nen, numel, numnp
-    use mMalha,              only: numelReserv, numnpReserv
-    use mMalha,              only: conecNodaisElem, conecLadaisElem
-    use mMalha,              only: numLadosElem, numLadosReserv
+    use mMalha,              only: x, nsd, numel, numnp
+    use mMalha,              only: numelReserv
+    use mMalha,              only: conecNodaisElem
 
     use mPropGeoFisica,      only: PORE0, PORE, PHI, PHI0, PHIEULER
-    use mPropGeoFisica,      only: TOLCREEP, GEOFORM, YOUNG
-    use mPropGeoFisica,      only: PERMKX,  MASCN0, MASCN
-    use mPropGeoFisica,      only: RHOW, RHOO, XTERLOAD
+    use mPropGeoFisica,      only: YOUNG
+    use mPropGeoFisica,      only: MASCN0, MASCN
+    use mPropGeoFisica,      only: XTERLOAD
 
     use mHidrodinamicaRT,    only: pressaoElemAnt, pressaoElem
-    use mHidrodinamicaRT,    only: ndofV, nlvectV, nlvectP, ndofP
-    use mTransporte,         only: satElemAnt, satElem
+    use mTransporte,         only: satElem
 
-    use mSolverPardiso,      only: solverPardisoCSR, escreverSistemaAlgCSRemMTX
     use mSolverGaussSkyline, only: solverGaussSkyline
-    use mSolverHypre
     !
     implicit none
 
@@ -103,9 +98,8 @@
     CHARACTER(LEN=18) :: FASE
     !
     real*8  :: t1,t2
-    integer :: i, j, k, ierr
-    real*8  :: final_res_norm, tol
-    integer :: num_iterations
+    integer :: i, j
+    real*8  :: tol
     !
     CHARACTER*18, DIMENSION(10) :: REFTASK
     !      real*8, external :: coldot
@@ -123,8 +117,6 @@
     escreverSistD = .false.; escreverSolD = .false.
 
     WRITE(*,*) ' ==> GEOMECHANIC TASK == ', FASE
-    solver_id_G  = 1
-    precond_id_G = 2
     tol = 1.0e-12
 
     DO 10 I=1,9
@@ -139,28 +131,18 @@
     !
 200 CONTINUE     !....   fase=='ELASTIC_BBAR_MATRX'
     if(optSolverD=='hypre') then
-        call destruirVetor_HYPRE (b_HYPRE_G)
-        call destruirVetor_HYPRE (u_HYPRE_G)
-        call destruirMatriz_HYPRE(A_HYPRE_G)
-        call criarMatriz_HYPRE   (A_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        call criarVetor_HYPRE    (b_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        call criarVetor_HYPRE    (u_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
+        write(*,*) ' não implementado '
+        stop 9
     endif
 
     call timing(t1)
     call montarSistEqAlgGEO('bbarmatrix_elast',satElem)
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,9002) t2-t1
-#endif
     tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
     write(*,'(a)', ADVANCE='NO') 'solucao do sistema de eq, GEOMECHANICS, '
     call timing(t1)
     call solverGeo200()
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,9003) t2-t1
-#endif
     tempoSolverGeo=tempoSolverGeo+(t2-t1)
     RETURN
     !
@@ -168,9 +150,6 @@
     call timing(t1)
     CALL montarSistEqAlgGEO('right_hand_elast',satElem)
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,9002) t2-t1
-#endif
     tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
 
     if(cont<1000)  zeros="00"
@@ -191,9 +170,6 @@
     call timing(t2)
     nomeArq = "coefSistEqAlgEsparsoD_"//trim(numSufix)//".sol";! write(*,*) nomeArq
     if(escreverSolD)  call  escreverBRHS (brhsD, neqD, nomeArq)
-#ifdef mostrarTempos
-    write(*,9003) t2-t1
-#endif
     !.... UPDATE DISPLACEMENT
     CALL BTOD(idDesloc,DIS,BRHSD,NDOFD,NUMNP)
     tempoSolverGeo=tempoSolverGeo+(t2-t1)
@@ -204,9 +180,6 @@
     call timing(t1)
     call montarSistEqAlgGEO('bbarmatrix_creep',satElem)
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,9002) t2-t1
-#endif
     tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
     !.... COMPUTE RESIDUAL EUCLIDEAN NORM
     RESIDUAL = sqrt(DOT_PRODUCT (BRHSD,BRHSD))
@@ -217,9 +190,6 @@
     call timing(t1)
     call solverGeo400()
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,9003) t2-t1
-#endif
     tempoSolverGeo=tempoSolverGeo+(t2-t1)
     !.... UPDATE TRIAL DISPLACEMENT WITH INCREMENT
     CALL UPDATEINCR(idDesloc,BRHSD,NDOFD,NUMNP)
@@ -250,9 +220,7 @@
     call timing(t1)
     CALL montarSistEqAlgGEO('right_hand_reset',satElem)
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,9002) t2-t1
-#endif
+    
     tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
     RETURN
     !
@@ -283,9 +251,8 @@
         write(*,'(2a)') ' direto ', optSolverD
         call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
     else
-        write(*,'(2a)') ' direto ', optSolverD
-        call solverPardisoCSR(alhsD, brhsD, ApGeo, AiGeo, ptD, iparmD, dparmD, neqD, nalhsD, simetriaGeo, 'geo', 'full')
-        stop
+        write(*,*) ' não implementado '
+        stop 9
     end if
     !
     !.... UPDATE TRIAL DISPLACEMENT WITH INCREMENT
@@ -318,15 +285,13 @@
     end if
     !
     if (optSolverD=='pardiso') then
-        write(*,'(2a)') ' direto ', optSolverD
-        if(NNP==0) &
-            call solverPardisoCSR(alhsD, brhsD, ApGeo, AiGeo, ptD, iparmD, dparmD, neqD, nalhsD, simetriaGeo, 'geo', 'reor')
-        call solverPardisoCSR(alhsD, brhsD, ApGeo, AiGeo, ptD, iparmD, dparmD, neqD, nalhsD, simetriaGeo, 'geo', 'fact')
+        write(*,*) ' não implementado '
+        stop 9
     endif
     !
     if(optSolverD=='hypre') then
-        write(*,'(2a)') ' iterativo ', optSolverD
-        call fecharMatriz_HYPRE    (A_HYPRE_G, parcsr_A_G )
+        write(*,*) ' não implementado '
+        stop 9
     endif
 
     solutionNorm = 0.0
@@ -361,28 +326,15 @@
     write(*,'(a,1e16.8)') "Euclid norms of computed desloc RHS     : ", solutionNorm
     !
     IF (optSolverD=='pardiso') then
-        write(*,'(2a)') ' direto ', optSolverD
-        !         call escreverSistemaAlgCSRemMTX(alhsD, brhsD, ApGeo, AiGeo,  nalhsD, neqD, "sistemaPardisoGeo300.mtx")
-        call solverPardisoCSR(alhsD, brhsD, ApGeo, AiGeo, ptD, iparmD, dparmD, neqD, nalhsD, simetriaGeo, 'geo', 'back')
+        write(*,*) ' não implementado '
+        stop 9
     endif
 
     if(optSolverD=='hypre') then
-        write(*,'(2a)') ' iterativo ', optSolverD
-        call fecharVetor_HYPRE     (b_HYPRE_G, par_b_G )
-        call fecharVetor_HYPRE     (u_HYPRE_G, par_u_G )
-        if(.not.allocated(initialGuess_G)) then
-            allocate(initialGuess_G(neqD)); initialGuess_G=0.0
-        endif
-        call resolverSistemaAlgHYPRE (A_HYPRE_G, parcsr_A_G, b_HYPRE_G, par_b_G, u_HYPRE_G, par_u_G, &
-            solver_G, solver_id_G, precond_id_G, tol,    &
-            num_iterations, final_res_norm, initialGuess_G, brhsD, rows_G, neqD, myid, mpi_comm)
-        call extrairValoresVetor_HYPRE(u_HYPRE_G, 1, neqD, rows_G,BRHSD)
-        initialGuess_G=brhsD
-        call destruirVetor_HYPRE(b_HYPRE_G)
-        call destruirVetor_HYPRE(u_HYPRE_G)
-        call criarVetor_HYPRE   (b_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        call criarVetor_HYPRE   (u_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
+        write(*,*) ' não implementado '
+        stop 9
     endif
+    
     solutionNorm = 0.0
     do i = 1, neqD
         solutionNorm = solutionNorm + brhsD(i)**2
@@ -400,35 +352,17 @@
 
     if (optSolverD=='skyline') then
         write(*,'(2a)') ' direto ', optSolverD
-        !          call solverDiretoSkyLine(alhsD, brhsD, idiagD, nalhsD, neqD, 'geo')
         call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
     end if
 
     if (optSolverD=='pardiso') then
-        write(*,'(2a)') ' direto ', optSolverD
-        !        call escreverSistemaAlgCSRemMTX(alhsD, brhsD, ApGeo, AiGeo,  nalhsD, neqD, "sistemaPardisoGeo400.mtx")
-        call solverPardisoCSR(alhsD, brhsD, ApGeo, AiGeo, ptD, iparmD, dparmD, neqD, nalhsD, simetriaGeo, 'geo', 'full')
+        write(*,*) ' não implementado '
+        stop 9
     endif
 
     if(optSolverD=='hypre') then
-        write(*,'(2a)') ' iterativo ', optSolverD
-        call fecharMatriz_HYPRE    (A_HYPRE_G, parcsr_A_G )
-        call fecharVetor_HYPRE     (b_HYPRE_G, par_b_G )
-        call fecharVetor_HYPRE     (u_HYPRE_G, par_u_G )
-        if(.not.allocated(initialGuess_G)) then
-            allocate(initialGuess_G(neqD)); initialGuess_G=0.0
-        endif
-        call resolverSistemaAlgHYPRE (A_HYPRE_G, parcsr_A_G, b_HYPRE_G, par_b_G, u_HYPRE_G, par_u_G, &
-            solver_G, solver_id_G, precond_id_G, tol,    &
-            num_iterations, final_res_norm, initialGuess_G, brhsD, rows_G, neqD, myid, mpi_comm)
-        call extrairValoresVetor_HYPRE(u_HYPRE_G, 1, neqD, rows_G,BRHSD)
-        initialGuess_G=brhsD
-        call destruirVetor_HYPRE(b_HYPRE_G)
-        call destruirVetor_HYPRE(u_HYPRE_G)
-        call destruirMatriz_HYPRE(A_HYPRE_G)
-        call criarMatriz_HYPRE  (A_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        call criarVetor_HYPRE   (b_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        call criarVetor_HYPRE   (u_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
+        write(*,*) ' não implementado '
+        stop 9
     endif
     solutionNorm = 0.0
     do i = 1, neqD
@@ -445,7 +379,6 @@
     subroutine escreverSistema_MTX(optSolver_, nomeArq_)
 
     use mMalha,              only: numnp, numel, nen, conecNodaisElem
-    use mSolverPardiso,      only: escreverSistemaAlgCSRemMTX
     use mSolverGaussSkyline, only: escreverSistemaSkylineEmMTX
 
     character(len=*), intent(in) :: optSolver_, nomeArq_
@@ -457,13 +390,12 @@
     nee = ndofD * nen
 
     if (optSolver_=='GaussSkyline') then
-        call escreverSistemaSkylineEmMTX (alhsD, brhsD, idiagD, lmD, idDesloc,conecNodaisElem,nee,nen,numel,numnp,neqD,nomeArq_)
+        call escreverSistemaSkylineEmMTX (alhsD, brhsD, idiagD, neqD,nomeArq_)
     end if
 
-
-    ! if (optSolver_=='PardisoEsparso') then
     if (optSolver_=='pardiso') then
-        call escreverSistemaAlgCSRemMTX (AlhsD, brhsD, ApGeo, AiGeo, nAlhsD, neqD, nomeArq_)
+        write(*,*) ' não implementado '
+        stop 9
     end if
     end subroutine escreverSistema_MTX
 
@@ -493,25 +425,77 @@
 
     END subroutine geomechanic
     !
+    subroutine InicializacaoGEO()
+    !
+    use mGlobaisEscalares, only: TypeProcess
+    !
+    use mTransporte,       only: satElem, satElemAnt
+    use mPropGeoFisica,    only: phi, phi0
+    use mPropGeoFisica,    only: PORE, PORE0, MASCN, MASCN0
+    use mPropGeoFisica,    only: XTERLOAD, PHIEULER
+    !
+    use mMalha,            only: numnp
+    !
+    !..NEW LINES 4 COMPRESSIBLE MODEL MASS CONTENT ARRAYS
+    !
+    IMPLICIT NONE
+    
+    !.... SETUP SATURATION AT TIME ZERO
+    !
+    satElemAnt = satElem
+    !
+    !.... SETUP EULERIAN AND 'CLASSICAL' POROSITIES AT TIME ZERO
+    !
+    PHI0     = PHI
+    PORE     = PHI
+    PORE0    = PHI0
+    MASCN    = PORE
+    MASCN0   = PORE0
+    PHIEULER = PORE
+    strss0   = 0.0D0
+    !
+    if(.not.allocated(ALHSD)) allocate(ALHSD(NALHSD))
+    if(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
+    !
+    !.... CLEAR LEFT AND RIGHT HAND SIDE FOR THE ELASTIC  PROBLEM
+    !
+    ALHSD = 0.0D0
+    BRHSD = 0.0D0
+    !
+    IF (TypeProcess.EQ.'MANDEL') THEN
+        CALL FTODMANDL(FDesloc,NDOFD,NUMNP,NLVECTD,XTERLOAD,0.0D0)
+    ENDIF
+    !
+    !.... ACCOUNT THE NODAL FORCES IN THE R.H.S.
+    !
+    IF (NLVECTD.GT.0) &
+        CALL LOAD(idDesloc,fDesloc,brhsd,NDOFD,NUMNP,NLVECTD)
+    !
+    IF (NLVECTD.GT.0) &
+        CALL FTOD(idDesloc,DIS,fDesloc,NDOFD,NUMNP,NLVECTD)
 
+    !
+    RETURN
+    !
+    END SUBROUTINE
     !**** new *******************************************************************
     !
     SUBROUTINE STRESS_INIT()
     !
     use mGlobaisEscalares
     !      use mGeomecanica!, only: ndofD, nlvectD , brhsd
-    use mHidrodinamicaRT, only: ndofV, nlvectV, nlvectP, ndofP, velocLadal, velocNodal, vc, PRESPROD
+    use mHidrodinamicaRT, only: ndofV, ndofP, velocLadal, velocNodal, vc
     !      use mGeomecanica,      only : ALHSD, idDesloc
-    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXMESH, PRINT_DXINFO, IFEDX
+    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXMESH, PRINT_DXINFO
     use mLeituraEscritaSimHidroGeoMec,   only : DXPRT_MSH3D
     use mLeituraEscritaSimHidroGeoMec, only : SOLIDONLY,CYLINDER,imprimirCondicoesIniciais
     use mLeituraEscrita,   only : iflag_tipoPrint
-    use mMalha,            only : nsd, numel, nen, numnp
-    use mMalha,            only : numelReserv, numnpReserv
-    use mMalha,            only : x, xc, conecNodaisElem
-    use mPropGeoFisica,    only : lerPropriedadesFisicas, nelXReserv
+    use mMalha,            only : nsd, numel
+    use mMalha,            only : numelReserv
+    use mMalha,            only : x, conecNodaisElem
+    use mPropGeoFisica,    only : lerPropriedadesFisicas
     use mPropGeoFisica,    only : YOUNG, PERMKX, MASCN, PHI
-    use mPropGeoFisica,    only : GEOFORM, PORE, PWELL, phiinicial
+    use mPropGeoFisica,    only : GEOFORM
     use mTransporte,       only : satElem
     !B     use mGeomecanica,      only : NROWB,NED2,NINTD,NROWB2,IOPT
     !B     use mGeomecanica,      only : SIGMAT, SIGMA0
@@ -523,8 +507,6 @@
     !
     implicit none
     !
-    INTEGER  :: K, NODE, NEL
-    !
     NNP = 0
     !
     !.... READ STOCHASTIC FIELDS
@@ -532,7 +514,7 @@
     CALL lerPropriedadesFisicas()
     !
     IF (SALTCREEP) THEN
-        CALL GEOSETUP(YOUNG,GEOFORM,NUMEL,NROWB,NINTD,NROWB2,IOPT)
+        CALL GEOSETUP(YOUNG,GEOFORM,NUMEL,NROWB,NINTD,IOPT)
     ENDIF
     !
     !.... SETUP INITIAL HIDROSTATIC PORE-PRESSURE
@@ -544,7 +526,7 @@
         CALL PLAST_EXAMPLE()
 
         call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-            permkx, satElem, YOUNG, DIS, PORE, PRESPROD, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
+            permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
 
         RETURN
     ENDIF
@@ -561,8 +543,8 @@
     !
     !.... SETUP PRESSURE ON RESERVOIR AND FOR TERZAGHI AND MANDEL EXAMPLES
     !
-    if(nsd==2) CALL PRSRINIT  (GEOPRSR,pressaoElem,XC,NUMEL,numelReserv,INITS3)
-    if(nsd==3) CALL PRSRINIT3D(GEOPRSR,pressaoElem,XC,NUMEL,numelReserv,INITS3)
+    if(nsd==2) CALL PRSRINIT  (GEOPRSR,pressaoElem,NUMEL,numelReserv,INITS3)
+    if(nsd==3) CALL PRSRINIT3D(GEOPRSR,pressaoElem,NUMEL,numelReserv,INITS3)
     !
     LDRAINED = .TRUE.
 
@@ -598,9 +580,6 @@
 
     !.... PRINT GEOMECHANICAL INITIAL CONDITIONS
     !
-    !       IF (SOLIDONLY.eq..true.) call imprimirCondicoesIniciais(pressaoElem, velocLadal, velocNodal, vc, phi, &
-    !            permkx, satElem, YOUNG, DIS, PORE, PRESPROD, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
-    !
     if(iflag_tipoPrint.eq.3)then
         IF (NSD.EQ.2) CALL PRINT_DXMESH(X,DIS0,GEOPRSR,STRSS0,&
             &                      conecNodaisElem, YOUNG,PERMKX)
@@ -609,7 +588,7 @@
     end if
 
     call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-        permkx, satElem, YOUNG, DIS, PORE, PRESPROD, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
+        permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
     !
     DIS  = 0.0D0
     DIVU = 0.0D0
@@ -632,12 +611,8 @@
     SUBROUTINE PLAST_EXAMPLE()
     !
     use mGlobaisEscalares
-    use mLeituraEscrita,   only : iflag_tipoPrint
     !
     use mMalha,            only : x, conecNodaisElem
-    !
-    use mPropGeoFisica,    only : YOUNG, PERMKX, MASCN
-    use mPropGeoFisica,    only : PORE, PWELL
     !
     implicit none
     !
@@ -684,14 +659,12 @@
     !
     subroutine montarSistEqAlgGeo(TASK,satElem)
     !
-    use mMalha,            only: conecNodaisElem, listaDosElemsPorNo
-    use mMalha,            only: x, numnp, nen, nsd, XC, numelReserv
-    use mGlobaisEscalares, only: TypeProcess
+    use mMalha,            only: conecNodaisElem
+    use mMalha,            only: x, numnp, nsd, numelReserv
     use mHidroDinamicaRT,  only: pressaoElem
     !
     implicit none
     !
-    integer :: i
     character(len=16) :: TASK
     REAL(8), DIMENSION(numelReserv) :: satElem
     !
@@ -815,23 +788,15 @@
     !        ASSEMBLE INTO THE GLOBAL LEFT-HAND-SIDE MATRIX
     !        AND RIGHT-HAND SIDE VECTOR
     !
-    use mGlobaisEscalares, only: nrowsh,nnp,S3DIM,IBBAR,LDRAINED
-    use mGlobaisArranjos,  only: grav, c
-    use mPropGeoFisica,    only: YOUNG, GRAINBLK, RHODVECT, PORELAGR
-    use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
-    use mPropGeoFisica,    only: GEOFORM, GEOINDIC, BULK
-    use mPropGeoFisica,    only: POISVECT,YUNGVECT,RHODVECT
-    use mPropGeoFisica,    only: PORE
+    use mGlobaisEscalares, only: nrowsh,IBBAR,LDRAINED
+    use mGlobaisArranjos,  only: grav
+    use mPropGeoFisica,    only: GEOINDIC, BULK
     !
     use mSolverGaussSkyline, only: addrhs, addlhs
     !
     use mFuncoesDeForma,   only: shgq, shlq
     use mMalha,            only: local, numnp, multab
     use mMalha,            only: nsd, numel, numelReserv, nen
-    use mSolverPardiso,    only: addlhsCRS
-    use mSolverHypre
-    !
-    use mHidroDinamicaRT, only: PRESSAOREF, COTAREF
     !
     implicit none
     !
@@ -859,14 +824,11 @@
     REAL(8) :: SHGBR(NROWSH,NEN)
     REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
     !
-    REAL(8) :: C1,RHOTOTAL, BULKROCK, BIOTCOEF, POROSITY, ONEMPORE
-    REAL(8) :: RHOMAT, DENSOLID, DENFLUID, SATURAT, ONEMSAT
-    REAL(8) :: BULKGRAIN, BULKFLUD, POISSON, RHOWLIN, RHOOLIN
+    REAL(8) :: C1,RHOTOTAL
     !
     INTEGER :: NEL, I, J, L, K
     !
-    integer :: tid, omp_get_thread_num,omp_get_num_threads, numThreads
-    integer :: numPrimeiroElemento, numUltimoElemento, inicioSol, fimSol
+    integer :: tid, numThreads
 
     real*8, external :: rowdot, coldot
     !
@@ -997,7 +959,7 @@
         !
         CALL ZTEST(DISL,NEE2,ZERODL)
         !
-        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL),NEL)
+        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
         !
         !.... ASSEMBLE ELEMENT STIFFNESS MATRIX AND FORCE ARRAY INTO GLOBAL
         !....     LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
@@ -1010,20 +972,19 @@
         endif
 
         if (optSolverD=='pardiso')   then
-            call addlhsCRS(ALHSD,ELEFFMD,LMD(1,1,nel),ApGeo,AiGeo,NEE2)
+            write(*,*) ' não implementado '
+            stop 9
         endif
 
         if (optSolverD=='hypre')   then
-            call addnslHYPRE(A_HYPRE_G, ELEFFMD, LMD(1,1,nel), NEE2, LSYM)
+            write(*,*) ' não implementado '
+            stop 9
         endif
         !
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
 
 500 CONTINUE
-
-    if (optSolverD=='hypre')   then
-        call atribuirValoresVetor_HYPRE(b_HYPRE_G, 1, neqD, rows_G, BRHSD)
-    end if
+    
     !
     RETURN
     !
@@ -1045,16 +1006,15 @@
     !        ASSEMBLE INTO THE GLOBAL LEFT-HAND-SIDE MATRIX
     !        AND RIGHT-HAND SIDE VECTOR
     !
-    use mGlobaisEscalares, only: nrowsh,nnp
-    use mGlobaisEscalares, only: S3DIM,IBBAR,LDRAINED
-    use mGlobaisArranjos,  only: grav, c
+    use mGlobaisEscalares, only: nrowsh
+    use mGlobaisEscalares, only: IBBAR,LDRAINED
+    use mGlobaisArranjos,  only: grav
     !
     use mSolverGaussSkyline,     only: addrhs, addlhs
     !
     use mFuncoesDeForma,   only: shgq, shlq
     use mMalha,            only: local, numnp, multab
     use mMalha,            only: nsd, numel, numelReserv, nen
-    use mSolverPardiso,    only: addlhsCRS
     !
     implicit none
     !
@@ -1077,19 +1037,18 @@
     !.... LOCAL VECTORS AND MATRIZES
     !
     REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ, BBARI, QIXIBBAR
-    REAL(8), DIMENSION(NROWB,NROWB)   :: QIXI, QIXIP
+    REAL(8), DIMENSION(NROWB,NROWB)   :: QIXI
     REAL(8), DIMENSION(NROWB)         :: TENSAO, PRESSURE, TENSAOP
     !
     REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
     REAL(8) :: SHGBR(NROWSH,NEN)
     REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
     !
-    REAL(8) :: C1, RHOTOTAL, h11, h12, h13, h22, h23, h33
-    REAL(8) :: DIX, DIY, DJX, DJY
+    REAL(8) :: C1, RHOTOTAL
     !
     INTEGER :: NEL, I, J, L, K
     !
-    integer :: tid, omp_get_thread_num,omp_get_num_threads, numThreads
+    integer :: tid, numThreads
     integer :: numPrimeiroElemento, numUltimoElemento, inicioSol, fimSol
     !
     !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
@@ -1101,19 +1060,6 @@
     DIAG       = .FALSE.
     TENSAO     = 0.0D0
     tid        = 1
-    numThreads = 1
-
-    ! !$OMP PARALLEL FIRSTPRIVATE(tid) &
-    ! !$OMP PRIVATE (numPrimeiroElemento, numUltimoElemento, inicioSol,fimSol) &
-    ! !$OMP PRIVATE (I,J,L,K,NEL,BBARI,BBARJ,QIXIBBAR,QIXI,PRESSURE,XL,DISL,TENSAO,C1,IOPT,QUAD,LSYM) &
-    ! !$OMP PRIVATE (R,SHGD,SHGBR,DETD) &
-    ! !$OMP REDUCTION(+:ELEFFMD,ELRESFD) !,BRHSD,ALHSD)
-
-    !
-    ! #ifdef withOMP
-    !        tid=tid+omp_get_thread_num()
-    !        numThreads=omp_get_num_threads()
-    ! #endif
     !
     numPrimeiroElemento = 1
     numUltimoElemento   = numel
@@ -1270,30 +1216,18 @@
         !
         CALL ZTEST(DISL,NEE2,ZERODL)
         !
-        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL),NEL)
+        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
         !
         !.... ASSEMBLE ELEMENT STIFFNESS MATRIX AND FORCE ARRAY INTO GLOBAL
         !....     LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
         !
         LSYM=.TRUE.
 
-        !$OMP ORDERED
-
-#ifdef withcrs
-        call addlhsCRS(ALHSD,ELEFFMD,LMD(1,1,nel),ApGeo,AiGeo,NEE2)
-#else
-        CALL ADDLHS(ALHSD,ELEFFMD,IDIAGD,LMD(1,1,NEL),NEE2, &
-            &            DIAG,LSYM)
-#endif
-        !
+        CALL ADDLHS(ALHSD,ELEFFMD,IDIAGD,LMD(1,1,NEL),NEE2, DIAG,LSYM)
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
 
-        !$OMP END ORDERED
 
 500 CONTINUE
-    !OMP END DO
-
-    !$OMP END PARALLEL
 
     !
     RETURN
@@ -1317,16 +1251,12 @@
     !
     use mGlobaisEscalares, only: nrowsh, IBBAR, LDRAINED
 
-    use mGlobaisArranjos,  only: grav, c
-    use mPropGeoFisica,    only: YOUNG, GEOFORM, GEOINDIC
-    use mPropGeoFisica,    only: POISVECT, YUNGVECT, RHODVECT
+    use mPropGeoFisica,    only: GEOINDIC
     use mSolverGaussSkyline, only: addrhs, addlhs
 
     use mFuncoesDeForma,   only: shgq, shlq
     use mMalha,            only: local, numnp, multab
-    use mMalha,            only: nsd, numel, nen, numelReserv
-    use mSolverPardiso,      only: addlhsCRS
-    use mSolverHypre
+    use mMalha,            only: nsd, numel, nen
     !
     implicit none
     !
@@ -1347,7 +1277,7 @@
     !.... LOCAL VECTORS AND MATRIZES
     !
     REAL(8) :: BBARJ(NROWB,NESD), BBARI(NROWB,NESD)
-    REAL(8) :: QIXI(NROWB,NROWB), QIXIBBAR(NROWB,NESD)
+    REAL(8) :: QIXIBBAR(NROWB,NESD)
     INTEGER :: NEL, I, J, L, II, JJ
     REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
     REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
@@ -1357,7 +1287,6 @@
     !
     character(len=11) :: nomeA
     character(len=11) :: nomeB
-    integer :: ierr
     nomeA = "Alhs00.out."
     nomeB = "brhs00.out."
     !
@@ -1462,7 +1391,7 @@
         !
         CALL ZTEST(DISL,NEE2,ZERODL)
         !
-        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL),NEL)
+        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
         !
         !.... ASSEMBLE ELEMENT STIFFNESS MATRIX AND FORCE ARRAY INTO GLOBAL
         !        LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
@@ -1474,11 +1403,13 @@
         endif
 
         if (optSolverD=='pardiso')   then
-            call addlhsCRS(ALHSD,ELEFFMD,LMD(1,1,nel),ApGeo,AiGeo,NEE2)
+            write(*,*) ' não implementado '
+            stop 9
         endif
 
         if (optSolverD=='hypre')   then ! elast
-            call addnslHYPRE(A_HYPRE_G, ELEFFMD, LMD(1,1,nel), NEE2, LSYM) ! elast
+            write(*,*) ' não implementado '
+            stop 9
         endif
         !
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
@@ -1489,14 +1420,6 @@
 450     CONTINUE
         !
 500 CONTINUE
-    !
-    if (optSolverD=='hypre')   then   ! elast
-        do i = 1, neqD   ! elast
-            rows_G(i) = i-1    ! elast
-        end do   ! elast
-
-        call atribuirValoresVetor_HYPRE(b_HYPRE_G, 1, neqD, rows_G, BRHSD)   ! elast
-    end if   ! elast
 
     RETURN
     !
@@ -1753,9 +1676,7 @@
     !
     USE mFuncoesDeForma,   only: shlq3d, shg3d
     use mMalha,            only: local, numnp, multab
-    use mMalha,            only: nsd, numel, nen, numelReserv
-    use mSolverPardiso,    only: addlhsCRS
-    use mSolverHypre
+    use mMalha,            only: nsd, numel, nen
     !
     IMPLICIT NONE
     !
@@ -1781,7 +1702,7 @@
     REAL(8)  :: DETD(NINTD), WD(NINTD)
     REAL(8)  :: SHLD(NROWSH,NEN,NINTD),SHGD(NROWSH,NEN,NINTD)
     !
-    INTEGER :: NEL, I, J, L, K,ii,jj
+    INTEGER :: NEL, I, J, L
     !
     real*8, external :: rowdot, coldot
     REAL*8  :: C1, POISSON, YOUNGMOD, B
@@ -1914,7 +1835,7 @@
         !
         CALL ZTEST(DISL,NEE2,ZERODL)
         !
-        IF(.NOT.ZERODL) CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL),NEL)
+        IF(.NOT.ZERODL) CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
         !
         !.... ASSEMBLE ELEMENT STIFFNESS MATRIX AND FORCE ARRAY INTO GLOBAL
         !....      LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
@@ -1926,11 +1847,13 @@
         endif
 
         if (optSolverD=='pardiso')   then
-            call addlhsCRS(ALHSD,ELEFFMD,LMD(1,1,nel),ApGeo,AiGeo,NEE2)
+            write(*,*) ' não implementado '
+            stop 9
         endif
 
         if (optSolverD=='hypre')   then ! elast
-            call addnslHYPRE(A_HYPRE_G, ELEFFMD, LMD(1,1,nel), NEE2, LSYM) ! elast
+            write(*,*) ' não implementado '
+            stop 9
         endif
         !
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
@@ -1942,13 +1865,6 @@
 
 500 CONTINUE
 
-    if (optSolverD=='hypre')   then   ! elast
-        do i = 1, neqD   ! elast
-            rows_G(i) = i-1    ! elast
-        end do   ! elast
-
-        call atribuirValoresVetor_HYPRE(b_HYPRE_G, 1, neqD, rows_G, BRHSD)   ! elast
-    end if
     ! !
     RETURN
 2000 FORMAT('ELEMENTO (NEL)=',I5,2X,' C1, C2, C3, C4 =',4(1PE9.2,2X)/5X)
@@ -2036,7 +1952,7 @@
     !
     IMPLICIT NONE
     !
-    INTEGER  :: NROWSHD,  NROWB, NESD, IBBAR, I, J, K
+    INTEGER  :: NROWSHD,  NROWB, NESD, IBBAR, I, J
     REAL*8   :: CONSTB
     !
     REAL*8, DIMENSION(3)           :: B
@@ -2127,7 +2043,7 @@
     !
     !**** NEW ****************************************************************
     !
-    SUBROUTINE KDBCGEO(ELEFFM,ELRESF,DL,NEE,LM,NEL)
+    SUBROUTINE KDBCGEO(ELEFFM,ELRESF,DL,NEE,LM)
     !
     !.... PROGRAM TO ADJUST LOAD VECTOR FOR PRESCRIBED DISPLACEMENT
     !     BOUNDARY CONDITION
@@ -2136,7 +2052,7 @@
     !
     IMPLICIT NONE
     !
-    INTEGER :: NEE, NEL
+    INTEGER :: NEE
     REAL*8  :: ELEFFM(NEE,*),ELRESF(*),DL(*)
     INTEGER :: LM(*)
     !
@@ -2168,11 +2084,11 @@
     !.... PROGRAM TO COMPUTE ELEMENT STRESS AND VOLUMETRIC DEFORMATION
     !....            FROM GEOMECHANIC ELASTIC MODEL
     !
-    use mMalha,            only: nsd, numnp, numel, numelReserv
-    use mMalha,            only: XC, nen, LOCAL
-    use mGlobaisEscalares, only: NNP, nrowsh, LDRAINED
+    use mMalha,            only: nsd, numnp, numel
+    use mMalha,            only: nen, LOCAL
+    use mGlobaisEscalares, only: nrowsh, LDRAINED
     use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica,    only: YOUNG, GEOFORM, GEOINDIC
+    use mPropGeoFisica,    only: GEOINDIC
     !
     IMPLICIT NONE
     !
@@ -2183,7 +2099,7 @@
     !
     LOGICAL QUAD
     !
-    INTEGER :: I,J,K,L,NEL,NODE
+    INTEGER :: J,K,L,NEL
     !
     real*8, external :: coldot, rowdot
     REAL(8), DIMENSION(NESD,NEN)          :: XL
@@ -2313,9 +2229,9 @@
     !.... PROGRAM TO COMPUTE ELEMENT STRESS AND VOLUMETRIC DEFORMATION
     !....            FROM GEOMECHANIC ELASTIC MODEL
     !
-    use mMalha,            only: nsd, numnp, numel, numelReserv
-    use mMalha,            only: XC, nen, LOCAL
-    use mGlobaisEscalares, only: NNP,  nrowsh, LDRAINED
+    use mMalha,            only: nsd, numnp, numel
+    use mMalha,            only: nen, LOCAL
+    use mGlobaisEscalares, only: nrowsh, LDRAINED
     USE mfuncoesDeForma,   only: shlq3d, shg3d
     !
     IMPLICIT NONE
@@ -2325,9 +2241,7 @@
     REAL(8), DIMENSION(NROWB,NUMEL) :: STRS3D
     REAL(8), DIMENSION(NUMEL)       :: DIVU
     !
-    LOGICAL QUAD
-    !
-    INTEGER :: I,J,K,L,NEL,no
+    INTEGER :: J,K,L,NEL
     real*8, external :: coldot, rowdot
     !
     REAL(8), DIMENSION(NESD,NEN)          :: XL
@@ -2342,7 +2256,7 @@
     REAL(8), DIMENSION(NROWB)         :: STRAIN
     REAL(8), DIMENSION(NROWSH)        :: CCOEF
     !
-    REAL(8) :: POISSON,VOLUME,C1,xno, YOUNGMOD, B
+    REAL(8) :: POISSON,VOLUME,C1,YOUNGMOD, B
     !
     CALL SHLQ3D(SHLD,WD,NINTD,NEN)
     !
@@ -2466,10 +2380,10 @@
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR CREEP MODEL
     !
     use mMalha,            only: nsd, numnp, numel, nen, LOCAL
-    use mMalha,            only: numelReserv, multab
-    use mGlobaisEscalares, only: nrowsh, nnp
+    use mMalha,            only: multab
+    use mGlobaisEscalares, only: nrowsh
     use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica,    only: YOUNG, PORE, PORE0
+    use mPropGeoFisica,    only: YOUNG
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC, FNCMECLAW
     !
     IMPLICIT NONE
@@ -2500,7 +2414,7 @@
     REAL(8) :: SHGBR(NROWSH,NEN)
     REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
 
-    REAL(8) :: POISSON, xpoisson
+    REAL(8) :: POISSON
     REAL(8) :: GTIMES2, GTIMES3, BULKROCK, TRCSTRS
     REAL(8) :: GAMMA,FX,DERFX,DELTAG, QTRIAL, ROOT3D2
     !
@@ -2640,7 +2554,7 @@
     !**** NEW **** FOR STOCHASTIC AND NON-LINEAR FORMULATION *****************
     !
     SUBROUTINE GEOSETUP(YOUNG,GEOFORM, &
-        &                     NUMEL,NROWB,NINTD,NROWB2,IOPT)
+        &                     NUMEL,NROWB,NINTD,IOPT)
     !
     use mPropGeoFisica,    only: GEOINDIC
     !
@@ -2648,7 +2562,7 @@
     !
     !.... PROGRAM TO SETUP INITIAL INELASTIC TANGENT MATRIX
     !
-    INTEGER :: NUMEL,NROWB,NINTD,NROWB2,IOPT
+    INTEGER :: NUMEL,NROWB,NINTD,IOPT
     !
     !.... NEXT LINES: GLOBAL VECTORS AND MATRIZES
     !
@@ -2770,7 +2684,7 @@
     !
     use mMalha,            only: NSD
     use mGlobaisEscalares, only: S3DIM
-    use mPropGeoFisica,    only: YUNGVECT, POISVECT, GRAINBLK
+    use mPropGeoFisica,    only: POISVECT, GRAINBLK
     use mPropGeoFisica,    only: YOUNG, GEOFORM, BULK
     !
     IMPLICIT NONE
@@ -2833,7 +2747,6 @@
     !
     !..... PROGRAM TO SETUP TANGENT MATRIX
     !
-    USE mGlobaisEscalares, only: nnp
     !
     IMPLICIT NONE
     !
@@ -2842,7 +2755,7 @@
     !
     REAL*8 :: UNITVECT(4),UNITTENS(4,4),DEVPROJ(4,4),QIXI(4,4)
     REAL*8 :: DEVSTRS(4), VECTNORM, X
-    REAL*8 :: BLOCOA, BLOCO2G, BLOCO6G2, BLOCOG2
+    REAL*8 :: BLOCOA, BLOCO2G, BLOCO6G2
     INTEGER :: I, J
     !
     UNITVECT(1)=1.0D0
@@ -3018,10 +2931,9 @@
     !
     !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
     !
-    SUBROUTINE PRINT_DX(DIS ,PORE  ,P     ,S     ,MASCN ,STRSS0, &
+    SUBROUTINE PRINT_DX(DIS ,PORE  ,P     ,S     ,MASCN , &
         &                    VC  ,AVSTRS,NDOF2 ,NUMEL ,NROWB ,NUMNP)
     !
-    use mMalha,            only: XC
     USE mGlobaisEscalares, only: NUMDX, NNP
     use mLeituraEscritaSimHidroGeoMec,   only: PRINT_DXINFO, IFEDX, PATHDX
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC
@@ -3048,12 +2960,11 @@
     REAL(8), DIMENSION(NDOF2,*)     :: VC
     REAL(8), DIMENSION(NUMEL)       :: PORE,P,S,MASCN
     REAL(8), DIMENSION(NROWB,NUMEL) :: AVSTRS
-    REAL(8), DIMENSION(NROWB,NUMEL) :: STRSS0
     !
     REAL(8), DIMENSION(NROWB)       :: TENSAO, DEVSTRS
     !
-    REAL(8) :: ROOT3D2,TRCSTRS,QTRIAL,STRIAL,SPORE,SBLNC
-    REAL(8) :: PHIDRO, ROOT, S1, S2, S3, TAU, SIGMAN
+    REAL(8) :: ROOT3D2,TRCSTRS,QTRIAL,STRIAL,SPORE
+    REAL(8) :: PHIDRO, ROOT, S1, S2
     !
     DATA ROOT3D2/1.224744871391589D0/
     !
@@ -3301,34 +3212,27 @@
     !
     !**** NEW ****************************************************************
     !
-    SUBROUTINE PRSRINIT(GEOPRSR,P,XC,NUMEL,numelReserv,LDRAINED)
+    SUBROUTINE PRSRINIT(GEOPRSR,P,NUMEL,numelReserv,LDRAINED)
     !
     !.... PROGRAM TO SETUP INITIAL HIDROSTATIC PRESSURE
     !
-    use mLeituraEscritaSimHidroGeoMec,   only: PATHDX,SOLIDONLY
+    use mLeituraEscritaSimHidroGeoMec,   only: SOLIDONLY
     use mGlobaisEscalares, only: TypeProcess
-    use mGlobaisArranjos,  only: GRAV
-    use mMalha,            only: NEN, NSD, LEFTLINE, RGHTLINE
-    use mPropGeoFisica,    only: GEOFORM, FNCMECLAW, RHOW, RHOO
-    use mPropGeoFisica,    only: PWELL, XTERLOAD
-    use mPropGeoFisica,    only: nelXReserv,nelYReserv,nelZReserv
+    use mMalha,            only: LEFTLINE, RGHTLINE
+    use mPropGeoFisica,    only: GEOFORM, FNCMECLAW
+    use mPropGeoFisica,    only: XTERLOAD
     !
-    use mPropGeoFisica,    only: BULKWATER, GRAINBLK
-    use mPropGeoFisica,    only: PORELAGR, YOUNG, POISVECT
-    use mPropGeoFisica,    only: MEANDENS, MEANBULK, RHODVECT, BULK
-    use mPropGeoFisica,    only: MEANRHOW, MEANBLKW, YUNGVECT
+    use mPropGeoFisica,    only: BULK
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC
     !
     IMPLICIT NONE
     !
-    INTEGER ::  i,NEL, NUMEL, NUMELRESERV, NELFIRST,NELSTEP,K
+    INTEGER ::  NEL, NUMEL, NUMELRESERV
     !
     LOGICAl :: LDRAINED
     REAL(8), DIMENSION(NUMEL)         :: GEOPRSR
     REAL(8), DIMENSION(1,numelReserv) :: P
-    REAL*8,  DIMENSION(NSD,NUMEL)     :: XC
     REAL*8  :: THREEA, BSKEM, UNDRAINU, PLOAD
-    REAL*8  :: ALPHASS, ALPHASF, ALPHARF, BULKROCK
     !
     IF (LDRAINED) THEN
         DO 100 NEL=1,numel
@@ -3388,34 +3292,27 @@
     !
     !**** NEW ****************************************************************
     !
-    SUBROUTINE PRSRINIT3D(GEOPRSR,P,XC,NUMEL,numelReserv,LDRAINED)
+    SUBROUTINE PRSRINIT3D(GEOPRSR,P, NUMEL,numelReserv,LDRAINED)
     !
     !.... PROGRAM TO SETUP INITIAL HIDROSTATIC PRESSURE
     !
     use mGlobaisEscalares, only: TypeProcess
-    use mGlobaisArranjos,  only: GRAV
-    use mLeituraEscritaSimHidroGeoMec, only: PATHDX, SOLIDONLY
-    use mMalha,            only: NEN, NSD, LEFTLINE, RGHTLINE
-    use mPropGeoFisica,    only: GEOFORM, FNCMECLAW, RHOW, RHOO
-    use mPropGeoFisica,    only: PWELL, XTERLOAD
-    use mPropGeoFisica,    only: nelXReserv,nelYReserv,nelZReserv
+    use mLeituraEscritaSimHidroGeoMec, only: SOLIDONLY
+    use mMalha,            only: LEFTLINE, RGHTLINE
+    use mPropGeoFisica,    only: GEOFORM, FNCMECLAW
+    use mPropGeoFisica,    only: XTERLOAD
     !
-    use mPropGeoFisica,    only: BULKWATER, GRAINBLK
-    use mPropGeoFisica,    only: PORELAGR, YOUNG, POISVECT
-    use mPropGeoFisica,    only: MEANDENS, MEANBULK, RHODVECT, BULK
-    use mPropGeoFisica,    only: MEANRHOW, MEANBLKW, YUNGVECT
+    use mPropGeoFisica,    only: BULK
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC
     !
     IMPLICIT NONE
     !
-    INTEGER ::  i,NEL, NUMEL, NUMELRESERV, NELFIRST,NELSTEP,K
+    INTEGER ::  NEL, NUMEL, NUMELRESERV
     !
     LOGICAl :: LDRAINED
     REAL(8), DIMENSION(NUMEL)         :: GEOPRSR
     REAL(8), DIMENSION(1,numelReserv) :: P
-    REAL*8,  DIMENSION(NSD,NUMEL)     :: XC
     REAL*8  :: THREEA, BSKEM, UNDRAINU, PLOAD
-    REAL*8  :: ALPHASS, ALPHASF, ALPHARF, BULKROCK
     !
     IF (LDRAINED) THEN
         DO 100 NEL=1,numel
@@ -3424,20 +3321,7 @@
             endif
             !.... ...projection of reservoir pressure to boundary condition for test
 100     CONTINUE
-        !         nelFirst = nelXReserv-nelYReserv+1
-        !         nelStep  = nelXReserv*nelYReserv
-        !         write(2020,4500) numelReserv,nelXReserv
-        !         DO 150 NEL=nelXReserv,numelReserv,nelXReserv
-        !            k = nel/nelXReserv
-        !            PWELL(NEL/nelXReserv) = P(1,NEL)
-        !             write(2020,4500) nel, K, (xc(i,nel),i=1,nsd), pwell(K)
-        !             write(2020,1000) (xc(i,nel),i=1,nsd)  !, pwell(K)
-        !150   CONTINUE
-        !
-        !         DO 150 NEL=nelFirst,numelReserv,nelStep
-        !            K = nel/nelstep + 1
-        !            PWELL(K) = P(1,NEL)
-        !150      CONTINUE
+        
         RETURN
     ENDIF
     !
@@ -3524,7 +3408,7 @@
     use mGlobaisEscalares, only: SALTCREEP, S3DIM
     use mMalha,          only: POSTLINE, SALTLINE, RTOPLINE
     use mMalha,          only: RBTTLINE, RIFTLINE, IDOME
-    use mPropGeoFisica,  only: RHOW, BULKWATER, SEADEPTH, GRAINBLK
+    use mPropGeoFisica,  only: SEADEPTH, GRAINBLK
     use mPropGeoFisica,  only: DOMESURF, PORELAGR, YOUNG, POISVECT
     use mPropGeoFisica,  only: MEANDENS, MEANBULK, RHODVECT, BULK
     use mPropGeoFisica,  only: MEANRHOW, MEANBLKW
@@ -3539,7 +3423,6 @@
     REAL(8) :: XC, YC, ADDPRSR, DENSRSRV, BULKRSRV, WEIGHT
     REAL(8) :: SOMAPARC, SOMA, YMIN, YMAX, G, RHOEQ, BULKEQ
     REAL(8) :: BULKROCK, BIOTCOEF, POROSITY, ONEMPORE
-    REAL(8), DIMENSION(4) :: YMARK
     CHARACTER(6) :: TASK
     !
     SOMA     = 0.0D0
@@ -3784,20 +3667,14 @@
     !
     SUBROUTINE VECTOR_SOURC(satElem, p, GEOPRSR, brhsd, lmD)
     !
-    use mGlobaisEscalares, only: nrowsh, S3DIM, LDRAINED
+    use mGlobaisEscalares, only: nrowsh, LDRAINED
     use mGlobaisArranjos,  only: grav
     use mSolverGaussSkyline, only: addrhs
     use mFuncoesDeForma,   only: shgq,shlq
     use mMalha,            only: local, multab
-    use mMalha,            only: X, conecNodaisElem,xc
-    use mMalha,            only: numnp, numel, nen, nsd, numelReserv
-    use mPropGeoFisica,    only: YOUNG, GRAINBLK, RHODVECT, PORELAGR
-    use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
-    use mPropGeoFisica,    only: GEOFORM, GEOINDIC, BULK
-    use mPropGeoFisica,    only: PORE
-    !
-    use mHidroDinamicaRT, only: PRESSAOREF, COTAREF
-    use mSolverHypre
+    use mMalha,            only: X, conecNodaisElem
+    use mMalha,            only: numel, nen, nsd, numelReserv
+    use mPropGeoFisica,    only: GEOINDIC, BULK
     !
     !.... PROGRAM TO COMPUTE PLASTIC DEFORMATION OVER THE MACRO DOMAIN
     !
@@ -3827,9 +3704,7 @@
     REAL(8) :: SHGBR(NROWSH,NEN)
     REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
     !
-    REAL(8) :: C1, BULKROCK, BIOTCOEF, POROSITY, ONEMPORE, RHOTOTAL
-    REAL(8) :: RHOMAT, DENSOLID, DENFLUID, SATURAT, ONEMSAT
-    REAL(8) :: BULKGRAIN, BULKFLUD, POISSON, RHOWLIN, RHOOLIN
+    REAL(8) :: C1, RHOTOTAL
     INTEGER :: NEL, I, L, II, JJ
     !
     real(8) :: curP, curSat
@@ -3929,21 +3804,13 @@
         CALL ZTEST(DISL,NEE2,ZERODL)
         !
         IF (.NOT.ZERODL) &
-            &      CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL),NEL)
+            &      CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
         !
         !.... ASSEMBLE ELEMENT FORCE ARRAY INTO GLOBAL RIGHT-HAND SIDE VECTOR
         !
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
         !
 500 CONTINUE
-    !
-
-    if (optSolverD=='hypre')   then
-        do i = 1, neqD
-            rows_G(i) = i-1
-        end do
-        call atribuirValoresVetor_HYPRE(b_HYPRE_G, 1, neqD, rows_G, BRHSD)
-    endif
 
     RETURN
 4500 FORMAT(I7,X,40(1PE15.8,2X))
@@ -3957,7 +3824,7 @@
     !
     !.... PROGRAM TO COMPUTE DENSITY FUNCTION OF PRESSURE OR COORDINATE
     !
-    use mHidroDinamicaRT, only: PRESSAOREF, COTAREF
+    use mHidroDinamicaRT, only: PRESSAOREF
     use mPropGeoFisica,    only: YOUNG, PORE
     use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
     use mPropGeoFisica,    only: BULK, GEOFORM, GEOINDIC
@@ -3974,7 +3841,7 @@
     REAL(8) :: NU, BULKROCK, BULKGRAIN, ALPHABIOT
     !
     real*8, external :: coldot
-    REAL(8) :: RHOMAT, DENsolid0, DENFLUID0
+    REAL(8) :: RHOMAT, DENFLUID0
     REAL(8) :: PRESSURE(NROWB)
     !
     !.... COMPUTE TOTAL DENSITY
@@ -4052,8 +3919,8 @@
     use mSolverGaussSkyline, only: addrhs
     USE mfuncoesDeForma,   only: shlq3d, shg3d
     use mMalha,            only: local, multab
-    use mMalha,            only: X, conecNodaisElem, xc
-    use mMalha,            only: numnp, numel, nen, nsd, numelReserv
+    use mMalha,            only: X, conecNodaisElem
+    use mMalha,            only: numel, nen, nsd, numelReserv
     !
     !.... PROGRAM TO COMPUTE PLASTIC DEFORMATION OVER THE MACRO DOMAIN
     !
@@ -4061,7 +3928,7 @@
     !
     !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
     !
-    LOGICAL DIAG,QUAD,ZERODL
+    LOGICAL ZERODL
     !
     !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
     !
@@ -4079,10 +3946,10 @@
     REAL(8) :: BBARI(NROWB,NESD), PRESSURE(NROWB)
     REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
     REAL(8) :: SHGBR(NESD,NEN)
-    REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
+    REAL(8) :: DETD(NINTD), WD(NINTD)
     !
     REAL(8) :: C1, RHOTOTAL
-    INTEGER :: NEL, I, J, L, II, JJ, k
+    INTEGER :: NEL, I, J, L
 
     real*8, external :: rowdot, coldot
 
@@ -4171,7 +4038,7 @@
         CALL ZTEST(DISL,NEE2,ZERODL)
         !
         IF (.NOT.ZERODL) &
-            &      CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL),NEL)
+            &      CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
         !
         !.... ASSEMBLE ELEMENT FORCE ARRAY INTO GLOBAL RIGHT-HAND SIDE VECTOR
         !
@@ -4204,9 +4071,7 @@
     !
     IMPLICIT NONE
     !
-    LOGICAL QUAD
-    !
-    INTEGER :: I,J,K,L,NEL, NUMEL, numelReserv
+    INTEGER :: NEL, NUMEL, numelReserv
     !
     !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
     !
@@ -4216,10 +4081,10 @@
     !
     !.... ..LOCAL VECTORS AND MATRIZES
     !
-    REAL(8) :: POISSON, DIFFDIVU, DIFFPRES
+    REAL(8) :: DIFFDIVU, DIFFPRES
     !
     REAL(8) :: BULKROCK, BIOTCOEF
-    REAL(8) :: BULKFLUID, DEFNM1, DEFMM1, JACOBIAN
+    REAL(8) :: DEFNM1, DEFMM1, JACOBIAN
     !
     DO 500 NEL=1,NUMELRESERV
         !
@@ -4286,10 +4151,10 @@
     !
     use mLeituraEscritaSimHidroGeoMec,   only: CODERROR
     use mMalha,            only: nen, LOCAL
-    use mMalha,            only: nsd, numnp, numel, numelReserv
+    use mMalha,            only: nsd, numnp, numel
     use mGlobaisEscalares, only: nrowsh
     use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica,    only: YOUNG, PORE, PORE0, GRAINBLK
+    use mPropGeoFisica,    only: YOUNG
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC
     !
     !.... PROGRAM TO COMPUTE SOLID ELEMENT: STRESS AND VOLUMETRIC DEFORMATION
@@ -4461,14 +4326,13 @@
     !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
     !
     LOGICAL QUAD
-    real(8) :: xl(nesd,nen), disl(ned2,nen), AREA, xdivu, c1
+    real(8) :: xl(nesd,nen), disl(ned2,nen), AREA, c1
     REAL*8  :: POISSON
     integer :: nel, l, j, k
     real*8, external :: rowdot, coldot
     !
     !.... ..LOCAL VECTORS AND MATRIZES
     !
-    REAL(8) :: DIVULOC(NUMEL)
     REAL(8) :: UNITVEC(NROWB),BBARJ(NROWB,NESD)
     REAL(8) :: CBBAR(NROWB, NROWB)
     REAL(8) :: SHLD(NROWSH,NEN,NINTD), SHGD(NROWSH,NEN,NINTD)
@@ -4479,7 +4343,7 @@
     !
     REAL*8 :: STRAIN(NROWB),DEVSTRS(NROWB)
     REAL*8  :: ROOT3D2, TRCSTRS, QVM, JACOBIAN
-    REAL(8) :: BIOTMOD, BULKROCK, BIOTCOEF
+    REAL(8) :: BULKROCK, BIOTCOEF
     REAL(8) :: DEFNM1, DEFMM1, DIFFDIVU, DIFFPRES
 
     UNITVEC(1)= 1.0D0

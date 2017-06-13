@@ -52,21 +52,15 @@
     !
     subroutine hidroGeomecanicaRT(satElemL,satElemL0,SIGMAT,SIGMA0,TIMEINJ)
     !
-    use mGlobaisArranjos,  only : mat, c, beta
     use mGlobaisEscalares, only : tempoSolverVel,tempoMontagemVel,tempoTotalPressao
-    use mGlobaisEscalares, only : dtBlocoTransp, tTransporte
-    use mGlobaisEscalares, only : nvel, nnp
+    use mGlobaisEscalares, only : dtBlocoTransp
     use mMalha,            only : conecNodaisElem, conecLadaisElem
-    use mMalha,            only : numel, numelReserv, nsd, nen
-    use mMalha,            only : x, xc,numLadosReserv, numLadosElem
-    use mMalha,            only : listaDosElemsPorFace
-    use mPropGeoFisica,    only : phi, phi0, nelx, nely, nelz
-    use mPropGeoFisica,    only : calcphi, hx, hy
-    use mPropGeoFisica,    only : permkx, xkkc, xltGeo
-    use mSolverPardiso,    only : solverPardisoCSR
+    use mMalha,            only : numelReserv, nsd, nen
+    use mMalha,            only : numLadosReserv, numLadosElem
+    use mPropGeoFisica,    only : phi, phi0
+    use mPropGeoFisica,    only : xkkc, xltGeo
 
     use mSolverGaussSkyline, only : solverGaussSkyline
-    use mSolverHypre
     !
     implicit none
     !
@@ -74,23 +68,6 @@
     real*8 :: SIGMAT(numelReserv), SIGMA0(numelReserv)
     !
     real*8  :: t1, t2, t3, TIMEINJ
-    integer :: i, nel, arq
-    character (len=80) :: nomeArqVel, nomeArqPres
-    real*8 :: difP, difV, difS
-    real(8) :: xlambda,xmu,bal,maxBal
-    real(8), save :: tTeste
-    real(8) :: elemAnt, elemDep, dx
-    real(8) :: difVel, maxDifVel, minDifVel
-
-    real*8  ::  final_res_norm, tol
-    integer :: num_iterations
-    !
-#ifdef debug
-    nomeArqVel ="velocidadeLadal_RT.txt"
-    nomeArqPres="pressao_RT.txt"
-    open(unit=206, file=nomeArqVel)
-    open(unit=207, file=nomeArqPres)
-#endif
     !
     print*, "calculando a HIDRODINAMICA"
     !
@@ -103,14 +80,11 @@
     !
     call timing(t1)
 
-    call montarSistEqAlgVelocidade(nsd,satElemL,satElemL0, &
+    call montarSistEqAlgVelocidade(satElemL,satElemL0, &
         &     PHI,PHI0,SIGMAT,SIGMA0,TIMEINJ)
     !
     call timing(t2)
     !
-#ifdef mostrarTempos
-    write(*,*) ' tempo montagem do sistema da velocidade ', t2-t1
-#endif
     tempoMontagemVel=tempoMontagemVel+(t2-t1)
     !
     write(*,'(a)', ADVANCE='NO') 'solucao do sistema de eq, VELOCITY, '
@@ -118,14 +92,11 @@
     call timing(t3)
     call btod(idVeloc,velocLadal,brhsV,ndofV,numLadosReserv)
 
-#ifdef mostrarTempos
-    write(*,*) ' tempo do solver velocidade', t3-t2
-#endif
     tempoSolverVel=tempoSolverVel+(t3-t2)
     !
     print*, "Calculando Pressao"
     call timing(t1)
-    call calcularPressaoRT (x, conecNodaisElem, conecLadaisElem,   &
+    call calcularPressaoRT (conecLadaisElem,   &
         pressaoElem, pressaoElemAnt, velocLadal, &
         satElemL, satElemL0, dtBlocoTransp, SIGMAT, SIGMA0)
     !
@@ -135,9 +106,6 @@
     !
     call timing(t2)
     !
-#ifdef mostrarTempos
-    write(*,*) ' Tempo para calculo da Pressao', t3-t2
-#endif
     tempoTotalPressao=tempoTotalPressao+(t2-t1)
 
     contains
@@ -151,42 +119,15 @@
     end if
     !
     if (optSolverV=='pardiso') then
-        write(*,'(2a)') ' direto ', optSolverV
-        call solverPardisoCSR(alhsV, brhsV, ApVel, AiVel, ptV, iparmV, dparmV,  &
-            &        neqV, nalhsV, simetriaVel, 'vel', 'full')
+        write(*,*) ' não implementado '
+        stop 9
     end if
     !
     if(optSolverV=='hypre') then
-
-        write(*,'(2a)') ' iterativo ', optSolverV
-
-        call fecharMatriz_HYPRE         (A_HYPRE_V, parcsr_A_V)
-        call fecharVetor_HYPRE          (b_HYPRE_V, par_b_V   )
-        call fecharVetor_HYPRE          (u_HYPRE_V, par_u_V   )
-
-        if(.not.allocated(initialGuess_V)) then
-            allocate(initialGuess_V(neqV)); initialGuess_V=0.0
-        endif
-
-        solver_id_V  = 1
-        precond_id_V = 1
-        tol = 1.0e-12
-        call resolverSistemaAlgHYPRE (A_HYPRE_V, parcsr_A_V, b_HYPRE_V, par_b_V, u_HYPRE_V, par_u_V, &
-            solver_V, solver_id_V, precond_id_V, tol,    &
-            num_iterations, final_res_norm, initialGuess_V, brhsV, rows_V, neqV, myid, mpi_comm)
-
-        call extrairValoresVetor_HYPRE(u_HYPRE_V, 1, neqV, rows_V,BRHSV)
-        initialGuess_V=brhsV
-
-        call destruirMatriz_HYPRE(A_HYPRE_V)
-        call destruirVetor_HYPRE (b_HYPRE_V)
-        call destruirVetor_HYPRE (u_HYPRE_V)
-
-        call criarMatriz_HYPRE  (A_HYPRE_V, Clower_V, Cupper_V, mpi_comm )
-        call criarVetor_HYPRE   (b_HYPRE_V, Clower_V, Cupper_V, mpi_comm )
-        call criarVetor_HYPRE   (u_HYPRE_V, Clower_V, Cupper_V, mpi_comm )
-
+        write(*,*) ' não implementado '
+        stop 9
     endif!
+    
     write(*,*) "Valores nos extremos do vetor solucao Velocidade RT,  "
     write(*,'(5e16.8)') brhsV(1     :5)
     write(*,'(5e16.8)') brhsV(neqV-4: neqV)
@@ -212,19 +153,16 @@
     !
     !**** new **********************************************************************
     !
-    subroutine montarSistEqAlgVelocidade(nsd,satElemL,satElemL0, &
+    subroutine montarSistEqAlgVelocidade(satElemL,satElemL0, &
         &           PHI,PHI0,SIGMAT,SIGMA0,TIMEINJ)
     !
-    use mGlobaisEscalares,    only: dtBlocoTransp, nnp, nvel
+    use mGlobaisEscalares,    only: dtBlocoTransp
     use mMalha,               only: x, conecNodaisElem
-    use mMalha,               only: conecLadaisElem, numLadosElem
-    use mMalha,               only: numLadosReserv, numelReserv, numel
-    use mMalha,               only: listaDosElemsPorFace
+    use mMalha,               only: conecLadaisElem
+    use mMalha,               only: numLadosReserv, numelReserv
     !
     implicit none
     !
-    integer, intent(in) :: nsd
-    integer :: i
     real*8  :: satElemL(numelReserv), satElemL0(numelReserv)
     REAL(8) :: PHI(numelReserv), PHI0(numelReserv)
     REAL(8) :: SIGMAT(numelReserv), SIGMA0(numelReserv)
@@ -252,25 +190,20 @@
 
     use mSolverGaussSkyline,only:addrhs, addlhs
     use mGlobaisEscalares, only: nrowsh, npint, nnp
-    use mGlobaisEscalares, only: ligarBlocosHetBeta, iflag_beta
     use mGlobaisEscalares, only: S3DIM
-    use mGlobaisArranjos,  only: grav, c, mat, beta
+    use mGlobaisArranjos,  only: grav, mat
     use mfuncoesDeForma,   only: shlq, shlqrt,shgq, shgqrt
     use mfuncoesDeForma,   only: shlq3d, shg3d, shlqrt3d, shgqrt3d
     use mMalha,            only: local, nsd
     use mMalha,            only: numnp, numel, numelReserv
     use mMalha,            only: numLadosElem, numLadosReserv, nen
-    use mPropGeoFisica,    only: nelxReserv, nelyReserv, nelzReserv
     use mPropGeoFisica,    only: xkkc,xkkcGeo,xlt,xltGeo, xlo, xlw
-    use mPropGeoFisica,    only: perm, permkx, permky, permkz
-    use mPropGeoFisica,    only: gf1, gf2, gf3, PWELL, rhow,rhoo
-    use mSolverPardiso,    only: addlhsCRS
+    use mPropGeoFisica,    only: permkx, permky, permkz
+    use mPropGeoFisica,    only: gf1, gf2, gf3, rhow,rhoo
     !..4COMPRESSIBILITY:
     use mPropGeoFisica,    only: YOUNG, POISVECT, BULK,GRAINBLK
-    use mPropGeoFisica,    ONLY: BULKWATER, BULKOIL
     !        USE mMCMC,             ONLY: ELEM_CONDP
     use mPropGeoFisica,    only: hx,hy,hz
-    use mSolverHypre
     !
     !.... program to calculate stifness matrix and force array for a
     !     singular problem element in one dimension
@@ -309,7 +242,7 @@
     integer :: nee, neesq
     !
     integer :: nel, m
-    integer :: l, i, j, k
+    integer :: l, i, j
     real*8  :: pi
     real*8  :: pix, piy, piz, sx, sy, sz, cx, cy, cz
     !
@@ -317,10 +250,10 @@
     real(8) :: h,h2,xx,yy,zz,du,dux,duy,duz,xindi,xindj,ff
     real(8) :: c1,phii1,phii2,phii3,phij1,phij2,phij3
     real(8) :: a11,a22,a33,divphij,divphii
-    real(8) :: swint,pp
+    real(8) :: pp
     real(8) :: dt
     !
-    integer :: tid, omp_get_thread_num,omp_get_num_threads
+    integer :: tid
     integer :: numPrimeiroElemento, numUltimoElemento
     integer :: numThreads, inicioSol, fimSol
     !
@@ -329,12 +262,11 @@
     !...
     !... BEGIN CATALOG FOR ITERATIVE FORMULATION FOR COMPRESSIBILTY
     !
-    REAL(8) :: BULKROCK, BETACOM, BIOTCOEF, BETAT, BETAT0, BETA4P
+    REAL(8) :: BULKROCK, BIOTCOEF, BETAT, BETAT0, BETA4P
     !
-    REAL(8) :: ALAM, AMU2, XBULK, POISSON, BETAGEO, COEFSIGM
+    REAL(8) :: BETAGEO, COEFSIGM
     REAL(8) :: DIFSIGMA, AT
     INTEGER :: NELWELL
-    REAL(8) :: XNELWELL,PRESAUX
     !
     !... END CATALOG FOR FOR ITERATIVE FORMULATION
     !
@@ -356,19 +288,6 @@
         call shlq3d  (shl,w,npint,nen)
         call shlqrt3d(numLadosElem,npint,w,shlrt)
     endif
-    !
-    ! $OMP PARALLEL FIRSTPRIVATE(tid) &
-    ! $OMP PRIVATE (numPrimeiroElemento, numUltimoElemento, inicioSol,fimSol) &
-    ! $OMP PRIVATE (xxlw,xxlo,xxlt,lambdab,xk,yk,h,h2,hx,hy,delta,theta, xl,fluxl,shg,shgrt,a11,a22,a33) &
-    ! $OMP PRIVATE (divphij,divphii ,phii1, phii2, phij1, phij2, AMU2, ALAM, XBULK,det,c1,xindi,xindj,vnl,nel,i,j,l,pp,m) &
-    ! $OMP REDUCTION(+:elert,elfrt) !,brhs,alhs)
-    !
-    ! #ifdef withOMP
-    !         tid=tid+omp_get_thread_num()
-    !         numThreads=omp_get_num_threads()
-    ! #endif
-    !
-    !       if(tid==1) print*, "Em Velocidade, numThreads=",numThreads
     !
     numPrimeiroElemento = 1
     numUltimoElemento   = numelReserv
@@ -560,18 +479,12 @@
             DO NELWELL=1,NCONDP
                 IF(NEL.EQ.ELEM_CONDP(NELWELL))THEN
                     CALL DIRICHLET_POCO_GRAVIDADE(PRESPROD,NEL,HY,NCONDP, &
-                        GF2,NELWELL,satElemL,pressao)
+                        GF2,NELWELL,satElemL)
                     XINDJ = VNL(1,2)+VNL(2,2)
                     ELFRT(2)=ELFRT(2)-(PRESPRODWELL(NELWELL))*XINDJ*(HY)
                     EXIT
                 END IF
             END DO
-            !             IF (MOD(NEL,nelxReserv).EQ.0) THEN
-            !                XINDJ = VNL(1,2)+VNL(2,2)
-            !                K = NEL/nelxReserv
-            !!                 write(2028,4500) NEL/nelxReserv, PWELL(NEL/nelxReserv)
-            !                ELFRT(2)=ELFRT(2)-deplet(at,PWELL(K))*XINDJ*HY
-            !             END IF
         ENDIF
         !
         call ztest(fluxl,nee,zerol)
@@ -586,79 +499,22 @@
             call addlhs(alhs,elert,lmV(1,1,nel),idiagV,nee,diag,lsym)
         endif
         if (optSolverV=='pardiso')   then
-            call addlhsCRS(alhs,elert,lmV(1,1,nel),ApVel, AiVel,nee)
+            write(*,*) ' não implementado '
+            stop 9
         endif
         if (optSolverV=='hypre')   then
-            call addnslHYPRE(A_HYPRE_V, elert, LMV(1,1,nel), nee, lsym)
+            write(*,*) ' não implementado '
+            stop 9
         endif
 
         call addrhs(brhs,elfrt,lmV(1,1,nel),nee)
         !
 500 continue
 
-    ! $OMP END PARALLEL
-
-    if (optSolverV=='hypre')   then
-        do i = 1, neqV
-            rows_V(i) = i-1
-        end do
-        call atribuirValoresVetor_HYPRE(b_HYPRE_V, 1, neqV, rows_V, BRHS)
-    endif
-
     RETURN
 4500 FORMAT(I8,X,40(1PE15.8,2X))
     !
     end subroutine
-    !*** NEW ***** FUNCTION TO COMPUTE ROCK BULK MODULUS  *******************
-    !
-    FUNCTION deplet(tempo, pinit)
-    !
-    use mGlobaisEscalares, only: tt
-    !
-    !... COMPUTE LINEAR FACTOR TO DEPLET PRESSURE
-    !
-    IMPLICIT NONE
-    !
-    REAL(8) :: tempo, deplet, depletlin, pinit
-    !
-    !      IF (TEMPO.LT.0.5D0*TT) THEN
-    !            DEPLETLIN = pinit !  - 0.5D0*TEMPO/TT
-    !         ELSE
-    !       DEPLETLIN = pinit*(1.0D0-0.183333D0*(tempo/tt))
-    !      ENDIF
-    !
-    !      DEPLETLIN = pinit - 7584.233D0*TEMPO
-    DEPLET =  pinit  !0.0d0 !1.0D0 !   DEPLETLIN !
-    !
-    END FUNCTION
-    !
-    !*** NEW ***** FUNCTION TO COMPUTE ROCK BULK MODULUS  *******************
-    !
-    FUNCTION deplet_old(tempo)
-    !
-    use mGlobaisEscalares, only: tt
-    !
-    !... COMPUTE LINEAR FACTOR TO DEPLET PRESSURE
-    !
-    IMPLICIT NONE
-    !
-    REAL(8) :: tempo, deplet_old, depletlin
-    !
-    IF (TEMPO.LT.0.5D0*TT) THEN
-        DEPLETLIN = 1.0D0 !  - 0.5D0*TEMPO/TT
-    ELSE
-        DEPLETLIN = 0.01D0
-    ENDIF
-    !
-    !      IF (TEMPO.LT.0.5D0*tt) THEN
-    !            depletlin = 1.0d0 - 0.5d0*tempo/tt
-    !         ELSE
-    !            depletlin = 0.75D0
-    !      ENDIF
-    !
-    deplet_old =  DEPLETLIN ! 0.0d0  !
-    !
-    END FUNCTION
     !
     !*** NEW ***** FUNCTION TO COMPUTE RECIPROCAL OF BIOT MODULUS ***********
     !
@@ -667,12 +523,11 @@
     !... COMPUTE RECIPROCAL OF BIOT MODULUS,THUS 1/M: REFERENCE CHENG.PDF
     !
     use mPropGeoFisica,    ONLY: BULKWATER, BULKOIL, GRAINBLK
-    use mPropGeoFisica,    ONLY: RHOW, RHOO
     !
     IMPLICIT NONE
     !
-    REAL(8) :: ALPHA, SATDENSW, SATDENSO, DENSITEQ
-    REAL(8) :: BIOTMOD, POROSITY, SAT, BULKFLUID
+    REAL(8) :: ALPHA
+    REAL(8) :: BIOTMOD, POROSITY, SAT
     REAL(8) :: BIOTAGUA, BIOTOLEO, ONEOVERN
     !
     !new
@@ -713,14 +568,9 @@
     !
     !**** new *************************************************************
     !
-    !old      subroutine calcularPressaoRT (x, conecNodaisElem, conecLadaisElem,  &
-    !old                          pressaoElem, pressaoElemAnt, velocLadal, satElem, dtBlocoTransp,         &
-    !old                          SIGMAT,SIGMA0)
-    !
     !Next Line Modified for Iterative Hidrodinamic and Transport
     !
-    subroutine calcularPressaoRT (x, conecNodaisElem, &
-        &           conecLadaisElem, pressaoElem, pressaoElemAnt,&
+    subroutine calcularPressaoRT (conecLadaisElem, pressaoElem, pressaoElemAnt,&
         &           velocLadal, satElemL, satElemL0, dtBlocoTransp,&
         &           SIGMAT,SIGMA0)
     !
@@ -731,11 +581,10 @@
     !
     use mFuncoesDeForma,   only: shlqrt, shgqrt, shlqrt3d, shgqrt3d
     use mMalha,            only: local, nsd
-    use mMalha,            only: numnp, numel, numelReserv
+    use mMalha,            only: numelReserv
     use mMalha,            only: nen, numLadosElem, numLadosReserv
-    use mGlobaisArranjos,  only: c, mat, beta
-    use mGlobaisEscalares, only: nrowsh, iflag_beta
-    use mGlobaisEscalares, only: npint, ligarBlocosHetBeta
+    use mGlobaisEscalares, only: nrowsh
+    use mGlobaisEscalares, only: npint
     use mGlobaisEscalares, only: S3DIM
     use mPropGeoFisica,    only: YOUNG, POISVECT, GRAINBLK, phi, BULK
     use mPropGeoFisica,    only: hx,hy,hz
@@ -744,8 +593,6 @@
     !
     !.... remove above card for single-precision operation
     !
-    real*8,  intent(in) :: x(nsd,numnp)
-    integer, intent(in) :: conecNodaisElem(nen,numel)
     integer, intent(in) :: conecLadaisElem(numLadosElem,numelReserv)
     real*8,  intent(inout) :: pressaoElem(ndofP,numelReserv)
     real*8,  intent(inout) :: pressaoElemAnt(numelReserv)
@@ -755,21 +602,19 @@
     real*8,  intent(in) :: dtBlocoTransp
     real*8,  intent(in) :: SIGMAT(numelReserv), SIGMA0(numelReserv)
     !
-    real*8 :: xl(nsd,nen)
     real*8, dimension(nrowsh,numLadosElem,npint) :: shgrt, shlrt
     real*8  :: w(npint)
     real(8) :: dt
     !
-    integer :: nel,m,i,l
+    integer :: nel,i
     real(8) :: vnl(nsd,numLadosElem)
     real(8) :: xind,div,fe
-    real(8) :: pi,delta,gf1,gf2,gf3
-    real(8) :: sx,sy,sz,cx,cy,cz,pix,piy,piz,xg,yg,zg,ff
-    real(8) :: dif, aux
+    real(8) :: delta
+    real(8) :: ff
     !...
     !... BEGIN CATALOG FOR ITERATIVE FORMULATION
     !
-    REAL(8) :: XBULK, POISSON, XTRACCO, BULKROCK, BETACOM, BIOTCOEF
+    REAL(8) :: XTRACCO, BULKROCK, BIOTCOEF
     !
     REAL(8) :: BETAT,BETAT0,BETA4P,COEFSIGM,BETAGEO,DIFSIGMA
     !
@@ -863,7 +708,6 @@
     implicit none
     !
     real(8) :: rk,uc,dt,ff
-    real(8) :: r1,r2,r3
     !
     !     Evolucao no tempo (Runge-Kutta)
     !
@@ -922,7 +766,7 @@
     integer :: conecLadaisElem(numLadosElem, numelReserv)
     integer :: conecNodaisElem(nen, numel)
     !
-    integer :: nel,no1,no2,no3,no4,no5,no6,no7,no8,j,i
+    integer :: nel,no1,no2,no3,no4,no5,no6,no7,no8
     integer :: lado1, lado2, lado3, lado4, lado5, lado6
     !
     !.....  loop on elements
@@ -1012,8 +856,6 @@
     subroutine calcve(nedg,numel,nsd,nedfl,nen,fluxo,vel,ieedg)
     !
     !     calcula a velocidade nos nos por elemento
-
-    use mGlobaisEscalares, only: nnp
     !
     implicit none
     !
@@ -1022,7 +864,7 @@
     real(8), dimension(nsd,nen,*) :: vel
     integer, dimension(nedg,*) :: ieedg
     !
-    integer :: nel,n1,n2,n3,n4,n5,n6,j
+    integer :: nel,n1,n2,n3,n4,n5,n6
     !
     !.....  loop on elements
     !
@@ -1090,33 +932,10 @@
     !
     return
     end subroutine
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE DIRICHLET_POCO_GRAVIDADE_APROX(BWP,NEL,HYY,NP,GRAVI,NELWELL,satElemL)
-    !
-    !        use mMCMC,          only : ELEM_CONDP
-    use mPropGeoFisica, only : RHOW, RHOO
-    use mMalha,         only : numelReserv
-    !
-    IMPLICIT NONE
-    !
-    REAL(8)               :: HYY,GRAVI,BWP,RHO
-    INTEGER               :: NP,NELWELL,NEL,I
-    real*8,  intent(in)   :: satElemL(numelReserv)
-    !
-    RHO=0.0
-    DO I=1,NP
-        RHO = RHO + RHOW*satElemL(ELEM_CONDP(I)) +  &
-            RHOO*(1.0-satElemL(ELEM_CONDP(I)))
-    END DO
-    RHO = RHO/REAL(NP)
-    PRESPRODWELL(NELWELL) = BWP+(REAL(NELWELL-1))*HYY*GRAVI*RHO
-    RETURN
-    END SUBROUTINE DIRICHLET_POCO_GRAVIDADE_APROX
     !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !
-    SUBROUTINE DIRICHLET_POCO_GRAVIDADE(BHP,NEL,HYY,NP,GRAVI,NELWELL,satElemL,pressao)
+    SUBROUTINE DIRICHLET_POCO_GRAVIDADE(BHP,NEL,HYY,NP,GRAVI,NELWELL,satElemL)
     !
     !        use mMCMC,             only : ELEM_CONDP
     use mPropGeoFisica,    only : RHOW, RHOO, BULKWATER, BULKOIL
@@ -1124,11 +943,10 @@
     !
     IMPLICIT NONE
     !
-    REAL(8) :: HYY,GRAVI,BHP,CW,CO,A,B,DELTAZ,RHO
+    REAL(8) :: HYY,GRAVI,BHP,CW,CO,A,B,RHO
     REAL(8) :: RHOW_BHP,RHOO_BHP,SAT_MEAN,AUX,RHOM
     INTEGER :: NELWELL,NEL,NP,I
     real*8,  intent(in)   :: satElemL(numelReserv)
-    real*8,  intent(in)   :: pressao(numelReserv)
     !
     AUX = xc(2,nel) -HYY/2.0d0
     SAT_MEAN = 0.0
@@ -1165,7 +983,7 @@
     integer  :: N
     REAL(8), DIMENSION(2,100) :: PCOND
     !
-    integer                        :: idata,i,j,ISTAT
+    integer                        :: i,j
     real(8)                        :: TOL
 
     integer*4 ::  keyword_line
@@ -1215,9 +1033,6 @@
     !
     IMPLICIT NONE
     !
-    INTEGER I, ISimulator
-    !
-    CHARACTER(LEN=128) :: NAMEFILE, TEXT, FLAG1
     character(len=50)  :: keyword_name
     integer :: ierr
     !
@@ -1397,7 +1212,7 @@
     real*8 :: djx, djy, djn, dix, diy, din
 
     integer :: curElement, l, i, j ! iterators
-    real*8 :: temp1, gf1, gf2, gf3 !temporary variables
+    real*8 :: temp1, gf1, gf2 !temporary variables
 
     logical :: quad, zerodl !is diagonal, is degenerated triange, is zero
 

@@ -83,7 +83,6 @@
     character(len=128) :: ifyou_out
     character(len=128) :: ifqtrial_out
     character(len=128) :: ifhgPres_out !galerkin
-
     !
     real(8) :: tprt_pres, dtprt_pres
     real(8) :: tprt_sat , dtprt_sat
@@ -311,7 +310,6 @@
     implicit none
 
     character(len=50) :: keyword_name
-    integer :: ierr
     !
     !.... Kozeny-Carman relation
     call readRandKozenyCarman
@@ -540,7 +538,7 @@
     !
     IMPLICIT NONE
     !
-    INTEGER :: IFILE, IREGION
+    INTEGER :: IREGION
     !
     CHARACTER*6 :: TEXT
     CHARACTER*18, DIMENSION(9) :: REGION
@@ -662,10 +660,6 @@
     use mInputReader, only: readStringKeywordValue
     !
     IMPLICIT NONE
-    !
-    INTEGER I, NUMPARAM
-    !
-    CHARACTER(LEN=128) :: NAMEFILE, TEXT
 
     character(len=50) :: keyword_name
     integer :: ierr
@@ -711,9 +705,6 @@
     !
     IMPLICIT NONE
     !
-    INTEGER I, ICREEP
-    !
-    CHARACTER(LEN=128) :: NAMEFILE, TEXT
     character(len=50) :: keyword_name
     integer :: ierr
     !
@@ -746,9 +737,6 @@
     !
     IMPLICIT NONE
     !
-    INTEGER I, ISimulator
-    !
-    CHARACTER(LEN=128) :: NAMEFILE, TEXT, FLAG1
     character(len=50)  :: keyword_name
     integer :: ierr
     !
@@ -1199,12 +1187,11 @@
     !*****************************************************
     !
     subroutine imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, velocCentral, phi, perm, satElem, YOUNG, DIS, &
-        &                                              PORE, PRESPROD, STRSS, MASCN, ndofV, ndofP, ndofD, nrowb)
-    use mGlobaisEscalares, only: tTransporte, numdx
-    use mMalha,            only: x, conecNodaisElem, conecLadaisElem, nen, nsd
+        &                                              STRSS, MASCN, ndofV, ndofP, ndofD, nrowb)
+    use mGlobaisEscalares, only: tTransporte
+    use mMalha,            only: conecNodaisElem, conecLadaisElem, nen, nsd
     use mMalha,            only: numel, numnp, numLadosElem
     use mMalha,            only: numelReserv, numLadosReserv, numnpReserv
-    USE mPropGeoFisica,    only: SRW,PHIINICIAL,PERMINICIAL, MASCN0
     use mLeituraEscrita,   only: iflag_tipoPrint
     use mLeituraEscrita,   only: prt
 
@@ -1215,14 +1202,13 @@
     real*8, intent(in) :: pressaoElem(ndofP, numelReserv), velocCentral(nsd, numelReserv)
     real*8, intent(in) :: velocNodal(nsd,numnpReserv), velocLadal(ndofV,numLadosReserv)
     real*8, intent(in) :: phi(numelReserv), perm(numelReserv), satElem(numelReserv)
-    real*8, intent(in) :: YOUNG(numel), DIS(ndofd,NUMNP), PORE(numelReserv), PRESPROD
+    real*8, intent(in) :: YOUNG(numel), DIS(ndofd,NUMNP)
     real*8, intent(in) :: STRSS(nrowb,numel), MASCN(numelReserv)
 
     integer, intent(in)  ::  ndofV, ndofP, ndofD, nrowb
-    integer :: i, k, DZERO = 0
+    integer :: DZERO = 0
     LOGICAL :: SIM,NAO
     real*8  :: ZERO=0.D0
-    real*8  :: YOUNGINICIAL=5e19
     !
     SIM=.TRUE.
     NAO=.FALSE.
@@ -1239,7 +1225,7 @@
         endif
         if(iflag_tipoPrint==2) then
             call escreverArqParaview_escalar(isat,satElem,ZERO,ifsat_out,nen, &
-                NAO,DZERO,' SAT',ndofP,SRW,reservSat)
+                NAO,DZERO,' SAT',ndofP,reservSat)
         end if
     endif
     !
@@ -1258,11 +1244,11 @@
         if(iflag_tipoPrint==2) then
             if(reservPres.eq.'dominioCompleto')then
                 call escreverArqParaview_escalar(ipres,GEOPRSR,ZERO,ifpres_out,nen,NAO,DZERO,'Pressure', &
-                    ndofP, PRESPROD,reservPres)
+                    ndofP, reservPres)
             end if
             if(reservPres.eq.'reservatorio')then
                 call escreverArqParaview_escalar(ipres,pressaoElem,ZERO,ifpres_out,nen,NAO,DZERO,'Pressure', &
-                    ndofP, PRESPROD,reservPres)
+                    ndofP, reservPres)
             end if
         end if
     endif
@@ -1279,7 +1265,7 @@
                 conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservVel, ivel)
         endif
         if(iflag_tipoPrint==2) then
-            call escreverArqParaview_vetor(ivel,velocNodal,ZERO,ifvel_out,nen,SIM,DZERO,'VELO',2, nsd, numnpReserv, reservVel)
+            call escreverArqParaview_vetor(ivel,velocNodal,ZERO,ifvel_out,nen,DZERO,'VELO',2, nsd, numnpReserv, reservVel)
         endif
 
     end if
@@ -1296,7 +1282,7 @@
                 conecNodaisElem, 1, 't=0.0', len('t=0.0'), reservVelc, ivelc)
         endif
         if(iflag_tipoPrint==2) then
-            call escreverArqParaview_vetor(ivelc,velocCentral,ZERO,ifvelc_out,nen,SIM,DZERO,'VELO',1, nsd, numelReserv, reservVelc)
+            call escreverArqParaview_vetor(ivelc,velocCentral,ZERO,ifvelc_out,nen,DZERO,'VELO',1, nsd, numelReserv, reservVelc)
         endif
 
     end if
@@ -1312,7 +1298,7 @@
                 conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservDesloc, idis)
         endif
         if(iflag_tipoPrint==2) then
-            call escreverArqParaview_vetor(idis,DIS,ZERO,ifdis_out,nen,SIM,DZERO,'DISP',2, ndofD, numnp, reservDesloc)
+            call escreverArqParaview_vetor(idis,DIS,ZERO,ifdis_out,nen,DZERO,'DISP',2, ndofD, numnp, reservDesloc)
         endif
     end if
     !
@@ -1327,7 +1313,7 @@
                 conecNodaisElem, 1, 't=0.0', len('t=0.0'), reservTensao, iten)
         endif
         if(iflag_tipoPrint==2) then
-            call escreverArqParaview_vetor(iten,STRSS,ZERO,iften_out,nen,SIM,DZERO,'TENS',1, nen, numel, reservTensao)
+            call escreverArqParaview_vetor(iten,STRSS,ZERO,iften_out,nen,DZERO,'TENS',1, nen, numel, reservTensao)
         endif
     end if
 
@@ -1344,7 +1330,7 @@
         endif
         if(iflag_tipoPrint==2) then
             call escreverArqParaview_escalar(iphi,phi,ZERO,ifphi_out,nen, &
-                NAO,DZERO,'PORE',ndofP,PHIINICIAL,reservPhi)
+                NAO,DZERO,'PORE',ndofP,reservPhi)
         end if
     endif
 
@@ -1361,7 +1347,7 @@
         endif
         if(iflag_tipoPrint==2) then
             call escreverArqParaview_escalar(iperm,perm,ZERO,ifperm_out,nen, &
-                NAO,DZERO,'PERM',ndofP,PERMINICIAL,reservPerm)
+                NAO,DZERO,'PERM',ndofP,reservPerm)
         end if
     endif
 
@@ -1378,7 +1364,7 @@
         endif
         if(iflag_tipoPrint==2) then
             call escreverArqParaview_escalar(imasc,MASCN,ZERO,ifmasc_out,nen, &
-                NAO,DZERO,'MASC',ndofP,0.d0,reservMasc)
+                NAO,DZERO,'MASC',ndofP,reservMasc)
         end if
     endif
     !
@@ -1394,7 +1380,7 @@
         endif
         if(iflag_tipoPrint==2) then
             call escreverArqParaview_escalar(iyou,YOUNG,ZERO,ifyou_out,nen, &
-                SIM,DZERO,'YOUN',ndofP,YOUNGINICIAL,reservYoung)
+                SIM,DZERO,'YOUN',ndofP,reservYoung)
         end if
     endif
     !
@@ -1404,12 +1390,10 @@
     !
     !*****************************************************
     !
-    subroutine imprimirSolucaoNoTempo(sat,DIS,PORE,YOUNG,GEOPRES,pressaoElem,velocLadal,velocNodal,velocCentral,NCONDP, &
-        PCONDP,PRESPROD,AVSTRS, MASCN, tempo, ndofV, ndofP, ndofD, NROWB)
+    subroutine imprimirSolucaoNoTempo(sat,DIS,PORE,YOUNG,GEOPRES,pressaoElem,velocLadal,velocNodal,velocCentral,AVSTRS, MASCN, tempo, ndofV, ndofP, ndofD, NROWB)
     !
     use mMalha,            only: nsd, numel, numelReserv, numLadosReserv, numLadosElem, conecLadaisElem,  numnpReserv
     use mMalha,            only: nen, numnp
-    USE mPropGeoFisica,    only: SRW,PHIINICIAL,MASCN0
     use mLeituraEscrita,   only: iflag_tipoPrint,prt
     !
     implicit none
@@ -1419,14 +1403,11 @@
     real*8, intent(in) :: velocNodal(nsd,numnpReserv), velocCentral(nsd,numelReserv)
     real*8, intent(in) :: sat(numelReserv),DIS(ndofD,numnp),PORE(numelReserv),YOUNG(numel), AVSTRS(nrowb,numel)
     real*8, intent(in) :: MASCN(numelReserv)
-    REAL(8), DIMENSION(2,400) :: PCONDP
-    real*8, intent(in) :: PRESPROD, Tempo
+    real*8, intent(in) :: Tempo
     integer, intent(in)  ::  ndofV, ndofP, ndofD, nrowb
-    integer :: NCONDP
     !
     character(21) :: labelTransp
     real*8        :: TOL=1e-6
-    integer       :: UM=1,i
     LOGICAL       :: SIM,NAO
     !
     SIM=.TRUE.
@@ -1452,7 +1433,7 @@
                 tprt_sat=tprt_sat+dtprt_sat
                 npcontsat=npcontsat+1
                 call escreverArqParaview_escalar(isat,sat,tempo,ifsat_out,nen,NAO,npcontsat,' SAT',&
-                    &                                            ndofP, SRW,reservSat)
+                    &                                            ndofP, reservSat)
             end if
         endif
     endif
@@ -1478,11 +1459,11 @@
                 npcontpres=npcontpres+1
                 if(reservPres.eq.'dominioCompleto')then
                     call escreverArqParaview_escalar(ipres,geopres,tempo,ifpres_out,nen,NAO,npcontpres,'Pressure', &
-                        ndofP, PRESPROD,reservPres)
+                        ndofP, reservPres)
                 end if
                 if(reservPres.eq.'reservatorio')then
                     call escreverArqParaview_escalar(ipres,pressaoElem,tempo,ifpres_out,nen,NAO,npcontpres,'Pressure', &
-                        ndofP, PRESPROD,reservPres)
+                        ndofP, reservPres)
                 end if
             end if
         endif
@@ -1507,7 +1488,7 @@
             if(abs(tempo-tprt_vel).le.TOL)then
                 tprt_vel=tprt_vel+dtprt_vel
                 npcontvel=npcontvel+1
-                call escreverArqParaview_vetor(ivel,velocNodal,tempo,ifvel_out,nen,SIM,npcontvel,'VELO', &
+                call escreverArqParaview_vetor(ivel,velocNodal,tempo,ifvel_out,nen,npcontvel,'VELO', &
                     2, nsd, numnpReserv, reservVel )
             endif
         endif
@@ -1533,7 +1514,7 @@
             if(abs(tempo-tprt_velc).le.TOL)then
                 tprt_velc=tprt_velc+dtprt_velc
                 npcontvelc=npcontvelc+1
-                call escreverArqParaview_vetor(ivelc,velocCentral,tempo,ifvelc_out,nen,SIM,npcontvelc,'VELO', &
+                call escreverArqParaview_vetor(ivelc,velocCentral,tempo,ifvelc_out,nen,npcontvelc,'VELO', &
                     1, nsd, numelReserv, reservVelc )
             endif
         endif
@@ -1558,7 +1539,7 @@
             if(abs(tempo-tprt_dis).le.TOL)then
                 tprt_dis=tprt_dis+dtprt_dis
                 npcontdis=npcontdis+1
-                call escreverArqParaview_vetor(idis,DIS,tempo,ifdis_out,nen,SIM,npcontdis,'DISP',2, ndofD, numnp, reservDesloc)
+                call escreverArqParaview_vetor(idis,DIS,tempo,ifdis_out,nen,npcontdis,'DISP',2, ndofD, numnp, reservDesloc)
             endif
         endif
     end if
@@ -1583,7 +1564,7 @@
             if(abs(tempo-tprt_ten).le.TOL)then
                 tprt_ten=tprt_ten+dtprt_ten
                 npcontten=npcontten+1
-                call escreverArqParaview_vetor(iten,AVSTRS,tempo,iften_out,nen,SIM,npcontten,'TENS',1, nen, numel, reservTensao)
+                call escreverArqParaview_vetor(iten,AVSTRS,tempo,iften_out,nen,npcontten,'TENS',1, nen, numel, reservTensao)
             endif
         endif
     end if
@@ -1608,7 +1589,7 @@
                 tprt_phi=tprt_phi+dtprt_phi
                 npcontphi=npcontphi+1
                 call escreverArqParaview_escalar(iphi,PORE,tempo, &
-                    ifphi_out,nen,NAO,npcontphi,'PORE',ndofP,PHIINICIAL,reservPhi)
+                    ifphi_out,nen,NAO,npcontphi,'PORE',ndofP,reservPhi)
             end if
         endif
     end if
@@ -1634,7 +1615,7 @@
                 tprt_masc=tprt_masc+dtprt_masc
                 npcontmasc=npcontmasc+1
                 call escreverArqParaview_escalar(imasc,MASCN,tempo,ifmasc_out,nen,NAO,npcontmasc,&
-                    'MASC',ndofP,0.d0,reservMasc)
+                    'MASC',ndofP,reservMasc)
             end if
         endif
     endif
@@ -1660,7 +1641,7 @@
                 tprt_you=tprt_you+dtprt_young
                 npcontyoung=npcontyoung+1
                 call escreverArqParaview_escalar(iyng,YOUNG,tempo,ifyou_out,nen,NAO,npcontyoung,&
-                    ' YNG',ndofP, 0.d0, reservYoung)
+                    ' YNG',ndofP, reservYoung)
             end if
         endif
     endif
@@ -1683,14 +1664,11 @@
     INTEGER, INTENT(IN)    :: NSD, NUMNP
     REAL(8), INTENT(INOUT) ::  X(NSD,NUMNP)
     !
-    INTEGER      :: INXCORD
     CHARACTER*30 :: NAMEIN
-    CHARACTER(LEN=128) :: FLAG, ROTULO
     !
-    INTEGER :: I, N, NODE
+    INTEGER :: NODE
     REAL(8) :: XLEFT,XRIGHT,YBOTTOM,YTOP, eps
 
-    integer*4:: keyword_line
     character(len=50) keyword_name
     integer :: ierr
 
@@ -1784,16 +1762,12 @@
     INTEGER, INTENT(IN)    :: NSD, NUMNP
     REAL(8), INTENT(INOUT) ::  X(NSD,NUMNP)
     !
-    INTEGER      :: INXCORD
     CHARACTER*30 :: NAMEIN
-    CHARACTER(LEN=128) :: ROTULO
     !
-    INTEGER :: I, N, NODE
+    INTEGER :: NODE
     REAL(8) :: XLEFT,XRIGHT,YFRONT,YBACK,ZTOP,ZBOTTOM
     REAL(8) :: XDIFF, EPSM8
     !
-
-    integer*4:: keyword_line
     character(len=50) keyword_name
     integer :: ierr
 
@@ -1902,180 +1876,11 @@
     !
     END SUBROUTINE
     !
-    !**** NEW ** MODIFIED FOR IRREGULAR MESH ***********************************
-    !
-    SUBRoutine LEITuraGERAcaoCOORdenadas3D(x, nsd, numnp, iin, icoords, iprtin)
-    use mMalha, only: IrregMesh, genfl
-    use mMalha, only: POSTLINE, SALTLINE, RTOPLINE, RBTTLINE, RIFTLINE
-    use mMalha, only: LEFTLINE, RGHTLINE, FRNTLINE, BACKLINE, BASELINE
-    use mMalha, only: IGEOFORM, IDome
-    !      use mLeituraEscritaSimHidroGeoMec,   only: CODERROR,ireadstat,readstat
-    !
-    !.... program to read, generate and write coordinate data
-    !
-    implicit none
-    !
-    INTEGER, INTENT(IN)    :: NSD, NUMNP, IIN, ICOORDS, IPRTIN
-    REAL(8), INTENT(INOUT) ::  X(NSD,NUMNP)
-    !
-    INTEGER      :: INXCORD
-    CHARACTER*30 :: NAMEIN
-    CHARACTER(LEN=128) :: FLAG, ROTULO
-    !
-    INTEGER :: I, N, NODE
-    REAL(8) :: XLEFT,XRIGHT,YFRONT,YBACK,ZTOP,ZBOTTOM
-    REAL(8) :: XDIFF, EPSM8
-    EPSM8 = 1.0D-8
-    !
-    call genfl(x,nsd,iin)
-    !
-    IF (IrregMesh.EQ.0) THEN
-        WRITE(*,5000) 'REGULAR MESH  : input.in'
-    ELSE
-        INXCORD  = 530
-        NAMEIN   = 'nodes_rsrv_outsburden.in'
-        WRITE(*,5000) NAMEIN
-        OPEN(UNIT=INXCORD,FILE=NAMEIN,STATUS='OLD')
-        DO 100 NODE=1,NUMNP
-            READ(INXCORD,1500) X(1,NODE), X(2,NODE), X(3,NODE)
-100     CONTINUE
-        CLOSE(INXCORD)
-    ENDIF
-    !
-    XLEFT   = 0.0D0
-    XRIGHT  = 0.0D0
-    !
-    YFRONT  = 0.0D0
-    YBACK   = 0.0D0
-    !
-    ZTOP    = 0.0D0
-    ZBOTTOM = 0.0D0
-    !
-    DO 200 NODE=1,NUMNP
-        XLEFT   = DMIN1(X(1,NODE),XLEFT)
-        XRIGHT  = DMAX1(X(1,NODE),XRIGHT)
-        YFRONT  = DMAX1(X(2,NODE),YFRONT)
-        YBACK   = DMIN1(X(2,NODE),YBACK)
-        ZTOP    = DMAX1(X(3,NODE),ZTOP)
-        ZBOTTOM = DMIN1(X(3,NODE),ZBOTTOM)
-200 CONTINUE
-    !
-    WRITE(*,*) 'XLEFT = ', XLEFT,'XRIGHT  = ',XRIGHT
-    WRITE(*,*) 'YBACK = ', YBACK,'YFRONT  = ',YFRONT
-    WRITE(*,*) 'ZTOP  = ',  ZTOP,'ZBOTTOM = ',ZBOTTOM
-
-
-    INXCORD  = 531
-    !                 123456789+123456789+123456789+
-    NAMEIN   = 'layer_reference.in'
-    OPEN(UNIT=INXCORD,FILE=NAMEIN,STATUS='OLD')
-    !
-    !.... HEADER OF FILE
-    !
-    FLAG = '#REFERENCE PLANES OF GEO-FORMATIONS'
-    READ(INXCORD,'(A)') ROTULO
-    IF (TRIM(FLAG).NE.TRIM(ROTULO)) THEN
-        CALL CODERROR(6,NAMEIN)
-    ENDIF
-    !
-    FLAG ='#READ GEOFORMATIONS FROM elmnt_geoformation.in FILE (NOT=0/YES=1)'
-    CALL IREADSTAT(FLAG,INXCORD,IGEOFORM)
-    !
-    FLAG = '#TOP POST-SALT HORIZONTAL Z-PLANE'
-    CALL READSTAT(FLAG,INXCORD,POSTLINE)
-    !      READ(INXCORD,3700) POSTLINE
-    FLAG = '#SALT-DOME TOP HORIZONTAL Z-PLANE'
-    CALL READSTAT(FLAG,INXCORD,SALTLINE)
-    !      READ(INXCORD,3700) SALTLINE
-    FLAG = '#TOP RESERVOIR HORIZONTAL Z-PLANE'
-    CALL READSTAT(FLAG,INXCORD,RTOPLINE)
-    !      READ(INXCORD,3700) RTOPLINE
-    FLAG = '#BOTTOM RESERVOIR HORIZONTAL Z-PLANE'
-    CALL READSTAT(FLAG,INXCORD,RBTTLINE)
-    !     READ(INXCORD,3700) RBTTLINE
-    FLAG ='#BOTTOM RIFT HORIZONTAL Z-PLANE'
-    CALL READSTAT(FLAG,INXCORD,RIFTLINE)
-    FLAG ='#BOTTOM BASE HORIZONTAL Z-PLANE'
-    CALL READSTAT(FLAG,INXCORD,BASELINE)
-    !      READ(INXCORD,3700) RIFTLINE
-    FLAG ='#LEFT RESERVOIR VERTICAL X-PLANE'
-    CALL READSTAT(FLAG,INXCORD,LEFTLINE)
-    !      READ(INXCORD,3700) LEFTLINE
-    FLAG ='#RIGHT RESERVOIR VERTICAL X-PLANE'
-    CALL READSTAT(FLAG,INXCORD,RGHTLINE)
-    !      READ(INXCORD,3700) RIFTLINE
-    FLAG ='#FRONT RESERVOIR VERTICAL Y-PLANE'
-    CALL READSTAT(FLAG,INXCORD,FRNTLINE)
-    !      READ(INXCORD,3700) LEFTLINE
-    FLAG ='#BACK RESERVOIR VERTICAL Y-PLANE'
-    CALL READSTAT(FLAG,INXCORD,BACKLINE)
-    !      READ(INXCORD,3700) RGHTLINE
-    FLAG ='#REFERENCE FOR SISMIC DOME (NOT=0/YES=1)'
-    CALL IREADSTAT(FLAG,INXCORD,IDOME)
-    !
-    CLOSE(INXCORD)
-    !
-    !.... VERIFY BOUNDARY DIMENSIONS COMPATIBILITY
-    !.... .. Z DIRECTION
-    XDIFF = DABS(ZTOP-POSTLINE)
-    IF (XDIFF.GT.EPSM8)  POSTLINE=ZTOP
-    !
-    XDIFF = DABS(ZBOTTOM-BASELINE)
-    IF (XDIFF.GT.EPSM8) BASELINE = ZBOTTOM
-    !
-    !.... .. Y DIRECTION
-    !
-    IF (YFRONT.LT.FRNTLINE) CALL CODERROR(6,NAMEIN)
-    IF (YBACK.GT.BACKLINE) CALL CODERROR(6,NAMEIN)
-    !
-    !.... .. X DIRECTION
-    !
-    IF (XLEFT.GT.LEFTLINE) CALL CODERROR(6,NAMEIN)
-    IF (XRIGHT.LT.RGHTLINE) CALL CODERROR(6,NAMEIN)
-    !
-    !.... .. Z LAYERS
-    !
-    IF (BASELINE.GT.RIFTLINE) CALL CODERROR(6,NAMEIN)
-    IF (RIFTLINE.GT.RBTTLINE) CALL CODERROR(6,NAMEIN)
-    IF (RBTTLINE.GT.RTOPLINE) CALL CODERROR(6,NAMEIN)
-    IF (RTOPLINE.GT.SALTLINE) CALL CODERROR(6,NAMEIN)
-    IF (SALTLINE.GT.POSTLINE) CALL CODERROR(6,NAMEIN)
-    !
-    IF (IPRTIN.EQ.1) RETURN
-    !
-#ifdef debug
-    write(icoords,*) "# Coordenadas ", nsd
-    do n=1,numnp
-        write(icoords,2000) n,(x(i,n),i=1,nsd)
-    end do
-#endif
-    !
-    RETURN
-    !
-1000 FORMAT(I10)
-1500 FORMAT(2X,40(1PE15.8,2X))
-2000 FORMAT(6x,i12,10x,3(1pe15.8,2x))
-3700 FORMAT(35X,1PE15.8)
-5000 FORMAT(5X,  &
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **  COORDINATES MESH STRUCTURE:                     **',/5X,&
-        &' **  OBTAINED FROM ', A30 ,                     '    **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X)
-    !
-    END SUBROUTINE
-    !
     !**** NEW **** MODIFIED FOR IRREGULAR MESH  *****************
     !
     SUBROUTINE GEOREGION_DS(XC,NSD,NUMEL)
     !
-    use mMalha,         only: IrregMesh, IGEOFORM
+    use mMalha,         only: IGEOFORM
     use mPropGeoFisica, only: GEOFORM, GEOINDIC, GEOYLOC, GEOYLOC3D
     use mInputReader,   only: leituraRegiaoDs
     !
@@ -2083,11 +1888,8 @@
     !
     IMPLICIT NONE
     !
-    INTEGER :: NSD, NEL, NUMEL, INGEOFOR
+    INTEGER :: NSD, NEL, NUMEL
     !
-    CHARACTER*30 :: NINGEOFOR
-    !
-    INTEGER,  DIMENSION(NUMEL)   :: IREG
     REAL(8),  DIMENSION(NSD,NUMEL) :: XC
 
     character(len=50) keyword_name
@@ -2164,18 +1966,16 @@
         write(iparaview,'(3a,i5)')'VECTORS ', trim(rotulo), ' float '
     endif
 
-    call escreverVetoresNodais(label, campo, dim1, dim2,rotulo,tamRot,tipo,reserv,iparaview)
+    call escreverVetoresNodais(label, campo, dim1, dim2, tipo,reserv,iparaview)
 
     end subroutine escreverArqParaviewVector
     !
     !**** new *******************************************************************
     !
-    SUBROUTINE escreverArqParaview_vetor(arquivo,campo,passo,fname,nen, &
-        NRESERV,nprint,LABEL,tipo, dim, dim2, reserv)
+    SUBROUTINE escreverArqParaview_vetor(arquivo,campo,passo,fname,nen, nprint,LABEL,tipo, dim, dim2, reserv)
     !
     USE mMalha,            only: x,nsd,numel, numnp, numelReserv, numnpReserv
-    USE mPropGeoFisica,    only: GEOFORM
-    use mMalha,            only: conecNodaisElem, conecLadaisElem
+    use mMalha,            only: conecNodaisElem
     !
     IMPLICIT NONE
     !
@@ -2188,7 +1988,6 @@
     CHARACTER(len=4)      :: EXT,LABEL
     CHARACTER(len=5)      :: C
     INTEGER               :: VARIOSARQ,ZERO,NPRINT, numPontos
-    LOGICAL               :: NRESERV
     REAL(8)               :: MINIMO(dim)
     integer :: numNos, numElementos
     character(len=*) :: reserv
@@ -2340,18 +2139,17 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !
     SUBROUTINE escreverArqParaview_escalar(arquivo,campo,passo,fname,nen, &
-        NRESERV,nprint,LABEL,dim,MINIMO,reserv)
+        NRESERV,nprint,LABEL,dim,reserv)
     !
     USE mMalha,            only: x,nsd,numel,numnp,numelReserv,numnpReserv
     USE mPropGeoFisica,    only: GEOFORM
-    use mMalha,            only: conecNodaisElem, conecLadaisElem
+    use mMalha,            only: conecNodaisElem
 
     !
     IMPLICIT NONE
     !
-    INTEGER :: ARQUIVO,ISTAT,d,i,n,nen,nprint,NPOSN,dim
+    INTEGER :: ARQUIVO,ISTAT,d,i,n,nen,nprint,dim
     REAL(8), DIMENSION(dim,*) :: CAMPO
-    REAL(8) :: MINIMO
     CHARACTER(LEN=128)    :: fname,NAME
     CHARACTER(LEN=21)     :: TEMPO
     REAL(8)               :: COORDZ = 0.0,PASSO,PROP
@@ -2361,10 +2159,8 @@
     CHARACTER(len=4)      :: EXT,LABEL
     CHARACTER(len=5)      :: C
     INTEGER               :: VARIOSARQ,ZERO
-    INTEGER, DIMENSION(numel) :: ELEMRESERV
     character(len=*) :: reserv
     !
-    !     MINIMO = 1E30
     if(trim(reserv)=='reservatorio')  then
         NUMNPLOCAL = numnpReserv
         NUMELLOCAL = numelReserv
@@ -2469,13 +2265,6 @@
         write(arquivo,'(3a)')'SCALARS ', 't='//TRIM(TEMPO)//'' , ' float '
     ENDIF
     write(arquivo,'(2a)')'LOOKUP_TABLE ','default'
-    !
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !     if(LABEL.EQ.' SAT')MINIMO = SRW
-    !     if(LABEL.EQ.'PRES')MINIMO = PRESPROD!PRESMEDIAINICIAL
-    !     IF(LABEL.EQ.'PORE')MINIMO = PHIINICIAL
-    !     IF(LABEL.EQ.'PERM')MINIMO = PERMINICIAL
-    !     IF(LABEL.EQ.'YOUN')MINIMO = 5e19
     !
     DO I=1,NUMELLOCAL
         IF(NRESERV)THEN
@@ -2790,7 +2579,7 @@
     use mMalha,            only: XC, NEN, NSD, numel, numnp, numelReserv
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC
     !
-    INTEGER :: K, NODE, NEL, ICENTER
+    INTEGER :: NODE, NEL, ICENTER
     INTEGER, DIMENSION(NEN,NUMEL)   :: conecNodaisElem
     REAL(8), DIMENSION(NSD,NUMNP)   :: X, DIS
     REAL(8), DIMENSION(NUMEL)       :: YOUNG, GEOPRSR
@@ -2889,7 +2678,7 @@
     use mMalha,            only: XC, NEN, NSD, numel, numnp, numelReserv
     use mPropGeoFisica,    only: GEOFORM, GEOINDIC
     !
-    INTEGER :: K, NODE, NEL, ICENTER
+    INTEGER :: NODE, NEL, ICENTER
     INTEGER, DIMENSION(NEN,NUMEL)   :: conecNodaisElem
     REAL(8), DIMENSION(NSD,NUMNP)   :: X, DIS
     REAL(8), DIMENSION(NUMEL)       :: YOUNG, GEOPRSR
@@ -3535,7 +3324,7 @@
     !
     IMPLICIT NONE
     !
-    INTEGER I, IERRO
+    INTEGER IERRO
     !
     CHARACTER(LEN=18) :: TASK
     CHARACTER*18, DIMENSION(6 ) :: REFTASK
@@ -3698,6 +3487,7 @@
     keyword_name = "solver_geomecanica"
     call readStringKeywordValue(keyword_name, optSolverD, 'skyline', ierr)
 
+
     return
     end subroutine readSetupPhaseDS
     !
@@ -3803,8 +3593,6 @@
 
     if (tipo == 1) call escreverEscalares(campo, dim1, dim2, rotulo, tamRot, reserv, arquivo)
     if (tipo == 2) call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
-
-
     !
     end subroutine escreverArqParaview
     !
@@ -3909,51 +3697,7 @@
     end subroutine escreverEscalaresNodais
     !
     !**** new *******************************************************************
-    !
-    subroutine escreverEscalaresPorElemento(arquivo,v, tam, tamRot)
-    !
-    use mMalha, only: numelReserv
-    !
-    implicit none
-    integer, intent(in)  :: arquivo,tam
-    real*8, intent(in)   :: v(tam)
-    integer :: tamRot
-    !
-    integer :: j
-    real*8 :: limite,zero
-
-    limite=1.e-15
-    zero=0.0d0
-
-    if(apenasReservatorio.eqv..true.) then
-        do j=1, tam
-            if(v(j).lt.limite) then
-                write(arquivo,*) zero
-            else
-                write(arquivo,*) v(j)
-            end if
-        end do
-        !
-    else
-        !
-        do j=1, tam
-            if(tam<=numelReserv) then
-                if(v(j).lt.limite) then
-                    write(arquivo,*) zero
-                else
-                    write(arquivo,*) v(j)
-                end if
-            else
-                write(arquivo,*) zero
-            endif
-        end do
-    endif
-    !
-    end subroutine
-    !
-    !**** new *******************************************************************
     subroutine escreverArqParaviewIntermed_CampoEscalar(arquivo, campo, dim1, dim2, rotulo, tamRot, reserv)
-    use mMalha, only: x, nsd, numel, numnp
 
     implicit none
     integer, intent(in) :: arquivo,dim1, dim2
@@ -3974,7 +3718,6 @@
     !
     subroutine escreverArqParaviewIntermed_CampoVetorial(label,campo, dim1, dim2, rotulo, tamRot, tipo, &
         reserv, arquivo)
-    use mMalha, only: x, nsd, numel, numnp
 
     implicit none
     integer, intent(in) :: arquivo,dim1, dim2, tipo
@@ -3992,26 +3735,25 @@
         write(arquivo,'(3a,i5)')'VECTORS ', trim(rotulo), ' float '
     endif
 
-    call escreverVetoresNodais(label, campo, dim1, dim2, rotulo, tamRot, tipo, reserv, arquivo)
+    call escreverVetoresNodais(label, campo, dim1, dim2, tipo, reserv, arquivo)
 
     end subroutine escreverArqParaviewIntermed_CampoVetorial
     !
     !**** new **********************************************************************
     !
-    subroutine escreverVetoresNodais(label, campo, tam1, tam2, rotulo, tamRot, tipo, reserv, arquivo)
+    subroutine escreverVetoresNodais(label, campo, tam1, tam2, tipo, reserv, arquivo)
 
-    use mMalha, only: x, nsd, numnp, numnpReserv, numel, numelReserv
+    use mMalha, only: nsd, numnp, numnpReserv, numel, numelReserv
 
     implicit none
     !
     character(len=3)      :: label
     integer,   intent(in) :: tam1,tam2
     real*8, intent(in)    :: campo(tam1,tam2)
-    integer               :: tamRot, tipo, arquivo
+    integer               :: tipo, arquivo
     character(len=*)      :: reserv
-    character(len=tamRot) :: rotulo
     !
-    integer   :: j,i
+    integer   :: j
     real*8    :: limite,zero
     integer   :: numPontosReserv, numPontosTotal
     real*8    :: minimo(tam1)
@@ -4060,22 +3802,6 @@
             end do
         endif
     endif
-
-    !          do j=1, numPontosTotal
-    !             if(j>tam2) then
-    !                if(label=='ten') then
-    !                   write(arquivo,*) minimo(1:tam1)
-    !                else
-    !                   write(arquivo,*) minimo(1:tam1),'0.0'
-    !                endif
-    !             else
-    !                if(label=='ten') then
-    !                   write(arquivo,*) campo(1:tam1,j)
-    !                else
-    !                   write(arquivo,*) campo(1:tam1,j), '0.0'
-    !                endif
-    !             end if
-    !          end do
     !
 1000 format(6(e15.7,5x))
 
@@ -4084,7 +3810,6 @@
     !********************************************************************************
     !
     subroutine escreverArqParaviewIntermed(arquivo, campo, dim1, dim2, rotulo, tamRot)
-    use mMalha, only: x, nsd, numel, numnp
 
     implicit none
     integer, intent(in) :: arquivo,dim1, dim2

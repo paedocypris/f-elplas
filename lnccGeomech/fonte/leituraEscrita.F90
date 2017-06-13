@@ -30,7 +30,6 @@
 !        iecho  = output unit of input data
 !        iouter  = output unit of error norms
 !
-      character(len=2) :: nRank
       character(len=20) :: nomeIecho
 !
       iecho         = 12
@@ -41,11 +40,6 @@
       nomeIecho='echo.dat'
       open(unit=iecho , file= nomeIecho)
 !
-#ifdef debug
-      open(unit=icoords    , file= 'coordenadas.dat')
-      open(unit=iconects   , file= 'conectsNodais.dat')
-      open(unit=iconectsL  , file= 'conectsLadais.dat')
-#endif
 
    end subroutine 
 !

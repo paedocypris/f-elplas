@@ -16,8 +16,7 @@
     !
     !funcoes e subrotinas
     public :: backns, factns, back, factor
-    public :: diag, load, addnsl, addlhs, addrhs
-    public :: btod, kdbc, pivots, btdb, predct, colht
+    public :: addnsl, addlhs, addrhs
 
     public :: coldot
     public :: matadd
@@ -649,9 +648,6 @@
     real*8  :: coldot
     integer*4:: i
 
-    real*8  :: dot_product
-    real*8  :: ddot
-
     !
     coldot = 0.0d0
     !
@@ -716,7 +712,7 @@
     !
     end subroutine
     ! **** new *********************************************************************
-    subroutine escreverSistemaSkylineEmMTX(alhs,brhs,idiag,lm,id,ien,nee,nen,numel,numnp,neq,nomeArq)
+    subroutine escreverSistemaSkylineEmMTX(alhs,brhs,idiag,neq,nomeArq)
     !
     ! .... program to add element left-hand-side matrix to
     !         global left-hand-side matrix
@@ -731,29 +727,17 @@
     !
     ! .... deactivate above card(s) for single-precision operation
     !
-    integer*4, intent(in) :: nee, nen, numel, numnp, neq
+    integer*4, intent(in) :: neq
     real*8, intent(in)  :: alhs(:), brhs(:)
-    integer*4:: idiag(*),lm(nee,numel)
-    integer*4:: id(1,numnp),ien(nen,numel)
+    integer*4:: idiag(*)
     character (len=*)  :: nomeArq
-    logical :: ldiag,lsym
     !
-    integer*4:: i, j, l, k, m, p, eq
-    integer*4::  nel, no, lAnterior, ned, node
+    integer*4:: i, j
     integer*4:: jjlast, jj, jcolht
     integer*4:: luSist = 2000
     character(len=40), parameter :: formatoEscritaA='(2(i0,1x),e15.8)'
     character(len=40), parameter :: formatoEscritaB='(e15.8)'
     character(len=40), parameter :: formatoEscritaC='(e15.8, a)'
-
-
-    ! formato mtx, para o matlab
-    !%%MatrixMarket matrix coordinate real symmetric
-    !% Generated 14-Aug-2014
-    !12 12 41
-    !1 1  1.333333333
-    !3 1 -0.3333333333
-    !8 1 -0.1666666667
 
     write(*,*) ' +++, em subroutine escreverSistemaSkylineEmMTX(alhs,idiag,lm,id,ien,nee,nen,numel,numnp)'
     open(file=nomeArq, unit=luSist)

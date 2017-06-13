@@ -20,26 +20,17 @@
     !
     program reservoirSimulator
     !
-    use mGlobaisEscalares, only: SALTCREEP
     use mLeituraEscrita,   only: fecharArquivosBase, abrirArquivosInformacoesMalha
     use mLeituraEscritaSimHidroGeoMec,   only: fecharArquivosSimHidroGeoMec
     use mLeituraEscritaSimHidroGeoMec, only: SOLIDONLY
-    use mSolverHypre,      only: inicializarMPI, finalizarMPI
-    use mSolverHypre,      only: myid, num_procs, mpi_comm
     use mgeomecanica,      only: STRESS_INIT
     !
     implicit none
     !
-    CHARACTER*128    :: FLAG
     real*8 :: t1, t2, t3, t4
 
     call timing(t3)
 
-    !-----------------------------------------------------------------------
-#ifdef withHYPRE
-    print*, "inicializando MPI"
-    call inicializarMPI                 (myid, num_procs, mpi_comm)
-#endif
     !
     !.... initialization phase
     !
@@ -49,32 +40,20 @@
     call timing(t1)
     call preprocessador_DS()
     call timing(t2)
-#ifdef mostrarTempos
-    write(*,*) "Tempo de preprocessamento=", t2-t1
-#endif
     !
     !.... solution phase
     !
     print*, ""
     print*, "Iniciando o PROCESSAMENTO..."
-    CALL STRESS_INIT()
-    !
-    !IF (.NOT.SOLIDONLY) THEN
-    !   IF (SALTCREEP) THEN
-    !        CALL processamento_creep()
-    !     ELSE
-    !        CALL processamento_elast()
-    !   ENDIF
-    !ENDIF
+    if (solidonly) CALL STRESS_INIT()
+
+    !processa o escoamento
     call processamentoGalerkinElastico()
 
     !
     call fecharArquivosBase()
     call fecharArquivosSimHidroGeoMec()
 
-#ifdef withHYPRE
-    call finalizarMPI()
-#endif
     call timing(t4)
     write(*,*) "TEMPO DE PAREDE TOTAL MEDIDO=", t4 - t3, " segundos "
     !
@@ -93,16 +72,15 @@
     use mGeomecanica,      only: idDesloc, idiagD, neqD, nalhsD
     use mHidroDinamicaRT,  only: neqV, nalhsV, idiagV, idVeloc,simetriaVel
     !
-    use mMalha,            only: nen, nsd, numel
+    use mMalha,            only: nen, nsd
     use mMalha,            only: numLadosElem, numLadosReserv
     use mMalha,            only: numnp, x, numelReserv, numnpReserv
-    use mMalha,            only: conecLadaisElem,conecNodaisElem
-    use mMalha,            only: listaDosElemsPorFace
+
     use mMalha,            only: IrregMesh, Dirichlet, Neumann
-    use mMalha,            only: IDome, I4SeaLoad
+    use mMalha,            only: I4SeaLoad
     use mMalha,            only: FNCPROCESS, FNCINIT, FNCSOLID
     !
-    use mLeituraEscrita,                 only: iin, iecho, icoords, echo, iflag_tipoPrint
+    use mLeituraEscrita,                 only: iecho, echo, iflag_tipoPrint
     use mLeituraEscritaSimHidroGeoMec,   only: leituraGeoformations_DS, leituraGeoformations3D_DS, ifdata
     use mLeituraEscritaSimHidroGeoMec,   only: inittime,lerDataIn_DS,lerNumericParam_DS
     use mLeituraEscritaSimHidroGeoMec,   only: lerCreepParam_DS, lerGeoMechParam_DS
@@ -112,30 +90,19 @@
     !
     use mPropGeoFisica,    only: lerPropriedadesFisicas
     use mPropGeoFisica,    only: nelx, nely, nelz
-    use mPropGeoFisica,    only: nr, hx, hy, hz
+    use mPropGeoFisica,    only: nr
     use mPropGeoFisica,    only: nelxReserv, nelyReserv, nelzReserv
-    use mPropGeoFisica,    only: XTERLOAD, RHOW, RHOO, GEOMECLAW
+    use mPropGeoFisica,    only: XTERLOAD, GEOMECLAW
     !
-    use mHidrodinamicaRT,  only: fVeloc, pressaoElem, pressaoElemAnt,leituraCoordenadasPoco
+    use mHidrodinamicaRT,  only: fVeloc, leituraCoordenadasPoco
     use mHidroDinamicaRT,  only: NCONDP,PCONDP, lerParametrosHidrodinamica_DS, optSolverV
     use mGeomecanica,      only: fDesloc, InSeaLoad, optSolverD, simetriaGeo
     use mTransporte,       only: satElem, satinit
     use mInputReader,      only: readInputFileDS, LEIturaGERacaoCOORdenadasDS
-    use mLeituraEscritaSimHidroGeoMec,  only: LEIturaGERacaoCOORdenadas3D
     use mInputReader,      only: leituraCodigosCondContornoDS,leituraValoresCondContornoDS
-    !
-    use leituraEscritaMCMC,             only: INITMCMC
-
-    use mHidrodinamicaGalerkin, only: hgNdof, hgNeq
-    use mHidrodinamicaGalerkin, only: hgId
-    use mHidrodinamicaGalerkin, only: hgF
 
     !
     implicit none
-    !
-    real*8            :: t1, t2
-    character(len=21) :: label
-    integer           :: i, neq
 
     character(len=50) :: keyword_name
     !
@@ -306,13 +273,9 @@
     !
     call satinit(nsd,numelReserv,satElem)
     !
-    !.... inicializa as variaveis para o MCMC
+    !    inicializa a pressão para o galerkin
     !
-    if (.not.solidonly) then
-        CALL INITMCMC(NCONDP,PCONDP)
-    end if
-    !
-    call initGalerkinPressure(numnpReserv, numel, nen)
+    call initGalerkinPressure(numnpReserv)
     !
     !
 1000 format(20a4)
@@ -356,10 +319,6 @@
         &'    eq. 0, Not Multiply by External Load               ',   /5x,&
         &'    eq. 1, Multiply by External Load                   ',  //)
 9001 FORMAT("Solvers escolhidos para a solucao do sistema de equacoes: Hidro:",A7, ", Geo:", A7)
-    !5x,&
-    !     &' Integer to Read Curve Dome Profile      (IDome    ) = ',I2/5X,&
-    !     &'    eq. 0, Not Read Sismic Profile for Dome            ',   /5x,&
-    !     &'    eq. 1, Read Sismic Profile for Dome                '//)
     !
     end subroutine preprocessador_DS
     !
@@ -393,16 +352,8 @@
     logical, intent(inout) :: listaSolverDisponivel_(*)
 
     listaSolverDisponivel_(1)=.true. !skyline
-#ifdef withPardiso
-    listaSolverDisponivel_(2)=.true. !pardiso
-#else
     listaSolverDisponivel_(2)=.false. !pardiso
-#endif
-#ifdef withHYPRE
-    listaSolverDisponivel_(3)=.true. !hypre
-#else
     listaSolverDisponivel_(3)=.false. !hypre
-#endif
 
     print*, "Solvers disponiveis:"
     print*, "                      SKYLINE"
@@ -417,14 +368,12 @@
     !
     use mGlobaisEscalares
     use mLeituraEscrita,   only : iflag_tipoPrint
-    use mGeomecanica, only: ndofD, nlvectD
-    use mHidrodinamicaRT, only: ndofV, nlvectV, nlvectP, ndofP
-    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXMESH, CYLINDER
+    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXMESH
     !
     use mMalha,            only : x, conecNodaisElem
     !
-    use mPropGeoFisica,    only : YOUNG, PERMKX, MASCN
-    use mPropGeoFisica,    only : TOLCREEP, PORE, PWELL
+    use mPropGeoFisica,    only : YOUNG, PERMKX
+    use mPropGeoFisica,    only : TOLCREEP
     !
     use mGeomecanica,      only : DIS, DTRL, DIS0
     use mGeomecanica,      only : DIVU, STRSS0, GEOPRSR, POS4STRS
@@ -504,57 +453,47 @@
     !
     use mGlobaisEscalares
     use mLeituraEscrita, only: iflag_tipoPrint
-    use mGeomecanica, only: ndofD, nlvectD
-    use mHidrodinamicaRT, only: ndofV, nlvectV, nlvectP, ndofP
-    use mGeomecanica,      only : idDesloc, ALHSD, STRS3D
-    use mHidroDinamicaRT,  only : nAlhsV, alhsV, brhsV,neqV
-    use mGlobaisArranjos,  only : mat, c
+    use mGeomecanica, only: ndofD
+    use mHidrodinamicaRT, only: ndofV, ndofP
     !
     use mLeituraEscritaSimHidroGeoMec,   only : imprimirCondicoesIniciais
     use mLeituraEscritaSimHidroGeoMec,   only : imprimirSolucaoNoTempo
     use mLeituraEscritaSimHidroGeoMec,   only : isat,escreverArqParaviewIntermed
-    use mLeituraEscritaSimHidroGeoMec,   only : iflag_sat,iflag_mass
+    use mLeituraEscritaSimHidroGeoMec,   only : iflag_sat
     use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXINFO, IFEDX
     !
     use mMalha,            only : nsd, numel,numelReserv, nen
-    use mMalha,            only : numnp, numnpReserv
+    use mMalha,            only : numnp
     use mMalha,            only : numLadosReserv, numLadosElem
-    use mMalha,            only : x, xc
+    use mMalha,            only : x
     use mMalha,            only : conecNodaisElem, conecLadaisElem
     !
-    use mPropGeoFisica,    only : phi, hx,hy,hz,nelx, nely, nelz
-    use mPropGeoFisica,    only : perm, permkx, permky, permkz, phi0
-    use mPropGeoFisica,    only : iflag_prod, tprt_prod
-    use mPropGeoFisica,    only : np_rand_prod, dtprt_prod
+    use mPropGeoFisica,    only : phi
+    use mPropGeoFisica,    only : permkx, phi0
     use mPropGeoFisica,    only : lerPropriedadesFisicas
     use mPropGeoFisica,    only : PORE, PORE0, PHIEULER
-    use mPropGeoFisica,    only : YOUNG, GEOFORM, MASCN0, MASCN
-    use mPropGeoFisica,    only : RHOW, RHOO
+    use mPropGeoFisica,    only : YOUNG, MASCN0, MASCN
     !
     use mTransporte,       only : transport, calc_prod
-    use mTransporte,       only : satElem, satElemAnt
+    use mTransporte,       only : satElem
     use mTransporte,       only : satElemL, satElemL0, satElem0
     !
-    use mGeomecanica,      only : SIGMAT, SIGMA0, GEOTIME, VDP, NED2
-    use mGeomecanica,      only : NROWB, IOPT, NINTD, NROWB2
+    use mGeomecanica,      only : SIGMAT, SIGMA0, GEOTIME
+    use mGeomecanica,      only : NROWB
     use mGeomecanica,      only : DIS, DIS0, AVSTRS, PRINT_DX
     use mGeomecanica,      only : DIVU0, DIVU, STRSS0, TMANDEL, GEOPRSR
     use mGeomecanica,      only: geomechanic
     !
     use mHidrodinamicaRT,  only : hidroGeomecanicaRT,  pressaoElem
     use mHidrodinamicaRT,  only : velocLadal, pressaoElemAnt, vc, velocNodal
-    use mHidroDinamicaRT,  only : NCONDP, NPRESPRODWELL, PCONDP, PRESMEDIAINICIAL, PRESPROD
-    USE mPropGeoFisica,    only : GEOFORM,HX,HY
-
-    use leituraEscritaMCMC,             only : imprimirCondicoesIniciaisMCMC,imprimirSolucaoNoTempoMCMC
+    use mHidroDinamicaRT,  only : NPRESPRODWELL, PRESMEDIAINICIAL, PRESPROD
     !
     IMPLICIT NONE
     !
     !.... solution driver program
     !
     LOGICAL       :: JUMPINDXK, JUMPINDXL
-    INTEGER       :: I, INDEXL, INDEXK
-    REAL*8        :: T1, T2
+    INTEGER       :: INDEXL, INDEXK
     character(21) :: labelTransp
     !
     REAL(8)       :: ERRSZSIG, ERRSZVEL, ERRSIG0, ERRVEL0
@@ -568,15 +507,13 @@
     !.... imprime condicoes iniciais
     !
     call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-        permkx, satElem, YOUNG, DIS, PORE, PRESPROD, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
-    !
-    call imprimirCondicoesIniciaisMCMC(phi, satElem)
+        permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
     !
     IF(iflag_tipoPrint.EQ.3)THEN
         IF (NUMDX.GT.0) THEN
             IF (MOD(NNP,NUMDX).EQ.0) THEN
                 CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                    &                       STRSS0,VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
+                    &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
             ENDIF
         ENDIF
     END IF
@@ -654,7 +591,7 @@
                 call hidroGeomecanicaRT(satElemL,satElemL0,SIGMAT,SIGMA0,TIMEINJ)
                 !...  .. ...
                 CALL GEOMECHANIC('RIGHT_SIDE_2_SOLVE')
-                CALL UPDTINIT(X,DIS,DIS0,NDOFD,NUMNP,INITS3)
+                CALL UPDTINIT(DIS,DIS0,NDOFD,NUMNP,INITS3)
                 CALL GEOMECHANIC('ELAST_STRSS_SIGMAT')
                 CALL GEOMECHANIC('RESETS_FORCE_VECTR')
                 !.... ..
@@ -686,7 +623,7 @@
         !...
         tTransporte=tTransporte+dtBlocoTransp
         !
-        call calc_prod(ndofV,numLadosElem,numnpReserv,numelReserv,&
+        call calc_prod(ndofV,numLadosElem,numelReserv,&
             &     nsd,nen, conecNodaisElem, conecLadaisElem,velocLadal, &
             &     satElem,x,tTransporte)
         !
@@ -701,16 +638,13 @@
         !.... imprime solucao intermediaria no tempo
         !
         call imprimirSolucaoNoTempo(satElem,DIS,PORE,YOUNG,GEOPRSR,pressaoElem, velocLadal, velocNodal, &
-            &       VC, NCONDP, PCONDP, PRESPROD, AVSTRS, MASCN, tTransporte, NDOFV,NDOFP, NDOFD, nrowb)
-
-        call imprimirSolucaoNoTempoMCMC(satElem,DIS,PORE,pressaoElem, &
-            velocLadal,NCONDP,PCONDP,tTransporte)
+            &       VC, AVSTRS, MASCN, tTransporte, NDOFV,NDOFP, NDOFD, nrowb)
         !
         IF(iflag_tipoPrint.EQ.3)THEN
             IF (NUMDX.GT.0) THEN
                 IF (MOD(NNP,NUMDX).EQ.0) THEN
                     CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                        &                       STRSS0,VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
+                        &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
                 ENDIF
             ENDIF
         END IF
@@ -762,21 +696,19 @@
     !
     !**** new ******************************************************************
     !
-    SUBROUTINE UPDTINIT(X,DIS,DIS0,NDOFD,NUMNP,LFLAG)
+    SUBROUTINE UPDTINIT(DIS,DIS0,NDOFD,NUMNP,LFLAG)
     !
     IMPLICIT NONE
     !
     LOGICAL :: LFLAG
-    INTEGER :: I,NODE, NDOFD, NUMNP,nnp
-    REAL(8), DIMENSION(NDOFD,NUMNP) :: X, DIS, DIS0
+    INTEGER :: I,NODE, NDOFD, NUMNP
+    REAL(8), DIMENSION(NDOFD,NUMNP) :: DIS, DIS0
     !
     IF (.NOT.LFLAG) RETURN
 
     DO 200 NODE=1, NUMNP
         DO 100 I=1,NDOFD
             DIS(I,NODE) = DIS(I,NODE)-DIS0(I,NODE)
-            !          DIS(2,NODE) = DIS(2,NODE)-DIS0(2,NODE)
-            !          write(2020+nnp,4500) NODE, DIS(1,NODE), DIS(2,NODE)
 100     CONTINUE
 200 CONTINUE
     !
@@ -790,12 +722,9 @@
     subroutine processamento_creep()
     use mLeituraEscrita, only: iflag_tipoPrint
 
-    use mHidroDinamicaRT,  only : neqV,nAlhsV, alhsV, brhsV
-    use mGeomecanica,      only : ALHSD
-    use mGlobaisArranjos,  only : mat, c
     use mGlobaisEscalares
-    use mGeomecanica, only: ndofD, nlvectD
-    use mHidrodinamicaRT, only: ndofV, nlvectV, nlvectP, ndofP
+    use mGeomecanica, only: ndofD
+    use mHidrodinamicaRT, only: ndofV, ndofP
     !
     use mLeituraEscritaSimHidroGeoMec,   only : imprimirCondicoesIniciais,imprimirSolucaoNoTempo
     use mLeituraEscritaSimHidroGeoMec,   only : escreverArqParaviewIntermed
@@ -803,45 +732,37 @@
     use mLeituraEscritaSimHidroGeoMec,   only : isat, iflag_sat
     !
     use mMalha,            only : nsd, numel, numelReserv, nen
-    use mMalha,            only : numnp, numnpReserv
+    use mMalha,            only : numnp
     use mMalha,            only : numLadosReserv, numLadosElem
-    use mMalha,            only : x, xc
+    use mMalha,            only : x
     use mMalha,            only : conecNodaisElem, conecLadaisElem
     !
-    use mPropGeoFisica,    only : phi, phi0, hx, hy, hz
-    use mPropGeoFisica,    only : nelx, nely, nelz
-    use mPropGeoFisica,    only : perm, permkx,permky,permkz
-    use mPropGeoFisica,    only : iflag_prod, tprt_prod
-    use mPropGeoFisica,    only : np_rand_prod, dtprt_prod
+    use mPropGeoFisica,    only : phi, phi0
+    use mPropGeoFisica,    only : permkx
     use mPropGeoFisica,    only : lerPropriedadesFisicas
     use mPropGeoFisica,    only : DTCREEP, TOLCREEP
     use mPropGeoFisica,    only : PORE, PORE0, PHIEULER
-    use mPropGeoFisica,    only : YOUNG, GEOFORM, MASCN0, MASCN
-    use mPropGeoFisica,    only : RHOW, RHOO
+    use mPropGeoFisica,    only : YOUNG, MASCN0, MASCN
     !
-    use mTransporte,       only : transport, satElem, satElemAnt, calc_prod
+    use mTransporte,       only : transport, satElem, calc_prod
     use mTransporte,       only : satElemL, satElemL0, satElem0
     use mGeomecanica,      only : SIGMAT, SIGMA0, GEOTIME, RESMAX
-    use mGeomecanica,      only : NWTNITER, RESIDUAL, VDP, NED2
-    use mGeomecanica,      only : HMTTG, NROWB, IOPT, NINTD, NROWB2
+    use mGeomecanica,      only : NWTNITER, RESIDUAL
+    use mGeomecanica,      only : NROWB
     use mGeomecanica,      only : GEOSETUP, DIS, DIS0, AVSTRS, PRINT_DX
     use mGeomecanica,      only : DIVU0, DIVU, DTRL, STRSS0, GEOPRSR
     use mGeomecanica,      only: geomechanic
     !
     use mHidrodinamicaRT,  only : hidroGeomecanicaRT, vc, velocLadal, velocNodal
     use mHidrodinamicaRT,  only : pressaoElem, pressaoElemAnt
-    use mHidroDinamicaRT,  only : NPRESPRODWELL,PRESMEDIAINICIAL,PRESPROD,PCONDP,NCONDP
-    !
-    USE mPropGeoFisica,    only : GEOFORM,HX,HY
-    use leituraEscritaMCMC,             only : imprimirCondicoesIniciaisMCMC,imprimirSolucaoNoTempoMCMC
+    use mHidroDinamicaRT,  only : NPRESPRODWELL,PRESMEDIAINICIAL,PRESPROD
     !
     implicit none
     !
     !.... solution driver program
     !
     LOGICAL       :: JUMPINDXK, JUMPINDXL, LJUMP
-    INTEGER       :: I, INDEXL, INDEXK
-    REAL*8        :: T1, T2
+    INTEGER       :: INDEXL, INDEXK
     character(21) :: labelTransp
     !
     REAL(8)       :: ERRSZSIG, ERRSZVEL, ERRSIG0, ERRVEL0
@@ -859,15 +780,13 @@
     !.... imprime condicoes iniciais
     !
     call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-        permkx, satElem, YOUNG, DIS, PORE, PRESPROD, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
-    !
-    call imprimirCondicoesIniciaisMCMC(phi, satElem)
+        permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
     !
     IF(iflag_tipoPrint.EQ.3)THEN
         IF (NUMDX.GT.0) THEN
             IF (MOD(NNP,NUMDX).EQ.0) THEN
                 CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                    &                       STRSS0,VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
+                    &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
             ENDIF
         ENDIF
     END IF
@@ -964,7 +883,7 @@
             !
             !.... .. ...  CORRECTION WITH INITIAL DISPLACEMENTS
             !
-            CALL UPDTINIT(X,DIS,DIS0,NDOFD,NUMNP,INITS3)
+            CALL UPDTINIT(DIS,DIS0,NDOFD,NUMNP,INITS3)
             !.... .. ...
             call GEOMECHANIC('CREEP_STRSS_SIGMAT')
             !.... .. ...
@@ -1005,7 +924,7 @@
         !...
         tTransporte=tTransporte+dtBlocoTransp
         !
-        call calc_prod(ndofV,numLadosElem,numnpReserv,numelReserv, &
+        call calc_prod(ndofV,numLadosElem,numelReserv, &
             &      nsd,nen, conecNodaisElem, conecLadaisElem,velocLadal, &
             &      satElem, x,tTransporte)
         !
@@ -1021,16 +940,14 @@
         !.... imprime solucao intermediaria no tempo
         !
         call imprimirSolucaoNoTempo(satElem,DIS,PORE,YOUNG,GEOPRSR,pressaoElem, velocLadal, velocNodal, &
-            &       VC, NCONDP, PCONDP, PRESPROD, AVSTRS, MASCN, tTransporte, NDOFV,NDOFP, NDOFD, nrowb)
-        !
-        call imprimirSolucaoNoTempoMCMC(satElem,DIS,PORE,pressaoElem, &
-            &      velocLadal,NCONDP,PCONDP,tTransporte)
+            &       VC, AVSTRS, MASCN, tTransporte, NDOFV,NDOFP, NDOFD, nrowb)
+
         !
         IF(iflag_tipoPrint.EQ.3)THEN
             IF (NUMDX.GT.0) THEN
                 IF (MOD(NNP,NUMDX).EQ.0) THEN
                     CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                        &                       STRSS0,VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
+                        &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
                 ENDIF
             ENDIF
         END IF
@@ -1144,73 +1061,11 @@
 4000 FORMAT(i5,2x,2(1PE15.8,2x))
     END FUNCTION
     !
-    !**** new **********************************************************************
-    !
-    subroutine InicializacaoGEO()
-    !
-    use mGeomecanica
-    use mGlobaisEscalares, only:  NUMDX, NNP
-    use mGlobaisEscalares, only: TypeProcess
-    !
-    use mHidrodinamicaRT,  only: pressaoElem, vc
-    use mTransporte,       only: satElem, satElemAnt
-    use mPropGeoFisica,    only: phi, phi0, PERMKX, YOUNG
-    use mPropGeoFisica,    only: PORE, PORE0, MASCN, MASCN0
-    use mPropGeoFisica,    only: RHOW, RHOO, XTERLOAD, PHIEULER
-    !
-    use mMalha,            only: numel, nsd, nen, numnp
-    use mMalha,            only: conecNodaisElem
-    use mMalha,            only: x, xc, numelReserv
-    !
-    !..NEW LINES 4 COMPRESSIBLE MODEL MASS CONTENT ARRAYS
-    !
-    IMPLICIT NONE
-    !
-    integer :: i
-    !.... SETUP SATURATION AT TIME ZERO
-    !
-    satElemAnt = satElem
-    !
-    !.... SETUP EULERIAN AND 'CLASSICAL' POROSITIES AT TIME ZERO
-    !
-    PHI0     = PHI
-    PORE     = PHI
-    PORE0    = PHI0
-    MASCN    = PORE
-    MASCN0   = PORE0
-    PHIEULER = PORE
-    strss0   = 0.0D0
-    !
-    if(.not.allocated(ALHSD)) allocate(ALHSD(NALHSD))
-    if(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
-    !
-    !.... CLEAR LEFT AND RIGHT HAND SIDE FOR THE ELASTIC  PROBLEM
-    !
-    ALHSD = 0.0D0
-    BRHSD = 0.0D0
-    !
-    IF (TypeProcess.EQ.'MANDEL') THEN
-        CALL FTODMANDL(FDesloc,NDOFD,NUMNP,NLVECTD,XTERLOAD,0.0D0)
-    ENDIF
-    !
-    !.... ACCOUNT THE NODAL FORCES IN THE R.H.S.
-    !
-    IF (NLVECTD.GT.0) &
-        CALL LOAD(idDesloc,fDesloc,brhsd,NDOFD,NUMNP,NLVECTD)
-    !
-    IF (NLVECTD.GT.0) &
-        CALL FTOD(idDesloc,DIS,fDesloc,NDOFD,NUMNP,NLVECTD)
-
-    !
-    RETURN
-    !
-    END SUBROUTINE
-    !
     !**** NEW **********************************************************************
     !
     subroutine alocarMemoria()
     use mGlobaisArranjos,  only: uTempoN, mat, grav, beta
-    use mHidrodinamicaRT,  only: ndofV, nlvectV, nlvectP, ndofP
+    use mHidrodinamicaRT,  only: ndofV, nlvectV, ndofP
     use mGlobaisEscalares, only: novaMalha
     !
     use mMalha,            only: nsd, numel, numelReserv, numnp, numnpReserv
@@ -1224,10 +1079,9 @@
     use mTransporte,       only: satElemAnt, satElem
     use mTransporte,       only: satElemL, satElemL0, satElem0
     use mGeomecanica
-    use mPropGeoFisica,    only: GEOFORM, MASCN, MASCN0, PHIEULER
+    use mPropGeoFisica,    only: GEOFORM, MASCN, MASCN0
     use mHidrodinamicaRT,  only: pressaoElem, pressaoElemAnt,PRESPRODWELL,NCONDP
     use mHidrodinamicaRT,  only: vc, ve, velocLadal, fVeloc, velocNodal
-    use mSolverPardiso, only: listaDosElemsPorNoCRS
 
     !
     implicit none
@@ -1276,16 +1130,6 @@
     listaDosElemsPorNo = 0
     allocate(listaDosElemsPorFace(numLadosElem,numLadosReserv))
     listaDosElemsPorFace = 0
-
-#ifdef withcrs
-    if(novaMalha.eqv..true.) then
-        allocate(listaDosElemsPorNoCRS(7,numnp))
-        listaDosElemsPorNoCRS = 0
-    else
-        allocate(listaDosElemsPorNoCRS(nen,numnp))
-        listaDosElemsPorNoCRS = 0
-    endif
-#endif
     !
     !contorno
     !
@@ -1357,20 +1201,17 @@
     !
     SUBroutine TOPologiaMALhaSistEQUAcoesDS(NALHSV,NEQV,NALHSD,NEQD)
     use mGlobaisEscalares
-    use mGeomecanica, only: ndofD, nlvectD, optSolverD, LMStencilGeo
-    use mHidrodinamicaRT, only: ndofV, nlvectV, nlvectP, ndofP , optSolverV, LMStencilVel
+    use mGeomecanica, only: ndofD, optSolverD
+    use mHidrodinamicaRT, only: ndofV, optSolverV
     use mGlobaisArranjos
-    use mLeituraEscrita, only: iin, iecho, nprint, prntel
+    use mLeituraEscrita, only: iecho, nprint, prntel
     use mLeituraEscritaSimHidroGeoMec, only: GEOREGION_DS
     !
-    use mHidroDinamicaRT, only: lmV, idVeloc, idiagV, nedV, ApVel, AiVel
-    use mHidrodinamicaRT, only: fVeloc, simetriaVel
-    use mHidroDinamicaRT, only: numCoefPorLinhaVel,  meanbwV
-    use mGeomecanica,     only: LMD, IDIAGD,ALHSD, BRHSD, CLHSD, IDDESLOC, ApGeo, AiGeo
-    use mGeomecanica,     only: AUXM,IOPT,NED,NED2,NEE,NEE2,NEESQ,NEESQ2,NESD,NSTR,simetriaGeo
-    use mGeomecanica,     only: numCoefPorLinhaGeo
+    use mHidroDinamicaRT, only: lmV, idVeloc, idiagV, nedV
+    use mHidroDinamicaRT, only: meanbwV
+    use mGeomecanica,     only: LMD, IDIAGD, IDDESLOC
+    use mGeomecanica,     only: AUXM,IOPT,NED,NED2,NEE,NEE2,NEESQ,NEESQ2,NESD,NSTR
     !
-    use mMalha,          only: IrregMesh
     use mMalha,          only: numel, numnp, nsd, nen
     use mMalha,          only: numLadosElem,numLadosReserv
     use mMalha,          only: numelReserv,numnpReserv
@@ -1379,21 +1220,14 @@
     use mMalha,          only: listaDosElemsPorNo
     use mMalha,          only: listaDosElemsPorFace
     use mMalha,          only: criarListaVizinhos
-    use mMalha,          only: genel, genelFaces
-    use mMalha,          only: formlm, renumerarMalha
+    use mMalha,          only: genel
+    use mMalha,          only: formlm
     !
-    use mPropGeoFisica,  only: hx,hy,hz,nelx,nely,nelz, calcdim
-    use mPropGeoFisica,  only: nelxReserv, nelyReserv, nelzReserv
-    use mPropGeoFisica,  only: GEOFORM
-    !
-    use mSolverPardiso, only: criarPonteirosMatEsparsa_CRS
-    use mSolverPardiso, only: listaDosElemsPorNoCRS
-    use mSolverPardiso, only: criarListaVizinhosCRS
+    use mPropGeoFisica,  only: hx,hy,hz, calcdim
+    use mPropGeoFisica,  only: nelxReserv, nelyReserv
 
     use mInputReader,      only: readNodeElementsDS, readMaterialPropertiesDS, readConstantBodyForcesDS
     use mInputReader,      only: genelFacesDS, leituraGeracaoConectividadesDS
-
-    use mSolverHypre
     !
 
     !
@@ -1402,22 +1236,11 @@
     !.... program to set arrays storage
     !
     integer :: NALHSV, NEQV, NALHSD, NEQD
-    integer :: numConexoesPorElem
-    integer :: i, m, n, nel
+    integer :: i
     real*8, allocatable :: xl(:,:)
-    real*8 :: t1, t2
-    !
-    !... NEW FOR IRREGULAR  MESH
-    !
-    INTEGER, DIMENSION(NEN,NUMEL)  :: OLDIEN
-    INTEGER :: INIEN, NODE
-    CHARACTER*30 NAMEIN
-    !... END FOR IRREGULAR MESH
 
     character(len=50) keyword_name
     integer :: ierr
-
-    integer*4 :: localSize_V, localSize_G
     !
     !.... calculate hx, hy, hz
     !
@@ -1478,7 +1301,7 @@
     if (nsd==2) then
         call leituraGeracaoConectividadesDS(keyword_name, conecLadaisElem, mat, numLadosELem, ierr)
     else
-        call genelFacesDS(keyword_name, conecLadaisElem, numLadosElem, nelxReserv, nelyReserv, nelzReserv, ierr)
+        call genelFacesDS(keyword_name, conecLadaisElem, numLadosElem, nelxReserv, nelyReserv, ierr)
     endif
 
     listaDosElemsPorNo=0
@@ -1487,21 +1310,6 @@
     listaDosElemsPorFace=0
     call criarListaVizinhos(numladosElem,numLadosReserv, &
         &     numelReserv,conecLadaisElem,listaDosElemsPorFace)
-
-#ifdef withcrs
-    if(novaMalha.eqv..true.)then
-        listaDosElemsPorNoCRS=0
-        call criarListaVizinhosCRS(nen, numnp, numel,7,&
-            &         conecNodaisElem,listaDosElemsPorNoCRS  )
-    endif
-#endif
-
-#ifdef debug
-    if(iprtin.eq.0) then
-        call prntel(mat,conecNodaisElem,nen,numel,1)
-        call prntel(mat,conecLadaisElem,numLadosELem,numelReserv,2)
-    end if
-#endif
     !
     !.... generation of velocity lm array
     !
@@ -1520,7 +1328,7 @@
         meanbwV = nalhsV/neqV
         write(iecho,9000) neqV, nalhsV, meanbwV, 8.0*nalhsV/1000/1000
     end if
-    
+
     !     calculo de xc (centros dos elementos)
     allocate(xl(nsd,nen)); xl=0.0
     do i=1,numel
@@ -1559,85 +1367,25 @@
     CALL GEOREGION_DS(XC,NSD,NUMEL)
 
     if(optSolverV=='pardiso') then
-        call timing(t1)
-        if(nsd==2) numCoefPorLinhaVel=7
-        if(nsd==3) numCoefPorLinhaVel=11
-        numConexoesPorElem=numLadosElem
-        call criarPonteirosMatEsparsa_CRS(nsd, ndofV, neqV, &
-            &        numCoefPorLinhaVel, conecLadaisElem, &
-            &        listaDosElemsPorFace, idVeloc, LMStencilVel, ApVel, AiVel, numLadosReserv, &
-            &        numLadosElem, numConexoesPorElem, nalhsV, &
-            &        simetriaVel)
-        !
-        call timing(t2)
-#ifdef mostrarTempos
-        write(*,9002) t2-t1
-#endif
+        write(*,*) ' não implementado '
+        stop 9
     endif
     !
     if(optSolverD=='pardiso') then
-        call timing(t1)
-
-        if(novaMalha.eqv..true.) then
-            numCoefPorLinhaGeo=26
-            numConexoesPorElem=7
-            call criarPonteirosMatEsparsa_CRS(nsd, ndofD, neqD, &
-                &              numCoefPorLinhaGeo, conecNodaisElem, &
-                &              listaDosElemsPorNoCRS, idDesloc, LMStencilGeo, ApGeo, AiGeo, numnp, nen, &
-                &              numConexoesPorElem, nalhsD, simetriaGeo)
-        else
-            if(nsd==2) then
-                numCoefPorLinhaGeo=18
-                numConexoesPorElem=4
-            endif
-            if(nsd==3) then
-                numCoefPorLinhaGeo=81
-                numConexoesPorElem=8
-            end if
-
-            call criarPonteirosMatEsparsa_CRS(nsd, ndofD, neqD, &
-                &              numCoefPorLinhaGeo, conecNodaisElem, &
-                &              listaDosElemsPorNo, idDesloc, LMStencilGeo, ApGeo, AiGeo, numnp, nen, &
-                &              numConexoesPorElem, nalhsD, simetriaGeo)
-
-        endif
-
-        call timing(t2)
-#ifdef mostrarTempos
-        write(*,9003) t2-t1
-#endif
+        write(*,*) ' não implementado '
+        stop 9
     endif
     !
     print*, "NALHSV=", NALHSV, "NALHSD=", NALHSD
 
     if(optSolverV=="hypre") then
-
-        Clower_V = 1 - 1
-        Cupper_V = neqV-1
-        localSize_V=CUpper_V-Clower_V+1
-        if(.not.allocated(rows_V)) allocate(rows_V(localSize_V))
-        do i = 1, localSize_V
-            rows_V(i) = i - 1
-        end do
-        call criarMatriz_HYPRE    (A_HYPRE_V, Clower_V, Cupper_V, mpi_comm )
-        call criarVetor_HYPRE     (b_HYPRE_V, Clower_V, Cupper_V, mpi_comm )
-        call criarVetor_HYPRE     (u_HYPRE_V, Clower_V, Cupper_V, mpi_comm )
-
+        write(*,*) ' não implementado '
+        stop 9
     endif
 
     if(optSolverD=="hypre") then
-
-        Clower_G = 1 - 1
-        Cupper_G = neqD-1
-        localSize_G=CUpper_G-Clower_G+1
-        if(.not.allocated(rows_G)) allocate(rows_G(localSize_G))
-        do i = 1, localSize_G
-            rows_G(i) = i - 1
-        end do
-        !          call criarMatriz_HYPRE    (A_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        !          call criarVetor_HYPRE     (b_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-        !          call criarVetor_HYPRE     (u_HYPRE_G, Clower_G, Cupper_G, mpi_comm )
-
+        write(*,*) ' não implementado '
+        stop 9
     endif
     !
     return
@@ -1708,8 +1456,6 @@
     !
     FUNCTION DESPRESSURIZAR_INIT(BWP,DT,nvel)
     !
-    use mMalha,            only : numel
-    USE mPropGeoFisica,    only : GEOFORM
     use mHidroDinamicaRT,  only : pressaoElem
     use mHidroDinamicaRT,  ONLY : TPRESPRODWELL,NPRESPRODWELL,PRESMEDIAINICIAL
     use mHidroDinamicaRT,  ONLY : NCONDP,ELEM_CONDP
@@ -1720,14 +1466,6 @@
     REAL(8) :: DESPRESSURIZAR_INIT
     INTEGER :: NEL,NVEL
     !
-    !      PRESMEDIAINICIAL = 1E30
-    !      DO NEL=1,NUMEL
-    !         IF(GEOFORM(NEL).EQ.'RESERVATORIO')THEN
-    !            IF(pressaoElem(1,NEL).LE.PRESMEDIAINICIAL)THEN
-    !               PRESMEDIAINICIAL=pressaoElem(1,NEL)
-    !            end IF
-    !         END IF
-    !      END DO
     PRESMEDIAINICIAL = -1E30
     DO NEL=1,NCONDP
         IF(pressaoElem(1,ELEM_CONDP(NEL)).GE.PRESMEDIAINICIAL)THEN
@@ -1762,13 +1500,13 @@
 
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine initGalerkinPressure(nnp, nel, nen)
+    subroutine initGalerkinPressure(nnp)
     !variable imports
     use mHidrodinamicaGalerkin, only: hgNumPassosTempo, hgTempoTotal
     use mHidrodinamicaGalerkin, only: hgInitialPressure, hgPrevPressure, hgPressure
     use mHidrodinamicaGalerkin, only: hgNdof, hgNlvect, hgNeq
     use mHidrodinamicaGalerkin, only: hgF
-    use mHidrodinamicaGalerkin, only: hgId, hgLm
+    use mHidrodinamicaGalerkin, only: hgId
 
     use mLeituraEscrita, only:iecho
     use mGlobaisEscalares, only: iprtin, betaCompressibility
@@ -1780,30 +1518,30 @@
     implicit none
 
     !variable input
-    integer nnp, nel, nen
+    integer nnp
 
     !variables
     character(len=50) :: keyword_name
     integer :: ierr
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     keyword_name = "numeroPassosTempoP"
     call readIntegerKeywordValue(keyword_name, hgNumPassosTempo, 0_4, ierr)
-    
+
     keyword_name = "tempoTotal"
     call readRealKeywordValue(keyword_name, hgTempoTotal, 0.0d0, ierr)
     hgTempoTotal = hgTempoTotal * 2592000.0 ! converts months to seconds
-    
+
     keyword_name = "hgCompressibilidade"
     call readRealKeywordValue(keyword_name, betaCompressibility, 0.0d0, ierr)
-    
+
     keyword_name = "hgNlvect"
     call readIntegerKeywordValue(keyword_name, hgNlvect, 0_4, ierr)
-    
+
     keyword_name = "pressao_inicial_fluxo"
     call readRealKeywordValue(keyword_name, hgInitialPressure, 0.0d0, ierr)
-    
-    
+
+
     hgNdof = 1
     allocate(hgPrevPressure(hgNdof, nnp))
     hgPrevPressure = 0.0d0
@@ -1853,31 +1591,31 @@
         ! inicializar a solução no passo anterior
         hgPrevPressure = hgInitialPressure
     endif
-    
+
     ! print initial state
     call escreverArqParaview(ihgPres, hgPrevPressure, hgNdof, numnp, nen, conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservHGPres)
 
     ! mount data structure
     call montarEstruturasDadosPressaoSkyline(conecNodaisElem, nen, numel)
-    
+
     !time loop
     t = 0
     deltaT = hgTempoTotal / hgNumPassosTempo
     do curTimeStep = 1, hgNumPassosTempo
         t = t + deltaT
         write(*,*) "tempo", t, "passo de tempo", curTimeStep
-        
+
         ! mount equation system
         call montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, numel, numnp, nsd, x)
-        
+
         !solve
         call solveGalerkinPressao(curTimeStep, numnp)
-        
+
         !print current solution
         write(num,'(f12.5)') t / 2592000
         labelTempo="t="//ADJUSTL(num)
         call escreverArqParaviewIntermed(ihgPres, hgPressure, hgNdof, numnp, trim(labelTempo), len(trim(labelTempo)))
-        
+
         ! copy solution to previous array
         do j = 1, numnp
             do i = 1, hgNdof

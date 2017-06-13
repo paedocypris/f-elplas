@@ -4,7 +4,7 @@
 		<Platform Name="Win32"/></Platforms>
 	<Configurations>
 		<Configuration Name="Debug|Win32">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" WarningsAsErrors="true" Diagnostics="diagnosticsShowAll" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarningsAsErrors="true" Diagnostics="diagnosticsShowAll" WarnInterfaces="true" Traceback="true" RuntimeChecks="rtChecksNone" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
 				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
@@ -62,12 +62,9 @@
 		<File RelativePath=".\fonte\leituraEscrita.F90"/>
 		<File RelativePath=".\fonte\leituraEscritaSimHidroGeoMec.F90"/>
 		<File RelativePath=".\fonte\malha.F90"/>
-		<File RelativePath=".\fonte\mcmc.F90"/>
 		<File RelativePath=".\fonte\mInputReader.F90"/>
 		<File RelativePath=".\fonte\propGeoFisica.F90"/>
 		<File RelativePath=".\fonte\solverGaussSkyline.F90"/>
-		<File RelativePath=".\fonte\solverHypre.F90"/>
-		<File RelativePath=".\fonte\solverPardiso.F90"/>
 		<File RelativePath=".\fonte\transporte.F90"/>
 		<File RelativePath=".\fonte\utilitarios.F90"/>
 		<File RelativePath=".\fonte\variaveisGlobais.F90"/></Filter></Files>

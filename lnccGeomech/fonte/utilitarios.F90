@@ -60,7 +60,7 @@
     !
     !**** new ********************************************************************
     !
-    subroutine printd(name,dva,ndof,numnp,icode)
+    subroutine printd(dva,ndof,numnp,icode)
     !
     !.... program to print kinematic data
     !
@@ -69,22 +69,14 @@
     !.... remove above card for single precision operation
     !
     integer :: ndof,numnp, icode
-    character (LEN=*) ::  name
     real*8 dva(ndof,*)
     !
-    logical lzero
     integer nn, n, i
     !
     nn = 0
     !
     do 100 n=1,numnp
-        !       call ztest(dva(1,n),ndof,lzero)
-        !       if (.not.lzero) then
-        !          nn = nn + 1
-        !          if (mod(nn,50).eq.1) &
-        !            write(icode,1000) name,(i,i=1,ndof)
         write(icode,2000) n,(dva(i,n),i=1,ndof)
-        !       endif
 100 continue
     !
     return
@@ -199,8 +191,6 @@
         end if
     end if
     elementos = fim_ - inicio_ + 1
-    ! write(*,'(a,4(a,i0))')rotulo,', id=', id_,  ' em dividirTrabalho, ' , inicio_,' ',  fim_, ' ', elementos
-    !  write(*,'(4(a,i0))')' id=', id_,  ' em dividirTrabalho, ' , inicio_,' ',  fim_, ' ', elementos
 
     end subroutine dividirTrabalho
     !
@@ -621,17 +611,10 @@
     integer :: n
     !
     real*8  :: coldot
-    integer :: i
     !
 
     coldot = 0.0d0
-    !
-    !       do 100 i=1,n
-    !       coldot = coldot + a(i)*b(i)
     coldot=dot_product(a(1:n),b(1:n))
-
-    !   100 continue
-
     !
     return
     end function
@@ -820,218 +803,7 @@
         tfAnt=tf
     end if
     end subroutine estimativasDeDesempenho
-    end  subroutine
-
-    !
-    !=======================================================================
-    !
-    subroutine solverUMFPack(alhs, b, Ap, Ai, neq, nonzeros)
-
-    implicit none
-    !
-    real*8  :: alhs(*), b(neq)
-    integer :: Ap(*), Ai(*)
-    integer, intent(in) :: neq, nonzeros
-    !
-    real*8, allocatable  :: x(:)
-    !
-    allocate(x(neq)); x=0.0d0
-
-#ifdef withumfpack
-    call solverUMFPackPPD(Ap, Ai, alhs, x, b, neq, nonzeros)
-#endif
-
-    b = x
-    deallocate(x)
-
-    end subroutine solverUMFPack
-    !
-    !=======================================================================
-    !
-    subroutine solverUMFPackPPD(Ap, Ai, Ax, x, b,  neq, nonzeros)
-
-    implicit none
-
-    real*8,   intent(inout) :: Ax(*)
-    integer,  intent(inout) :: Ap(*), Ai(*)
-    real*8,   intent(inout) :: x(*)
-    real*8,   intent(in)    :: b(*)
-    integer, intent(in) :: neq, nonzeros
-    !
-    real*8  :: control (20), info (90)
-    integer :: j, p, symbolic, numeric, sys
-
-#ifdef withumfpack
-    !     ----------------------------------------------------------------
-    !     convert from 1-based to 0-based
-    !     ----------------------------------------------------------------
-
-    do 60 j = 1, neq+1
-        Ap (j) = Ap (j) - 1
-60  continue
-    do 70 p = 1, nonzeros
-        Ai (p) = Ai (p) - 1
-70  continue
-
-    !     ----------------------------------------------------------------
-    !     factor the matrix and save to a file
-    !     ----------------------------------------------------------------
-
-    !     set default parameters
-    call umf4def (control)
-
-    !     print control parameters.  set control (1) to 1 to print
-    !     error messages only
-    control (1) = 1
-    call umf4pcon (control)
-
-    !     pre-order and symbolic analysis
-    call umf4sym (neq, neq, Ap, Ai, Ax, symbolic, control, info)
-
-    !   check umf4sym error condition
-    !   if (info (1) .lt. 0) then
-    !       print *, 'Error occurred in umf4sym: ', info (1)
-    !       stop
-    !   endif
-
-    !     numeric factorization
-    call umf4num (Ap, Ai, Ax, symbolic, numeric, control, info)
-
-    !     print statistics for the numeric factorization
-    !     call umf4pinf (control, info) could also be done.
-    !     print 90, info (1), info (66), &
-    !         (info (41) * info (4)) / 2**20, &
-    !         (info (42) * info (4)) / 2**20, &
-    !         info (43), info (44), info (45)
-90  format ('numeric factorization:',/, &
-        '   status:  ', f5.0, /, &
-        '   time:    ', e10.2, /, &
-        '   actual numeric LU statistics:', /, &
-        '   size of LU:    ', f10.2, ' (MB)', /, &
-        '   memory needed: ', f10.2, ' (MB)', /, &
-        '   flop count:    ', e10.2, / &
-        '   nnz (L):       ', f10.0, / &
-        '   nnz (U):       ', f10.0)
-
-    !     check umf4num error condition
-    if (info (1) .lt. 0) then
-        print *, 'Error occurred in umf4num: ', info (1)
-        stop
-    endif
-    !     solve Ax=b, without iterative refinement
-    sys = 0
-    call umf4sol (sys, x, b, numeric, control, info)
-    if (info (1) .lt. 0) then
-        print *, 'Error occurred in umf4sol: ', info (1)
-        stop
-    endif
-
-    !     print the residual.  x (i) should be 1 + i/n
-    !     call resid (neq, nonzeros, Ap, Ai, Ax, pressaoElem, brhsP, r)
-
-    !     ----------------------------------------------------------------
-    !     solve Ax=b, with iterative refinement
-    !     ----------------------------------------------------------------
-
-    sys = 0
-    call umf4solr (sys, Ap, Ai, Ax, x, b, numeric, control, info)
-    if (info (1) .lt. 0) then
-        print *, 'Error occurred in umf4solr: ', info (1)
-        stop
-    endif
-
-    !     print the residual.  x (i) should be 7 - i/n
-    !     call resid (neq, nonzeros, Ap, Ai, Ax, x, b, r)
-
-    !     free the numeric factorization
-    call umf4fnum (numeric)
-    !     free the symbolic analysis
-    call umf4fsym (symbolic)
-
-    do j = 1, neq+1
-        Ap (j) = Ap (j) + 1
-    enddo
-    do p = 1, nonzeros
-        Ai (p) = Ai (p) + 1
-    enddo
-    !
-#endif
-    end subroutine solverUMFPackPPD
-    !         LNCC/MCT
-    !         Petropolis, 07.2013
-    !
-    !**** NEW **** MODIFIED FOR IRREGULAR MESH  *****************
-    !
-    subroutine printf(f,ndof,numnp,nlv,iecho)
-    !
-    !.... program to print prescribed force and boundary condition data
-    !
-    implicit none
-    !
-    !.... remove above card for single precision operation
-    !
-    integer ndof, numnp, nlv, iecho
-    real*8 :: f(ndof,numnp,*)
-    !
-    logical lzero
-    integer :: nn, n, i
-    !
-    nn = 0
-    !
-    do 100 n=1,numnp
-        call ztest(f(1,n,nlv),ndof,lzero)
-        if (.not.lzero) then
-            nn = nn + 1
-            if (mod(nn,50).eq.1) write(iecho,1000) nlv,(i,i=1,ndof)
-            write(iecho,2000) n,(f(i,n,nlv),i=1,ndof)
-        endif
-100 continue
-    !
-    return
-    !
-1000 format('1',&
-        ' p r e s c r i b e d   f o r c e s   a n d   k i n e m a t i c ',&
-        '  b o u n d a r y   c o n d i t i o n s'//5x,&
-        ' load vector number = ',i10///5x,&
-        ' node no.',6(13x,'dof',i1,:)/)
-2000 format(6x,i10,10x,6(1pe15.8,2x))
-    end subroutine
-    !
-    !**** new ********************************************************************
-    !
-    subroutine printd(name,dva,ndof,numnp,icode)
-    !
-    !.... program to print kinematic data
-    !
-    implicit none
-    !
-    !.... remove above card for single precision operation
-    !
-    integer :: ndof,numnp, icode
-    character (LEN=*) ::  name
-    real*8 dva(ndof,*)
-    !
-    logical lzero
-    integer nn, n, i
-    !
-    nn = 0
-    !
-    do 100 n=1,numnp
-        !       call ztest(dva(1,n),ndof,lzero)
-        !       if (.not.lzero) then
-        !          nn = nn + 1
-        !          if (mod(nn,50).eq.1) &
-        !            write(icode,1000) name,(i,i=1,ndof)
-        write(icode,2000) n,(dva(i,n),i=1,ndof)
-        !       endif
-100 continue
-    !
-    return
-    !
-1000 format('1',11a4//1x,'node',6(11x,'dof',i1)/)
-2000 format(1x,i10,2x,6(1pe30.10,2x))
-    end subroutine
-
+    end subroutine solverGaussBanda
     !
     !=============================================================================
     !
@@ -1488,7 +1260,6 @@
     integer :: n
     !
     real*8  :: coldot
-    integer :: i
     !
 
     coldot = 0.0d0
@@ -1681,147 +1452,7 @@
         write(*,*)' tempo total     (inst.) estimado =', tempoProc *      ns  / (part*ns)
         write(*,*)' tempo decorrido (inst.) estimado =', tempoProc *       n  / (part*ns)
         write(*,*)' tempo restante  (inst.) estimado =', tempoProc * (ns - n) / (part*ns)
-        !         write(*,*)' tempo total (medio)       estimado =', somaTempoProcTotEst/cont
-        !         write(*,*)' tempo restante            estimado =', somaTempoProcTotEst/cont -  (tf - ti)
-        !write(*,*)' tempo de estimado total =' , ns * tempoProc/(part*ns)
-        !write(*,*)' tempo restante          =' , ns * tempoProc/(part*ns) - (tf - ti)
         tfAnt=tf
     end if
     end subroutine estimativasDeDesempenho
-    end  subroutine
-
-    !
-    !=======================================================================
-    !
-    subroutine solverUMFPack(alhs, b, Ap, Ai, neq, nonzeros)
-
-    implicit none
-    !
-    real*8  :: alhs(*), b(neq)
-    integer :: Ap(*), Ai(*)
-    integer, intent(in) :: neq, nonzeros
-    !
-    real*8, allocatable  :: x(:)
-    !
-    allocate(x(neq)); x=0.0d0
-
-#ifdef withumfpack
-    call solverUMFPackPPD(Ap, Ai, alhs, x, b, neq, nonzeros)
-#endif
-
-    b = x
-    deallocate(x)
-
-    end subroutine solverUMFPack
-    !
-    !=======================================================================
-    !
-    subroutine solverUMFPackPPD(Ap, Ai, Ax, x, b,  neq, nonzeros)
-
-    implicit none
-
-    real*8,   intent(inout) :: Ax(*)
-    integer,  intent(inout) :: Ap(*), Ai(*)
-    real*8,   intent(inout) :: x(*)
-    real*8,   intent(in)    :: b(*)
-    integer, intent(in) :: neq, nonzeros
-    !
-    real*8  :: control (20), info (90)
-    integer :: j, p, symbolic, numeric, sys
-
-#ifdef withumfpack
-    !     ----------------------------------------------------------------
-    !     convert from 1-based to 0-based
-    !     ----------------------------------------------------------------
-
-    do 60 j = 1, neq+1
-        Ap (j) = Ap (j) - 1
-60  continue
-    do 70 p = 1, nonzeros
-        Ai (p) = Ai (p) - 1
-70  continue
-
-    !     ----------------------------------------------------------------
-    !     factor the matrix and save to a file
-    !     ----------------------------------------------------------------
-
-    !     set default parameters
-    call umf4def (control)
-
-    !     print control parameters.  set control (1) to 1 to print
-    !     error messages only
-    control (1) = 1
-    call umf4pcon (control)
-
-    !     pre-order and symbolic analysis
-    call umf4sym (neq, neq, Ap, Ai, Ax, symbolic, control, info)
-
-    !   check umf4sym error condition
-    !   if (info (1) .lt. 0) then
-    !       print *, 'Error occurred in umf4sym: ', info (1)
-    !       stop
-    !   endif
-
-    !     numeric factorization
-    call umf4num (Ap, Ai, Ax, symbolic, numeric, control, info)
-
-    !     print statistics for the numeric factorization
-    !     call umf4pinf (control, info) could also be done.
-    !     print 90, info (1), info (66), &
-    !         (info (41) * info (4)) / 2**20, &
-    !         (info (42) * info (4)) / 2**20, &
-    !         info (43), info (44), info (45)
-90  format ('numeric factorization:',/, &
-        '   status:  ', f5.0, /, &
-        '   time:    ', e10.2, /, &
-        '   actual numeric LU statistics:', /, &
-        '   size of LU:    ', f10.2, ' (MB)', /, &
-        '   memory needed: ', f10.2, ' (MB)', /, &
-        '   flop count:    ', e10.2, / &
-        '   nnz (L):       ', f10.0, / &
-        '   nnz (U):       ', f10.0)
-
-    !     check umf4num error condition
-    if (info (1) .lt. 0) then
-        print *, 'Error occurred in umf4num: ', info (1)
-        stop
-    endif
-    !     solve Ax=b, without iterative refinement
-    sys = 0
-    call umf4sol (sys, x, b, numeric, control, info)
-    if (info (1) .lt. 0) then
-        print *, 'Error occurred in umf4sol: ', info (1)
-        stop
-    endif
-
-    !     print the residual.  x (i) should be 1 + i/n
-    !     call resid (neq, nonzeros, Ap, Ai, Ax, pressaoElem, brhsP, r)
-
-    !     ----------------------------------------------------------------
-    !     solve Ax=b, with iterative refinement
-    !     ----------------------------------------------------------------
-
-    sys = 0
-    call umf4solr (sys, Ap, Ai, Ax, x, b, numeric, control, info)
-    if (info (1) .lt. 0) then
-        print *, 'Error occurred in umf4solr: ', info (1)
-        stop
-    endif
-
-    !     print the residual.  x (i) should be 7 - i/n
-    !     call resid (neq, nonzeros, Ap, Ai, Ax, x, b, r)
-
-    !     free the numeric factorization
-    call umf4fnum (numeric)
-    !     free the symbolic analysis
-    call umf4fsym (symbolic)
-
-    do j = 1, neq+1
-        Ap (j) = Ap (j) + 1
-    enddo
-    do p = 1, nonzeros
-        Ai (p) = Ai (p) + 1
-    enddo
-    !
-#endif
-    end subroutine solverUMFPackPPD
+    end subroutine
