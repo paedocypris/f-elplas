@@ -1,6 +1,7 @@
 *codigos_cond_contorno_desloc{
          1      5051       101         1         0
-       101      5151       101         0         1
+       101      5151       101         1         0 
+         1       101         1         1         1
          0
 }
 *nlvectD{

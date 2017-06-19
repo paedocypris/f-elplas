@@ -22,7 +22,6 @@
     !
     use mLeituraEscrita,   only: fecharArquivosBase, abrirArquivosInformacoesMalha
     use mLeituraEscritaSimHidroGeoMec,   only: fecharArquivosSimHidroGeoMec
-    use mLeituraEscritaSimHidroGeoMec, only: SOLIDONLY
     use mgeomecanica,      only: STRESS_INIT
     !
     implicit none
@@ -45,7 +44,6 @@
     !
     print*, ""
     print*, "Iniciando o PROCESSAMENTO..."
-    if (solidonly) CALL STRESS_INIT()
 
     !processa o escoamento
     call processamentoGalerkinElastico()
@@ -1567,18 +1565,27 @@
     !************************************************************************************************************************************
     subroutine processamentoGalerkinElastico()
     !variable imports
+    !flow
     use mHidrodinamicaGalerkin, only:hgNumPassosTempo, hgTempoTotal, hgInitialPressure
     use mHidrodinamicaGalerkin, only:hgPrevPressure, hgPressure
     use mHidrodinamicaGalerkin, only:hgNdof
     use mMalha, only: numnp, numel, nen, nsd, conecNodaisElem
     use mMalha, only: x
     use mLeituraEscritaSimHidroGeoMec, only:ihgPres, reservHGPres
+    !mechanics
+    use mGeomecanica, only: dis0
+    use mGeomecanica, only: ndofD
+    use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
+    
 
     !function imports
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
     use mHidrodinamicaGalerkin, only:montarSistemaEquacoesPressao
     use mHidrodinamicaGalerkin, only:solveGalerkinPressao
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview, escreverArqParaviewIntermed
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewVector
+    use mGeomecanica, only:stress_init
+    use mGeomecanica, only:incrementMechanicSolution
 
     !variables
     implicit none
@@ -1594,6 +1601,13 @@
 
     ! print initial state
     call escreverArqParaview(ihgPres, hgPrevPressure, hgNdof, numnp, nen, conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservHGPres)
+    
+    ! init stress and print stress
+    call stress_init()
+    call escreverArqParaviewVector('dis', dis0, nDofD, numnp, nen, conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservDesloc, iDis)
+    
+    ! solve initialization incrementally
+    call incrementMechanicSolution(conecNodaisElem, nen, numel, numnp, nsd, x)
 
     ! mount data structure
     call montarEstruturasDadosPressaoSkyline(conecNodaisElem, nen, numel)

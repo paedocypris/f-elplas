@@ -33,7 +33,8 @@
     integer :: iyng   = 32
     integer :: iqtrial= 33
     integer :: ivelc  = 34
-    integer :: ihgPres = 35
+    integer :: ihgPres = 35 !galerkin
+    integer :: iimDis = 36 !incremental mechanic
     !
     integer :: ifdata = 150
     integer :: ipress = 152
@@ -67,7 +68,8 @@
     integer :: iflag_disp, iflag_tens, iflag_perm
     integer :: iflag_mass, iflag_masl, iflag_masc
     integer :: iflag_young, iflag_qtrial, iflag_velc
-    integer :: iflag_hgPres
+    integer :: iflag_hgPres !galerkin
+    integer :: iflag_imDis !incremental Mechanic
     !
     character(len=128) :: ifpres_out
     character(len=128) :: ifsat_out
@@ -83,6 +85,7 @@
     character(len=128) :: ifyou_out
     character(len=128) :: ifqtrial_out
     character(len=128) :: ifhgPres_out !galerkin
+    character(len=128) :: ifimDis_out !incremental Mechanic
     !
     real(8) :: tprt_pres, dtprt_pres
     real(8) :: tprt_sat , dtprt_sat
@@ -101,11 +104,14 @@
     integer :: npvel, npvelc, npmass, npmasl, NPMASG, NPSIGT, npdis, npten, npmasc, npyoung, npqtrial
     integer :: npcontpres,npcontsat,npcontphi,npcontvel,npcontvelc,npcontdis, npcontmasc, npcontten, npcontyoung
     integer :: npHGPres !galerkin
+    integer :: npIMDis !incremental Mechanic
+    
 
     character(len=15) :: reservSat, reservVel, reservVelC, reservPres, reservDesloc, reservTensao
     character(len=15) :: reservPhi, reservPerm, reservBalMassa, reservMassaAgua, reservMasc
     character(len=15) :: reservYoung, reservQtrial
     character(len=15) :: reservHGPres !galerkin
+    character(len=15) :: reservIMDis !incremental Mechanic
     !
     logical :: apenasReservatorio=.false.
 
@@ -129,6 +135,7 @@
     close(iyng)
     close(iqtrial)
     close(ihgPres) !galerkin
+    close(iIMDis) !incremental mechanic
     !
     end subroutine fecharArquivosSimHidroGeoMec
     !
@@ -291,6 +298,10 @@
     !galerkin
     keyword_name = "impressao_da_pressaoGalerkin"
     call readOutFlagKeyword(keyword_name, iflag_hgPres, ifhgPres_out, npHgPres, reservHGPres, ierr)
+    
+    !incremental mechanic
+    keyword_name = "impressao_do deslocamentoIncremental"
+    call readOutFlagKeyword(keyword_name, iflag_imDis, ifimDis_out, npIMDis, reservIMDis, ierr)
 
     !
 1000 FORMAT(A6)
@@ -995,6 +1006,21 @@
         end if
         if(iflag_tipoPrint==2) then
             ifhgPres_out = trim(ifhgPres_out)//'resultadoHGPres-'
+        end if
+    end if
+    
+    !incremental displacement
+    if(iflag_imDis==1)then
+        if(iflag_tipoPrint==0) then
+            ifhgPres_out = trim(ifIMDis_out)//'resultadoIMDis.res'
+            open(unit=iimDis,file=ifIMDis_out,status='unknown',action='write')
+        end if
+        if(iflag_tipoPrint==1) then
+            ifhgPres_out = trim(ifIMDis_out)//'resultadoIMDis.vtk'
+            open(unit=iimDis,file=ifIMDis_out,status='unknown',action='write')
+        end if
+        if(iflag_tipoPrint==2) then
+            ifhgPres_out = trim(ifimDis_out)//'resultadoIMDis-'
         end if
     end if
     !
@@ -2792,7 +2818,7 @@
     !
     !..... PROGRAM TO SET-UP AND WRITE DATA ON OPEN-DX FORMAT
     !
-    IMPLICIT REAL*8 (A-H,O-Z)
+    IMPLICIT none
     !
     CHARACTER*15 TASK
     !

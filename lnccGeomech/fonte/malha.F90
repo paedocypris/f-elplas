@@ -146,7 +146,7 @@
     !
     !.... program to move a floating-point array
     !
-    implicit real*8(a-h,o-z)
+    implicit none
     !
     !.... remove above card for single-precision operation
     !

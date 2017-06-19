@@ -26,6 +26,8 @@
     module mGeomecanica
     !
     use mGlobaisEscalares, only: novaMalha
+    
+    implicit none
 
     integer              :: ndofD, nlvectD
     integer              :: neqD, nalhsD
@@ -483,26 +485,13 @@
     SUBROUTINE STRESS_INIT()
     !
     use mGlobaisEscalares
-    !      use mGeomecanica!, only: ndofD, nlvectD , brhsd
-    use mHidrodinamicaRT, only: ndofV, ndofP, velocLadal, velocNodal, vc
-    !      use mGeomecanica,      only : ALHSD, idDesloc
-    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXMESH, PRINT_DXINFO
-    use mLeituraEscritaSimHidroGeoMec,   only : DXPRT_MSH3D
-    use mLeituraEscritaSimHidroGeoMec, only : SOLIDONLY,CYLINDER,imprimirCondicoesIniciais
-    use mLeituraEscrita,   only : iflag_tipoPrint
+    use mLeituraEscritaSimHidroGeoMec, only : SOLIDONLY
     use mMalha,            only : nsd, numel
     use mMalha,            only : numelReserv
     use mMalha,            only : x, conecNodaisElem
     use mPropGeoFisica,    only : lerPropriedadesFisicas
-    use mPropGeoFisica,    only : YOUNG, PERMKX, MASCN, PHI
+    use mPropGeoFisica,    only : YOUNG
     use mPropGeoFisica,    only : GEOFORM
-    use mTransporte,       only : satElem
-    !B     use mGeomecanica,      only : NROWB,NED2,NINTD,NROWB2,IOPT
-    !B     use mGeomecanica,      only : SIGMAT, SIGMA0
-    !B     use mGeomecanica,      only : GEOSETUP, DIS, DIS0, AVSTRS
-    !B     use mGeomecanica,      only : POS4ITER, COMPTRACE, PRINT_DX
-    !B     use mGeomecanica,      only : POS4ITER_3D,PRSRINIT, PRSRINIT3D
-    !B     use mGeomecanica,      only : DIVU, STRSS0, GEOPRSR
     use mHidrodinamicaRT,  only : pressaoElem
     !
     implicit none
@@ -520,18 +509,9 @@
     !.... SETUP INITIAL HIDROSTATIC PORE-PRESSURE
     !
 
-    CALL GEOMECHANIC('INIT_GEOMECH_ARRAY')
-    !
-    IF (CYLINDER) THEN
-        CALL PLAST_EXAMPLE()
-
-        call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-            permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
-
-        RETURN
-    ENDIF
-
     IF (INITS3) THEN
+        CALL GEOMECHANIC('INIT_GEOMECH_ARRAY')
+        
         !.... ..MOUNT STIFFNESS MATRIX OF GEOMECHANIC
         CALL GEOMECHANIC('ELASTIC_BBAR_MATRX')
         !.... ..ASSEMBLE RIGHT HAND VECTOR FORCE ARRAY AND SOLVE
@@ -539,6 +519,8 @@
         !.... ..COMPUTE INITIAL STRESS AND VOLUMETRIC DEFORMATION
         IF (NSD.EQ.2) CALL POS4ITER(X, conecNodaisElem, STRSS0, DIVU)
         IF (NSD.EQ.3) CALL POS4ITER_3D(X, conecNodaisElem, STRSS0, DIVU)
+        
+        CALL GEOMECHANIC('RESETS_FORCE_VECTR')
     ENDIF
     !
     !.... SETUP PRESSURE ON RESERVOIR AND FOR TERZAGHI AND MANDEL EXAMPLES
@@ -547,8 +529,6 @@
     if(nsd==3) CALL PRSRINIT3D(GEOPRSR,pressaoElem,NUMEL,numelReserv,INITS3)
     !
     LDRAINED = .TRUE.
-
-    CALL GEOMECHANIC('RESETS_FORCE_VECTR')
 
     CALL GEOMECHANIC('INIT_GEOMECH_ARRAY')
     !
@@ -578,17 +558,6 @@
         CALL GEOMECHANIC('RESETS_FORCE_VECTR')
     ENDIF
 
-    !.... PRINT GEOMECHANICAL INITIAL CONDITIONS
-    !
-    if(iflag_tipoPrint.eq.3)then
-        IF (NSD.EQ.2) CALL PRINT_DXMESH(X,DIS0,GEOPRSR,STRSS0,&
-            &                      conecNodaisElem, YOUNG,PERMKX)
-        IF (NSD.EQ.3) CALL DXPRT_MSH3D(X,DIS0,GEOPRSR,STRSS0, &
-            &                      conecNodaisElem, YOUNG,PERMKX)
-    end if
-
-    call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-        permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
     !
     DIS  = 0.0D0
     DIVU = 0.0D0
@@ -1335,7 +1304,7 @@
         !
         CALL SETUPC(CBBAR,YOUNGMOD,POISSON,NROWB,IOPT)
         !
-        !      write(3030,4500) nel,young(nel), poisson!, geoform(nel)
+        !      write(3030,4500) nel,young(nel), poisson!, ,geoform(nel)
         !.... FORM STIFFNESS MATRIX
         !
         !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
@@ -1355,8 +1324,7 @@
             !
             DO 200 J=1,NEN
                 !
-                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L), &
-                    &            SHGBR(1:NROWSH,J),R(L),NROWSH,NROWB,IOPT,IBBAR)
+                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L), SHGBR(1:NROWSH,J),R(L),NROWSH,NROWB,IOPT,IBBAR)
                 !
                 !.... .... MULTIPLY CBBAR*BBARJ ===>QIXIBBAR
                 !
@@ -1366,23 +1334,18 @@
                 !
                 DO 200 I=1,NEN
                     !
-                    CALL SETBB(BBARI,SHGD(1:NROWSH,I,L), &
-                        &            SHGBR(1:NROWSH,I),R(L),NROWSH,NROWB,IOPT,IBBAR)
+                    CALL SETBB(BBARI,SHGD(1:NROWSH,I,L), SHGBR(1:NROWSH,I),R(L),NROWSH,NROWB,IOPT,IBBAR)
                     !
                     !.... .... MOUNT ELEMNT STIFFNESS NODAL MATRIX:
                     !.... ...        K^E_IJ= MULTIPLY BBAR^T_I*(QIXI*BBAR_J)
                     !
-                    ELEFFMD(NED2*I-1,NED2*J-1)= ELEFFMD(NED2*I-1,NED2*J-1) &
-                        &             +COLDOT(BBARI(1:4,1),QIXIBBAR(1:4,1),4)*C1
+                    ELEFFMD(NED2*I-1,NED2*J-1)= ELEFFMD(NED2*I-1,NED2*J-1) + COLDOT(BBARI(1:4,1),QIXIBBAR(1:4,1),4) * C1
                     !
-                    ELEFFMD(NED2*I-1,NED2*J)= ELEFFMD(NED2*I-1,NED2*J) &
-                        &             +COLDOT(BBARI(1:4,1),QIXIBBAR(1:4,2),4)*C1
+                    ELEFFMD(NED2*I-1,NED2*J)= ELEFFMD(NED2*I-1,NED2*J) + COLDOT(BBARI(1:4,1),QIXIBBAR(1:4,2),4) * C1
                     !
-                    ELEFFMD(NED2*I,NED2*J-1)= ELEFFMD(NED2*I,NED2*J-1) &
-                        &             +COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,1),4)*C1
+                    ELEFFMD(NED2*I,NED2*J-1)= ELEFFMD(NED2*I,NED2*J-1) + COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,1),4) * C1
                     !
-                    ELEFFMD(NED2*I,NED2*J)= ELEFFMD(NED2*I,NED2*J)  &
-                        &             +COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,2),4)*C1
+                    ELEFFMD(NED2*I,NED2*J)= ELEFFMD(NED2*I,NED2*J) + COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,2),4) * C1
                     !
 200         CONTINUE
 400     CONTINUE
@@ -1488,7 +1451,6 @@
     !
     !     PROGRAM TO SETUP ELASTICITY TENSOR
     !
-    !      IMPLICIT REAL*8 (A-H,O-Z)
     IMPLICIT NONE
     !
     REAL*8  :: YOUNG,POISSON
@@ -2114,6 +2076,8 @@
     REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ
     REAL(8), DIMENSION(NROWB)         :: STRAIN
     REAL(8), DIMENSION(4)             :: UNITVEC
+    real*8 :: tempVec2(2)
+    real*8 :: tempVec4(4)
     !
     REAL(8) :: POISSON, AREA, C1, YOUNGMOD, B
     !
@@ -2189,7 +2153,8 @@
                 !.... ..COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
                 !
                 DO 200 K=1,NROWB
-                    STRAIN(K)=STRAIN(K)+COLDOT(BBARJ(K,1:2),DISL(1:2,J),2)*C1
+                    tempVec2 = BBARJ(K,1:2)
+                    STRAIN(K)=STRAIN(K)+COLDOT(tempVec2 ,DISL(1:2,J),2)*C1
 200         CONTINUE
 300     CONTINUE
         !
@@ -2204,7 +2169,8 @@
         !.... ..COMPUTE MEAN VOLUMETRIC STRESS
         !
         DO 420 K=1,NROWB
-            STRESS(K,NEL)=COLDOT(CBBAR(K,1:4),STRAIN(1:4),4)  !+STRSS0(K,NEL)
+            tempVec4 = CBBAR(K,1:4)
+            STRESS(K,NEL)=COLDOT(tempVec4,STRAIN(1:4),4)  !+STRSS0(K,NEL)
 420     CONTINUE
         !
         IF (.NOT.LDRAINED) THEN
@@ -3731,6 +3697,7 @@
             curSat = satElem(nel)
         end if
 
+
         CALL DENSLOC(RHOTOTAL,PRESSURE,GEOPRSR(nel),&
             &               curP,curSat,NEL,LDRAINED)
         !
@@ -4720,9 +4687,76 @@
     !
     END FUNCTION
     !
-    !***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ***** %%% *****
-
-
-    END MODULE MGEOMECANICA
+    !***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ****
+    
     !
-    !*********************** ************** **************************
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine incrementMechanicSolution(conecNodaisElem, nen, nel, nnp, nsd, x)
+    !function imports
+    
+    implicit none
+    
+    !variables input
+    integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
+    real*8 :: x(nsd, nnp)
+    
+    ! Variables
+    real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
+    real*8, allocatable :: r(:,:) !r - residual
+    real*8 :: error
+    
+    integer :: nLoadSteps
+    integer :: j, k
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    ! for now, total increment is always 10
+    nLoadSteps = 10
+    
+    ! allocate the required matrices
+    if(.not.allocated(fExtT)) allocate(fExtT(ndofD, nnp))
+    if(.not.allocated(fIntJ)) allocate(fIntJ(ndofD, nnp))
+    if(.not.allocated(r)) allocate(r(ndofD, nnp))
+    
+    fExtT = 0.d0
+    fIntJ = 0.d0
+    
+    do k = 1, nLoadSteps
+        call updateIncrementMechanic(fExtT, k, nLoadSteps, nnp)
+        
+        error = 1
+        do j = 1, 15
+            ! compute the tangential stiffness matrix
+            call bbarmtrx_elast(x, conecnodaiselem, alhsD, brhsD, idiagD, lmD)
+            
+            ! load force vector in the right side
+            call matsub(fExtT, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            
+            
+        end do
+    end do
+    
+    end subroutine incrementMechanicSolution
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine updateIncrementMechanic(fExtT, curStep, nSteps, nnp)
+    
+    implicit none
+    !variables input
+    integer :: curStep, nSteps, nnp
+    real*8 :: fExtT(ndofD, nnp)
+    
+    ! Variables
+    integer :: i, j
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do j = 1, nnp
+        do i = 1, ndofD
+            fExtT(i, j) = fDesloc(i, j) / nSteps * curStep
+        end do
+    end do
+    
+    end subroutine updateIncrementMechanic
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    
+    end module mGeomecanica
