@@ -411,7 +411,7 @@
     !
     !.... POST-PROCESS STRESS FIELD
     !
-    CALL POS4STRS(X, conecNodaisElem, STRSS0, DIVU)
+    CALL POS4STRS(X, conecNodaisElem, STRSS0, DIVU, dis)
     !
     !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
     !
@@ -1064,7 +1064,7 @@
     subroutine alocarMemoria()
     use mGlobaisArranjos,  only: uTempoN, mat, grav, beta
     use mHidrodinamicaRT,  only: ndofV, nlvectV, ndofP
-    use mGlobaisEscalares, only: novaMalha
+
     !
     use mMalha,            only: nsd, numel, numelReserv, numnp, numnpReserv
     use mMalha,            only: numLadosReserv, nen, numLadosElem
@@ -1076,7 +1076,13 @@
     use mHidroDinamicaRT,  only: idVeloc, lmV
     use mTransporte,       only: satElemAnt, satElem
     use mTransporte,       only: satElemL, satElemL0, satElem0
-    use mGeomecanica
+    use mGeomecanica,      only: EINELAS
+    use mGeomecanica,      only: nrowB, nintD, nrowB2
+    use mGeomecanica,      only: idDesloc, lmD, ndofD, nlVectD, fDesloc
+    use mGeomecanica,      only: idDis, dis, dis0, vdP, dtrl
+    use mGeomecanica,      only: divU, divU0, strss, strss0, hmTTG, eCreep
+    use mGeomecanica,      only: geoPrsr, avStrs, avCrep, strs3D
+    use mGeomecanica,      only: sigmaT, sigma0
     use mPropGeoFisica,    only: GEOFORM, MASCN, MASCN0
     use mHidrodinamicaRT,  only: pressaoElem, pressaoElemAnt,PRESPRODWELL,NCONDP
     use mHidrodinamicaRT,  only: vc, ve, velocLadal, fVeloc, velocNodal
@@ -1187,6 +1193,9 @@
     !
     allocate(MASCN (numelReserv));        MASCN   = 0.0D0
     allocate(MASCN0(numelReserv));        MASCN0  = 0.0D0
+    !
+    !... allocate memory for plasticity
+    allocate(EINELAS(NUMEL,NINTD,NROWB)); EINELAS = 0.0d0
     !
     !... END GEOMECANICA
     !

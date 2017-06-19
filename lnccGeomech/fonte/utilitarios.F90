@@ -719,13 +719,69 @@
 3100    continue
         !
 3200 continue
-    return
+     return
 
     end subroutine matsub
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-
-    !**** new **********************************************************************
+    FUNCTION DETM3X3(XM)
+    !
+    !.... PROGRAM TO COMPUTE DETERMINANT OF A MATRIX OF ORDER 3
+    !
+    IMPLICIT NONE
+    !
+    REAL(8), DIMENSION(3,3) :: XM
+    REAL(8) :: XDET11, XDET12, XDET13, DETM3X3
+    !
+    XDET11 = XM(2,2)*XM(3,3)-XM(2,3)*XM(3,2)
+    XDET12 = XM(2,1)*XM(3,3)-XM(2,3)*XM(3,1)
+    XDET13 = XM(2,1)*XM(3,2)-XM(2,2)*XM(3,1)
+    !
+    DETM3X3 = XM(1,1)*XDET11-XM(1,2)*XDET12+XM(1,3)*XDET13
+    !
+    RETURN
+    !
+    END FUNCTION DETM3X3
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE COMPMINOR(XOUTPUT,XINPUT,ILINE,JCOLUMN,NORDER)
+    !
+    !.... PROGRAM TO COMPUTE MINOR'S MATRIX OF XINPUT
+    !
+    IMPLICIT NONE
+    !
+    !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
+    !
+    INTEGER :: II, JJ, KK, LL, ILINE, JCOLUMN, NORDER
+    !
+    !.... INPUT/OUTPUT MATRIZES
+    !
+    REAL(8), DIMENSION(NORDER,NORDER)     :: XINPUT
+    REAL(8), DIMENSION(NORDER-1,NORDER-1) :: XOUTPUT
+    !
+    !.... LOCAL ARRAYS
+    !
+    INTEGER, DIMENSION(NORDER,NORDER-1)   :: INDX
+    !
+    DO 200 II=1,NORDER
+        DO 200 JJ=1,NORDER-1
+            IF (II.LE.JJ) THEN
+                INDX(II,JJ) = JJ+1
+            ELSE
+                INDX(II,JJ) = JJ
+            ENDIF
+200 CONTINUE
+    !
+    DO 300 KK=1,NORDER-1
+        DO 300 LL=1,NORDER-1
+            XOUTPUT(KK,LL)=XINPUT(INDX(ILINE,KK),INDX(JCOLUMN,LL))
+300 CONTINUE
+    !
+    RETURN
+    !
+    END SUBROUTINE COMPMINOR
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     function rowdot(a,b,ma,mb,n)
     !
     !.... program to compute the dot product of vectors stored row-wise

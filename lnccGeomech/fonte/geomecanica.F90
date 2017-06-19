@@ -1,4 +1,3 @@
-    !
     !     *******************************************************************
     !     *                                                                 *
     !     *            * * *    G E O M E C H A N I C      * * *            *
@@ -26,7 +25,7 @@
     module mGeomecanica
     !
     use mGlobaisEscalares, only: novaMalha
-    
+
     implicit none
 
     integer              :: ndofD, nlvectD
@@ -53,13 +52,19 @@
     REAL(8), ALLOCATABLE :: GEOPRSR(:)
     REAL(8), ALLOCATABLE :: SIGMAT(:),SIGMA0(:),DIVU(:),DIVU0(:)
     REAL(8), ALLOCATABLE :: DIS(:,:), DIS0(:,:), VDP(:,:)
-    real(8), allocatable :: STRSS(:,:,:), STRSSP(:,:,:)
+    real(8), allocatable :: STRSS(:,:,:), STRSSP(:,:,:), EINELAS(:,:,:)
     ! CREEP
     REAL*8, ALLOCATABLE, DIMENSION(:,:)   :: DTRL, AVCREP, AVSTRS
     REAL*8, ALLOCATABLE, DIMENSION(:,:)   :: STRSS0, STRS3D
     REAL*8, ALLOCATABLE, DIMENSION(:,:,:) :: HMTTG, ECREEP, AUXM
     INTEGER :: NROWB2, NWTNITER
     REAL*8  :: RESMAX, RESIDUAL
+    !
+    !plasticity
+    !todo: inicializar tolYield, plastified, toleplas
+    real*8 :: tolYield, toleplas
+    logical :: plastified
+    real*8 :: cohesion
     !
     real*8,  allocatable :: fDesloc(:,:)
     !
@@ -213,7 +218,7 @@
 600 CONTINUE     !.... fase=='CREEP_STRSS_SIGMAT'
     VDP   = 0.0D0
     !.... POST-PROCESS STRESS FIELD
-    CALL POS4STRS(x, conecNodaisElem, AVSTRS, DIVU)
+    CALL POS4STRS(x, conecNodaisElem, AVSTRS, DIVU, DIS)
     !.... COMPUTE TRACE OF TOTAL STRESS'S (SIGMAT)
     CALL COMPTRACE(pressaoElem,AVSTRS,SIGMAT,NROWB,NUMEL,numelReserv)
     RETURN
@@ -222,7 +227,7 @@
     call timing(t1)
     CALL montarSistEqAlgGEO('right_hand_reset',satElem)
     call timing(t2)
-    
+
     tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
     RETURN
     !
@@ -263,11 +268,11 @@
     !
     !.... NEXT LINE PLASTIC DEFORMATION AND TANGENT MATRIX UPDATE
     !
-    !CALL POS4PLAST(x, conecNodaisElem)
+    CALL POS4PLAST(x, conecNodaisElem)
     !
     !.... NEXT LINE UPDATE STRESS FOR PLASTIC DEFORMATION
     !
-    !CALL STRSS4PLAST(x, conecNodaisElem)
+    CALL STRSS4PLAST(x, conecNodaisElem)
     !
     RETURN
     !
@@ -336,7 +341,7 @@
         write(*,*) ' não implementado '
         stop 9
     endif
-    
+
     solutionNorm = 0.0
     do i = 1, neqD
         solutionNorm = solutionNorm + brhsD(i)**2
@@ -441,7 +446,7 @@
     !..NEW LINES 4 COMPRESSIBLE MODEL MASS CONTENT ARRAYS
     !
     IMPLICIT NONE
-    
+
     !.... SETUP SATURATION AT TIME ZERO
     !
     satElemAnt = satElem
@@ -511,7 +516,7 @@
 
     IF (INITS3) THEN
         CALL GEOMECHANIC('INIT_GEOMECH_ARRAY')
-        
+
         !.... ..MOUNT STIFFNESS MATRIX OF GEOMECHANIC
         CALL GEOMECHANIC('ELASTIC_BBAR_MATRX')
         !.... ..ASSEMBLE RIGHT HAND VECTOR FORCE ARRAY AND SOLVE
@@ -519,7 +524,7 @@
         !.... ..COMPUTE INITIAL STRESS AND VOLUMETRIC DEFORMATION
         IF (NSD.EQ.2) CALL POS4ITER(X, conecNodaisElem, STRSS0, DIVU)
         IF (NSD.EQ.3) CALL POS4ITER_3D(X, conecNodaisElem, STRSS0, DIVU)
-        
+
         CALL GEOMECHANIC('RESETS_FORCE_VECTR')
     ENDIF
     !
@@ -608,7 +613,7 @@
     !
     !.... POST-PROCESS STRESS FIELD
     !
-    CALL POS4STRS(x, conecNodaisElem, strss0, divU)
+    CALL POS4STRS(x, conecNodaisElem, strss0, divU, dis)
     !
     !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
     !
@@ -953,7 +958,7 @@
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
 
 500 CONTINUE
-    
+
     !
     RETURN
     !
@@ -1512,6 +1517,67 @@
 2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE SETCBBM1(CBBARM1,YOUNG,POISSON,NROWB)
+    !
+    !.... PROGRAM TO SETUP INVERSE OF ELASTICITY TENSOR
+    !....  REFERENCE PAG. 74 M.SADD ELASTICITY THEORY, APPLICATIONS BOOK
+    !
+    IMPLICIT NONE
+    !
+    INTEGER :: NROWB
+    REAL(8) :: YOUNG, POISSON
+    REAL(8) :: CBBARM1(NROWB, NROWB)
+    !
+    REAL(8) :: EEM1,XNIEEM1, XNIP1EM1
+    !
+    !... SET MATERIAL PARAMETERS FOR OUT-OF-PLANE COMPONENTS
+    !
+    CBBARM1  = 0.0D0
+    EEM1     = 1.0D0/YOUNG
+    XNIEEM1  = -POISSON*EEM1
+    XNIP1EM1 = 2.0D0*(1.0D0 + POISSON)*EEM1
+    !
+    !... COLUMN MATRIX D3
+    !
+    CBBARM1(1,4) = XNIEEM1
+    CBBARM1(2,4) = XNIEEM1
+    CBBARM1(3,4) = 0.0D0
+    CBBARM1(4,4) = EEM1
+    !
+    !..... TRANSPOSE OF D3
+    !
+    CBBARM1(4,1) = CBBARM1(1,4)
+    CBBARM1(4,2) = CBBARM1(2,4)
+    CBBARM1(4,3) = CBBARM1(3,4)
+    !
+    !..... SET MATERIAL PARAMETERS FOR IN-PLANE COMPONENTS
+    !
+    !..... .. MATRIX D_33: UP TRIANGULAR
+    !
+    CBBARM1(1,1) = EEM1
+    CBBARM1(1,2) = XNIEEM1
+    CBBARM1(2,2) = CBBARM1(1,1)
+    CBBARM1(1,3) = 0.0D0
+    CBBARM1(2,3) = 0.0D0
+    CBBARM1(3,3) = XNIP1EM1
+    !
+    !..... .. MATRIX D_33: LOW TRIANGULAR
+    !
+    CBBARM1(2,1) = CBBARM1(1,2)
+    CBBARM1(3,1) = CBBARM1(1,3)
+    CBBARM1(3,2) = CBBARM1(2,3)
+    !
+100 CONTINUE
+    !
+    RETURN
+    !
+2000 FORMAT(5(1PE15.8,2X))
+    !
+    END SUBROUTINE SETCBBM1
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     !
     !**** FROM  HUGHES: THE FINITE ELEMENT METHOD ** PAG 760 ***************
     !
@@ -1669,23 +1735,8 @@
     real*8, external :: rowdot, coldot
     REAL*8  :: C1, POISSON, YOUNGMOD, B
     !
-    !      WRITE(*,*) 'NINTD = ',NINTD, 'Nrowb = ',Nrowb, 'NROWSH = ',NROWSH
-    !      WRITE(*,*) 'NED2 = ',NED2, 'NDOFD = ',NDOFD, 'NEE2 = ',NEE2, NESD
-    !
     CALL SHLQ3D(SHLD,WD,NINTD,NEN)
     !
-    !      write(*,*) 'entrando elast 3d'
-    !      write(*,*) 'write nesd 3D', nesd, 'nrowb ', nrowb, 'nrowsh ', nrowsh
-    !      do 110 j=1,nen
-    !        do 110 i=1,nintd
-    !           write(3031,2001) i, j, (shLd(k,j,i),k=1,nrowsh)
-    !110     continue
-    !      write(*,*) 'gravidade elast 3D', grav(1), grav(2), grav(3)
-    !      stop
-    !      do 110 j=1,nen
-    !        do 110 i=1,nintd
-    !           write(3030,2001) i, j, (shLd(k,j,i),k=1,nrowsh)
-    !110     continue
     !
     !.... CONSISTENT MATRIX
     !
@@ -2515,6 +2566,242 @@
 5000 FORMAT(I4,2X,I1,2X,40(1PE15.8,2X))
     !
     END SUBROUTINE
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE POS4PLAST(x, conecNodaisElem)
+    !
+    !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
+    !
+    !function import
+    !
+    use mMalha,            only: nsd, numnp, numel, nen, LOCAL
+    use mMalha,            only: multab
+    use mGlobaisEscalares, only: nrowsh
+    use mFuncoesDeForma,   only: shgq, shlq
+    use mPropGeoFisica,    only: YOUNG
+    use mPropGeoFisica,    only: GEOFORM, GEOINDIC, FNCMECLAW
+    !
+    IMPLICIT NONE
+    !
+    REAL(8), intent(in)    :: x(nsd,numnp)
+    INTEGER, intent(in)    :: conecNodaisElem(nen,numel)
+    CHARACTER(5)           :: MECLAW
+    !
+    LOGICAL QUAD
+    !
+    INTEGER :: J,K,L,NEL,NITPLAS
+    !
+    !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
+    !
+    REAL(8), DIMENSION(NESD,NEN)      :: XL
+    REAL(8), DIMENSION(NED2,NEN)      :: DLTRL
+    !
+    !.... LOCAL VECTORS AND MATRIZES
+    !
+    REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ
+    REAL(8), DIMENSION(NROWB,NROWB)   :: QIXI, CBBAR, CBBARM1
+    REAL(8), DIMENSION(NROWB) :: TENSAO, STRAIN, GRAD, QIXIGRAD
+    REAL(8), DIMENSION(NROWB) :: EELAS, EPTRIAL, EPINIT, RESIDUO
+    !
+    REAL(8) :: SHLD(NROWSH,NEN,NINTD), SHGD(NROWSH,NEN,NINTD)
+    REAL(8) :: SHGBR(NROWSH,NEN)
+    REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
+
+    REAL(8) :: POISSON, FYIELD, TAUB, SIGMAB, HGAMMA, HNORMA
+
+    real*8, external :: rowdot, coldot
+    !
+    !.... ETOTAL      :  deformacao total
+    !.... EPLAS       :  deformacao plastica
+    !.... EETRIAL     :  deformacao elastica teste
+    !.... EPINIT      :  deformacao plastica inicial
+    !.... HGAMMA      :  multiplicador de lagrange na lei de
+    !....                de escoamento da deformacao plastica
+
+    !.... subrutinas usadas
+
+    !.... FYIELD      : calcula a funcao de escoamento
+    !.... GRADS       : gradiente da funcao de escoamento e tensor QIXI
+    !
+    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
+    !
+    QIXIGRAD = 0.0D0
+    !      QIXIP    = 0.0D0
+    !
+    CALL SHLQ(SHLD,WD,NINTD,NEN)
+    !
+    TENSAO = 0.0D0
+    !
+    DO 500 NEL=1,NUMEL
+        !
+        MECLAW  = FNCMECLAW(GEOFORM(NEL))
+        !
+        POISSON = GEOINDIC('POISSON',GEOFORM(NEL))
+        !
+        !.... SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
+        !
+        CALL SETUPC(CBBAR,YOUNG(NEL),POISSON,NROWB,IOPT)
+        !
+        !..... COMPUTE INVERSE OF ELASTIC MATERIAL TENSOR CBBARM1
+        !
+        CALL SETCBBM1(CBBARM1,YOUNG(NEL),POISSON,NROWB)
+        !
+        !         QIXI = MATMUL(CBBARM1,CBBAR)
+        !          CALL MULTAB(CBBARm1,cbbar,qixi,4,4,4,4,4,4,1)
+        !
+        !         write(*,2222) nel, 1, qixi(1,1:4),qixi(2,1:4),qixi(3,1:4),qixi(4,1:4)
+        !..... ..LOCALIZE COORDINATES AND DIRICHLET B.C.
+        !
+        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
+        CALL LOCAL(conecNodaisElem(1,NEL),DTRL,DLTRL,NEN,NDOFD,NED2)
+        !
+        QUAD = .TRUE.
+        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
+        !
+        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
+        !..
+        !..... ..SETUP FOR AXISYMMETRIC OPTION
+        !..
+        IF (IOPT.EQ.2) THEN
+            DO 100 L=1,NINTD
+                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
+                DETD(L) = DETD(L)*R(L)
+100         CONTINUE
+        ENDIF
+        !
+        !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
+        !....    FOR MEAN-DILATATIONAL B-BAR FORMULATION
+        !
+        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
+        !..
+        !.... ...LOOP OVER INTEGRATION POINTS
+        !..
+        DO 400 L=1,NINTD
+            !..
+            !..... ..CLEAR INITIAL STRAIN
+            !..
+            STRAIN = 0.0D0
+            !
+            DO 200 J=1,NEN
+                !...
+                !.... ..... UPLOAD B-BAR MATRIX AT NODE J
+                !..
+                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), &
+                    &                    R(L),NROWSH,NROWB,IOPT,IBBAR)
+                !..
+                !.... ..... COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
+                !..
+                DO 200 K=1,NROWB
+                    STRAIN(K) = STRAIN(K) + COLDOT(BBARJ(K,1:2),DLTRL(1:2,J),2)
+200         CONTINUE
+            !..
+            DO 210 K=1,NROWB
+                EPTRIAL(K) = EINELAS(NEL,L,K)
+                EPINIT(K)  = EINELAS(NEL,L,K)
+210         CONTINUE
+            !..
+            CALL TANG2QX(HMTTG(NEL,L,1:16),QIXI)
+            !
+            !.... PART 1 FROM BOX 4.1 Simo-Hughes COMPUTE PREDICTORS
+            !..
+            !.... ... DEFORM ELAST (TRIAL): E_elast=E_total-E_plast
+            !..
+            DO 220 K=1,NROWB
+                EELAS(K) = STRAIN(K) - EPTRIAL(K)
+220         CONTINUE
+            !
+            !.... ..... COMPUTE TRIAL STRESS
+            !..
+            CALL MULTAB(CBBAR,EELAS,TENSAO,4,4,4,4,4,1,1)
+            !..
+            !.... ... COMPUTE YIELD FUNCTION (MOHR-COULOMB):
+            !
+            CALL YIELD(FYIELD,SIGMAB,TAUB,TENSAO,POISSON)
+            !..
+            !               write(*,2000) '   yield = ',fyield, poisson
+            IF (FYIELD.GE.TOLYIELD) THEN
+                PLASTIFIED = .TRUE.
+                HGAMMA = 0.0D0
+                NITPLAS = 0
+                !
+                !.... ************* CLOSEsT POINT-PROJECTION ********************
+                !
+250             CONTINUE
+                NITPLAS = NITPLAS + 1
+                !
+                !.... ...DEFORM ELAST (TRIAL): E_elast=E_total-E_plast
+                !
+                DO 255 K=1,NROWB
+                    EELAS(K) = STRAIN(K) - EPTRIAL(K)
+255             CONTINUE
+                !
+                !.... PART 2a DE BOX 4.1 Simo-Hughes COMPUTE RESIDUALS
+                !..
+                !.... ... COMPUTE ELASTIC PREDICTOR STRESS: STRESS = C*E_elastico
+                CALL MULTAB(CBBAR,EELAS,TENSAO,4,4,4,4,4,1,1)
+                !.... ... COMPUTE YIELD FUNCTION (MOHR-COULOMB):
+                CALL YIELD(FYIELD,SIGMAB,TAUB,TENSAO,POISSON)
+                !
+                !.... ... COMPUTE GRADIENT AND HESSIAN OF YIELD FUNCTION
+                !
+                CALL GRADS(GRAD,QIXI,TENSAO,HGAMMA,CBBARM1,POISSON,NROWB)
+                !
+                !.... ... RESIDUAL COMPUTATION
+                !
+                DO 260 K=1,NROWB
+                    RESIDUO(K)  = EPTRIAL(K)-EPINIT(K)-HGAMMA*GRAD(K)
+260             CONTINUE
+                !
+                !.... ... COMPUTE NORM OF RESIDUO
+                !
+                !          write(*,*) 'antes DE TRIALS , nitplas = ',nitplas,l,nel
+                HNORMA = DSQRT(COLDOT(RESIDUO,RESIDUO,NROWB))
+                !
+                !.... PART 2b DE BOX 4.1 Simo-Hughes: CONVERGENCE TEST:
+                !
+                !.... ... UPDATE TRIAL PLASTIC DEFORMATION, GAMMA AND QIXIGRAD VALUES
+                !
+                CALL TRIALS(EPTRIAL,HGAMMA,QIXIGRAD,QIXI, RESIDUO,GRAD,FYIELD,CBBARM1,NROWB)
+                !
+                !.... ... CONVERGENCE TEST
+                !
+                IF ((FYIELD.GT.TOLYIELD).OR.(HNORMA.GT.TOLEPLAS)) GOTO 250
+                !
+            ENDIF
+            !
+            !.... ... UPDATE PLASTIC DEFORMATION, ETC.
+            !
+            DO 270 K=1,NROWB
+                EINELAS(NEL,L,K) = EPTRIAL(K)
+270         CONTINUE
+            !
+            !.... ... UPDATE TANGENT MODULI
+            !.... .... TRANSFER 4X4-ORDER MATRIX TO GLOBAL TANGENT ARRAY
+            !..
+            CALL QX2TANG(QIXI,HMTTG(NEL,L,1:16))
+            !
+            !
+400     CONTINUE
+        !
+500 CONTINUE
+    !
+    !      stop
+    RETURN
+    !
+2000 FORMAT(A20,2X,40(1PE15.4e2,2X))
+2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X  &
+        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                  &
+        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                  &
+        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                  &
+        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
+4000 FORMAT(2X,40(1PE15.8,2X))
+4001 FORMAT('nel=',I5,x,'gauss=',I1,x,'I',i1,2X,40(1PE15.8,2X))
+5000 FORMAT(I4,2X,I1,2X,40(1PE15.8,2X))
+    !
+    END SUBROUTINE POS4PLAST
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+
 
     !
     !**** NEW **** FOR STOCHASTIC AND NON-LINEAR FORMULATION *****************
@@ -3287,7 +3574,7 @@
             endif
             !.... ...projection of reservoir pressure to boundary condition for test
 100     CONTINUE
-        
+
         RETURN
     ENDIF
     !
@@ -4114,7 +4401,7 @@
     !
     !**** NEW **** FOR VISCOELASTICITY ***************************************
     !
-    SUBROUTINE POS4STRS(x, conecNodaisElem, STRESS, DIVU)
+    SUBROUTINE POS4STRS(x, conecNodaisElem, STRESS, DIVU, u)
     !
     use mLeituraEscritaSimHidroGeoMec,   only: CODERROR
     use mMalha,            only: nen, LOCAL
@@ -4131,6 +4418,8 @@
     !
     INTEGER, intent(in)             :: conecNodaisElem(NEN,NUMEL)
     REAL(8), intent(in)             :: X(NSD,NUMNP)
+    real*8, intent(in) :: u(ndofD, numnp)
+    
     REAL(8), DIMENSION(NROWB,NUMEL) :: STRESS
     REAL(8), DIMENSION(NUMEL)       :: DIVU
     real*8, external :: rowdot, coldot
@@ -4174,7 +4463,7 @@
         !...  ..LOCALIZE COORDINATES AND DIRICHLET B.C.
         !
         CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
+        CALL LOCAL(conecNodaisElem(1,NEL), u, DISL, NEN, NDOFD, NED2)
         !
         QUAD = .TRUE.
         IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
@@ -4217,14 +4506,12 @@
                 !
                 !.... ..UPLOAD B-BAR MATRIX AT NODE J
                 !
-                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), &
-                    &             R(L),NROWSH,NROWB,IOPT,IBBAR)
+                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), R(L),NROWSH,NROWB,IOPT,IBBAR)
                 !
                 !.... ..COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
                 !
                 DO 200 K=1,NROWB
-                    STRAIN(K)=STRAIN(K)+                                &
-                        &                COLDOT(BBARJ(K,1:2),DISL(1:2,J),2)*C1
+                    STRAIN(K)=STRAIN(K) + COLDOT(BBARJ(K,1:2),DISL(1:2,J),2)*C1
 200         CONTINUE
             !..
             !.... ..COMPUTE STRESS WITHIN INTRINSIC B-BAR FORMULATION
@@ -4688,64 +4975,642 @@
     END FUNCTION
     !
     !***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ****
-    
+    SUBROUTINE YIELD(FYIELD,SIGMAB,TAUB,TENSAO,POISSON)
     !
+    !      use mPropGeoFisica,    only: COHESION, SINFRI, TANFRI, COSFRI
+    !
+    !..... PROGRAM TO COMPUTE GRADIENT (FNABLA) AND HESSIAN (FHESSI)
+    !..... OF MOHR-COLUMB IN FUNCTION FOR NORMAL AND SHEAR STRESS
+    !..... AS INDENDENT VARIABLES.
+    !
+    REAL(8) :: FYIELD, SIGMAB, TAUB, POISSON, VMPOISSON
+    REAL(8), DIMENSION(NROWB) :: TENSAO
+    !
+    SIGMAB = 0.5D0*(TENSAO(1)+TENSAO(2))
+    TAUB   = DSQRT((0.5D0*(TENSAO(1)-TENSAO(2)))**2+TENSAO(3)**2)
+    !
+    !.... VON MISES CRITERIA
+    !
+    VMPOISSON = 2.0D0*(1.0D0-2.0D0*POISSON)**2
+    FYIELD    = VMPOISSON*SIGMAB**2+6.0D0*TAUB**2-6.0D0*COHESION**2
+    !
+    RETURN
+
+    !.... MOHR-COULOMB CRITERIA
+    !
+    !.... IOPT=4---> LINEAR CLASSICAL MOHR-COULOMB YIELD
+    !....           FOR (SIGMA_N,TAU) STRESS FORMULATION
+    !
+    !      FYIELD = TAUB + SIGMAB*TANFRI-COHESION
+    !
+    RETURN
+    !
+    END SUBROUTINE YIELD
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE GRADS(GRAD,QIXI,TENSAO,HGAMMA,CBBARM1,POISSON,nrowb)
+    !
+    !.... PROGRAM TO CALCULATE YIELD'S GRADIENT: GRAD,
+    !.... AND THE HINVERSE OF QIXI
+    !
+    IMPLICIT NONE
+    !
+    !.... MATRIX OF IN/OUT FUNCTION
+    !
+    INTEGER :: I, J, NROWB
+    REAL(8) :: HGAMMA, POISSON
+    REAL(8), DIMENSION(NROWB)       :: GRAD, TENSAO
+    REAL(8), DIMENSION(NROWB,NROWB) :: QIXI
+    !
+    !.... MATRIX OF LOCAL COMPUTATIONS
+    !
+    REAL(8), DIMENSION(NROWB,NROWB) :: CBBARM1, GRAD2, HINVQIXI
+    !
+    GRAD  = 0.0D0
+    GRAD2 = 0.0D0
+    !
+    !.... COMPUTE GRADIENT AND HESSIAN OF BASIC FUNCTIONS (SIGMA_B,TAU_B)
+    !
+    CALL SGTAGRAD(GRAD,GRAD2,TENSAO,POISSON,NROWB)
+    !
+    !.... QIXI INVERSE DEFINITION (SIMO PAG.175. EQUATION 4.3.15)
+    !
+    DO 200 I=1,NROWB
+        DO 100 J=1,NROWB
+            HINVQIXI(I,J) = CBBARM1(I,J) + HGAMMA*GRAD2(I,J)
+100     CONTINUE
+200 CONTINUE
+    !
+    !.... COMPUTE INVERSE OF SIMETRIC MATRIX HINVQIXI
+    !
+    CALL COMPQIXI(QIXI,HINVQIXI,NROWB)
+    !
+    !
+    RETURN
+    !
+2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X  &
+        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                  &
+        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                  &
+        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                  &
+        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
+    !
+    END SUBROUTINE GRADS
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE SGTAGRAD(GRAD,GRAD2,TENSAO,POISSON,NROWB)
+    !
+    !..... PROGRAM TO COMPUTE GRADIENT (grad) AND HESSIAN (grad2)
+    !..... FOR MISES AND MOHR-COULOMB CAP MODEL.
+    !
+    IMPLICIT NONE
+    !
+    INTEGER :: I, J,  NROWB
+    REAL(8) :: POISSON
+    REAL(8), DIMENSION(NROWB)  :: GRAD, TENSAO
+    REAL(8), DIMENSION(NROWB,NROWB) :: GRAD2
+    !
+    REAL(8), DIMENSION(2,3) :: BNABLA
+    REAL(8), DIMENSION(3,3) :: BHESSI
+    REAL(8), DIMENSION(2)   :: FNABLA
+    REAL(8), DIMENSION(2,2) :: FHESSI
+    !
+    !.... COMPUTE BASIC GRADIENTS (SEE INFORMATION FILE: contas2.pdf)
+    !
+    CALL BASGRAD(BNABLA,BHESSI,TENSAO,NROWB)
+    !
+    !.... COMPUTE GRADIENTS OF YIELD FUNCTION IN (SIGMA_B,TAU_B) COORDINATES
+    !
+    CALL FMCGRAD(FNABLA,FHESSI,TENSAO,POISSON,NROWB)
+    !
+    !..... COMPUTE GRADIENTS YIELD CRITERION AS CHAIN RULE PRODUCT
+    !.....     SEE contas_new_code.pdf FILE
+    !
+    DO 12 I = 1,3
+        DO 11 J = 1,2
+            GRAD(I) = GRAD(I) + FNABLA(J)*BNABLA(J,I)
+11      CONTINUE
+12  CONTINUE
+    !
+    GRAD(4) = 0.0D0
+    !
+    GRAD2   = 0.0D0
+    !
+    !..... COMPUTE HESSIAN MATRIX OF YIELD FUNCTION
+    !
+    GRAD2(1,1)=BNABLA(1,1)*FHESSI(1,1)*BNABLA(1,1)+ &
+        &           BNABLA(2,1)*FHESSI(2,2)*BNABLA(2,1)+ &
+        &           FNABLA(2)*BHESSI(1,1)
+    !
+    GRAD2(1,2)=BNABLA(1,1)*FHESSI(1,1)*BNABLA(1,2)+ &
+        &           BNABLA(2,1)*FHESSI(2,2)*BNABLA(2,2)+ &
+        &           FNABLA(2)*BHESSI(1,2)
+    !
+    GRAD2(1,3)=BNABLA(2,1)*FHESSI(2,2)*BNABLA(2,3)+ &
+        &           FNABLA(2)*BHESSI(1,3)
+    !
+    GRAD2(2,1)=GRAD2(1,2)
+    !
+    GRAD2(2,2)=BNABLA(1,2)*FHESSI(1,1)*BNABLA(1,2)+ &
+        &           BNABLA(2,2)*FHESSI(2,2)*BNABLA(2,2)+ &
+        &           FNABLA(2)*BHESSI(2,2)
+    !
+    GRAD2(2,3)=BNABLA(2,2)*FHESSI(2,2)*BNABLA(2,3)+ &
+        &           FNABLA(2)*BHESSI(2,3)
+    !
+    GRAD2(3,1)=GRAD2(1,3)
+    !
+    GRAD2(3,2)=GRAD2(2,3)
+    !
+    GRAD2(3,3)=BNABLA(2,3)*FHESSI(2,2)*BNABLA(2,3)+ &
+        &           FNABLA(2)*BHESSI(3,3)
+    !
+    RETURN
+    !
+    END SUBROUTINE SGTAGRAD
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE BASGRAD(BNABLA,BHESSI,TENSAO,NROWB)
+    !
+    !..... PROGRAM TO COMPUTE GRADIENT (BNABLA) AND HESSIAN (BHESSI)
+    !..... OF BASIC FUNCTIONS CALLED \SIGMA_B ANR \TAU_B
+    !.....
+    !..... SUCH DERIVATIVES WE CALLED BASIC GRADIENTS
+    !..... BECAUSE THEY ARE INDEPENDT OF THE YIELD CRITERIA.
+    !
+    IMPLICIT NONE
+    !
+    INTEGER NROWB
+    REAL(8) :: ROOT, ROOTM1, P25RM13, SXMSY
+    REAL(8), DIMENSION(2,3)   :: BNABLA
+    REAL(8), DIMENSION(3,3)   :: BHESSI
+    REAL(8), DIMENSION(NROWB) :: TENSAO
+    !
+    SXMSY   = TENSAO(1)-TENSAO(2)
+    ROOT    = DSQRT(0.25D0*(SXMSY)**2 + TENSAO(3)**2)
+    ROOTM1  = 1.0D0/ROOT
+    P25RM13 = 0.25D0*(ROOTM1)**3
+    !
+    !.... BNABLA(1,*) GRADIENT OF TRACE STRESS
+    !           (1,1) Drho /Drho X
+    BNABLA(1,1) = 0.5D0
+    !           (1,2) Drho /Drho Y
+    BNABLA(1,2) = 0.5D0
+    !           (1,3) Drho /Drho XY
+    BNABLA(1,3) = 0.0D0
+    !
+    !.... BNABLA(2,*) GRADIENT OF SQUARE ROOT
+    !           (2,1) Drho /Drho X
+    BNABLA(2,1) =  0.25D0*SXMSY*ROOTM1
+    !           (2,2) Drho /Drho Y
+    BNABLA(2,2) = -BNABLA(2,1)
+    !           (2,3) Drho /Drho XY
+    BNABLA(2,3) =  TENSAO(3)*ROOTM1
+    !
+    !.... HESSIAN OF TRACE == ZERO
+    !.... HESSIAN OF SQUARE ROOT :
+    !           (1,1) Drho2/(Drho X Drho X)
+    BHESSI(1,1) =  P25RM13*(TENSAO(3))**2
+    !           (1,2) Drho2/(Drho X Drho Y)
+    BHESSI(1,2) = -BHESSI(1,1)
+    !           (1,3) Drho2/(Drho X Drho XY)
+    BHESSI(1,3) = -P25RM13*(SXMSY)*TENSAO(3)
+    !           (2,1) Drho2/(Drho Y Drho X)
+    BHESSI(2,1) =  BHESSI(1,2)
+    !           (2,2) Drho2/(Drho Y Drho Y)
+    BHESSI(2,2) =  BHESSI(1,1)
+    !           (2,3) Drho2/(Drho Y Drho XY)
+    BHESSI(2,3) = -BHESSI(1,3)
+    !           (3,1) Drho2/(Drho XY Drho X)
+    BHESSI(3,1) =  BHESSI(1,3)
+    !           (3,2) Drho2/(Drho XY Drho Y)
+    BHESSI(3,2) =  BHESSI(2,3)
+    !           (2,3) Drho2/(Drho XY Drho XY)
+    BHESSI(3,3) =  P25RM13*SXMSY**2
+    !
+    RETURN
+    !
+    END SUBROUTINE BASGRAD
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE FMCGRAD(FNABLA,FHESSI,TENSAO,POISSON,NROWB)
+    !
+    !..... PROGRAM TO COMPUTE GRADIENT (FNABLA) AND HESSIAN (FHESSI)
+    !..... OF MOHR-COLUMB IN FUNCTION OF NORMAL AND SHEAR STRESS
+    !..... AS INDENDENTS VARIABLES.
+    !
+    IMPLICIT NONE
+    !
+    INTEGER :: NROWB
+    REAL(8) :: SIGMAB, TAUB, POISSON, VMPOISSON
+    REAL(8), DIMENSION(2)     :: FNABLA
+    REAL(8), DIMENSION(2,2)   :: FHESSI
+    REAL(8), DIMENSION(NROWB) :: TENSAO
+    !
+    !     GO TO (200,300,400,500), IOPT-1
+    !
+    SIGMAB = 0.5D0*(TENSAO(1)+TENSAO(2))
+    TAUB   = DSQRT((0.5D0*(TENSAO(1)-TENSAO(2)))**2+TENSAO(3)**2)
+    !
+    !
+    ! 300   CONTINUE
+    !
+    !.... IOPT=3---> VON MISES CRITERION (SIGMA_B,TAU_B) SPACE
+    !
+    VMPOISSON = 4.0D0*(1.0D0-2.0D0*POISSON)**2
+    !
+    !..... GRADIENT
+    !
+    FNABLA(1) = VMPOISSON*SIGMAB
+    FNABLA(2) = 12.0D0*TAUB
+    !
+    !..... HESSIAN
+    !
+    FHESSI(1,1) = VMPOISSON
+    FHESSI(1,2) = 0.0D0
+    FHESSI(2,1) = 0.0D0
+    FHESSI(2,2) = 12.0D0
+    !
+    RETURN
+    !
+    END SUBROUTINE FMCGRAD
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE COMPQIXI(QIXI,HINVQIXI,NROWB)
+    !
+    !.... PROGRAM TO COMPUTE INVERSE OF HINVQIXI MATRIX
+    !.... OUTPUT IS MATRIX QIXI
+    !
+    IMPLICIT NONE
+    !
+    INTEGER :: I , J, NORDER, NROWB
+    REAL(8) :: XDET
+    !
+    !.... INPUT/OUTPUT MATRIZES
+    !
+    REAL(8), DIMENSION(NROWB,NROWB) ::  QIXI, HINVQIXI
+    !
+    !.... LOCAL ARRAYS
+    !
+    REAL(8), DIMENSION(NROWB,NROWB)     :: ATEMP, COFATOR
+    REAL(8), DIMENSION(NROWB-1,NROWB-1) :: AMINOR
+    !
+    ! external
+    real*8, external :: detm3x3
+    !
+    !.... MOVE HINVQIXI TO ATEMP
+    !
+    NORDER = NROWB
+    !
+    DO 20 I=1,NORDER
+        DO 10 J=1,NORDER
+            ATEMP(I,J)=HINVQIXI(I,J)
+10      CONTINUE
+20  CONTINUE
+    !
+    DO 60 I=1,NORDER
+        DO 50 J=1,NORDER
+            !
+            !.... .... COMPUTE MATRIX OF MINORS
+            !
+            CALL COMPMINOR(AMINOR,ATEMP,I,J,NORDER)
+            !
+            !.... .... COMPUTE MATRIX CO-FATORS
+            !
+            COFATOR(I,J)=((-1)**(I+J))*DETM3X3(AMINOR)
+50      CONTINUE
+60  CONTINUE
+    !
+    !..... COMPUTE DETERMINANT
+    !
+    XDET = 0.0D0
+    !
+    DO 70 I=1,NORDER
+        XDET=XDET+ATEMP(1,I)*COFATOR(1,I)
+70  CONTINUE
+    !
+    DO 90 I=1,NORDER
+        DO 80 J=1,NORDER
+            QIXI(I,J)=COFATOR(J,I)/XDET
+80      CONTINUE
+90  CONTINUE
+    !
+    RETURN
+    !
+2000 FORMAT(A15,4(1PE10.2,2X))
+    !
+    END SUBROUTINE COMPQIXI
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE TRIALS(EPTRIAL,HGAMMA,QIXIGRAD,QIXI,RESIDUO, &
+        &                  GRAD,FYIELD,CBBARM1,NROWB)
+    !
+    use mMalha,            only: multab
+    !
+    !.... PROGRAM TO UPDATE PLASTIC AND GAMMA TRIAL'S
+    !.... ALSO COMPUTE QIXIGRAD VETOR (NAME N SIMO VETOR)
+    !.... TO USE IN CONSISTENT TANGENT MODULI.
+    !
+    !.... INPUT DATA: QIXI, RESIDUO, GRAD, FMOHR
+    !.... OUTPUT DATA: EPTRIAL, HGAMMA, QIXIGRAD
+    !
+    IMPLICIT NONE
+    !
+    INTEGER :: I,NROWB
+    REAL(8) :: HGAMMA, FYIELD, DHGAMMA, DENOMIN
+
+    real*8, external :: coldot
+    !
+    !.... GLOBAL VETORS AND MATRIZES
+    !
+    REAL(8), DIMENSION(NROWB) :: EPTRIAL, GRAD, QIXIGRAD, RESIDUO
+    REAL(8), DIMENSION(NROWB,NROWB) :: QIXI, CBBARM1
+    !
+    !.... LOCAL VETORS AND MATRIZES
+    !
+    REAL(8), DIMENSION(NROWB) :: QIXIRES, RESLOC, DPLAS, GRADMRES
+    !
+    !.... PART: 2D FROM BOX 4.1 "COMPUTE INCREMENTS"
+    !
+    QIXIRES  = 0.0D0
+    DPLAS    = 0.0D0
+    RESLOC   = 0.0D0
+    QIXIGRAD = 0.0D0
+    GRADMRES = 0.0D0
+    !
+    !.... ... COMPUTATION OF QIXIRES=QIXI*RESIDUO
+    !
+    CALL MULTAB(QIXI,RESIDUO,QIXIRES,4,4,4,4,4,1,1)
+    !
+    !.... ... COMPUTATION OF QIXIGRD=QIXI*GRAD
+    !
+    CALL MULTAB(QIXI,GRAD,QIXIGRAD,4,4,4,4,4,1,1)
+
+    DENOMIN = 1.0D0/COLDOT(GRAD,QIXIGRAD,NROWB)
+    !
+    !.... .. HGAMMA INCREMENT:
+    !
+    DHGAMMA = (FYIELD+COLDOT(GRAD,QIXIRES,NROWB))*DENOMIN
+    !      WRITE(*,*) 'DHGAMMA = ',DHGAMMA, 'denomin = ',denomin
+    !
+    !.... .. PLASTIC INCREMENT
+    !
+    DO 20 I=1,NROWB
+        GRADMRES(I) = DHGAMMA*GRAD(I)-RESIDUO(I)
+20  CONTINUE
+
+    !
+    CALL MULTAB(QIXI,GRADMRES,RESLOC,4,4,4,4,4,1,1)
+    !
+    !.... ...SOLVE C*DPLAS = RESLOC, FOR DPLAS --> DPLAS = Cm1*RESLOC
+    !
+    CALL MULTAB(CBBARM1,RESLOC,DPLAS,4,4,4,4,4,1,1)
+    !
+    !.... PARTE 2E BOX 4.1 UPDATE PLASTIC AND HGAMMA TRIALS
+    !
+    HGAMMA = HGAMMA + DHGAMMA
+    !      WRITE(*,*)'HGAMMA= ',HGAMMA,' DHGAMMA = ',DHGAMMA
+    !
+    DO 100 I=1,NROWB
+        EPTRIAL(I) = EPTRIAL(I) + DPLAS(I)
+100 CONTINUE
+    !
+    !.... COMPUTE QIXIGRAD (SIMO PAG.175, EQUATION 4.3.19)
+    !
+    DO 120 I=1,NROWB
+        QIXIGRAD(I) = QIXIGRAD(I)*DSQRT(DENOMIN)
+120 CONTINUE
+
+    RETURN
+    !
+    END SUBROUTINE TRIALS
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    SUBROUTINE STRSS4PLAST(x, conecNodaisElem)
+    !
+    !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR CREEP MODEL
+    !
+    use mMalha,            only: nsd, numnp, numel, nen, LOCAL
+    use mMalha,            only: multab
+    use mGlobaisEscalares, only: nrowsh
+    use mFuncoesDeForma,   only: shgq, shlq
+    use mPropGeoFisica,    only: YOUNG
+    use mPropGeoFisica,    only: GEOFORM, GEOINDIC, FNCMECLAW
+    !
+    IMPLICIT NONE
+    !
+    REAL*8,  intent(in)    :: x(nsd,numnp)
+    INTEGER, intent(in)    :: conecNodaisElem(nen,numel)
+    CHARACTER(5)           :: MECLAW
+    
+    real*8, external :: coldot, rowdot
+    !
+    LOGICAL QUAD
+    !
+    INTEGER :: J,K,L,NEL
+    !
+    !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
+    !
+    REAL(8), DIMENSION(NESD,NEN)      :: XL
+    REAL(8), DIMENSION(NED2,NEN)      :: DLTRL
+    !
+    !.... LOCAL VECTORS AND MATRIZES
+    !
+    REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ
+    REAL(8), DIMENSION(NROWB,NROWB)   :: CBBAR
+    REAL(8), DIMENSION(NROWB)         :: TENSAO, STRAIN, EELAS
+    !
+    REAL(8) :: SHLD(NROWSH,NEN,NINTD), SHGD(NROWSH,NEN,NINTD)
+    REAL(8) :: SHGBR(NROWSH,NEN)
+    REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
+
+    REAL(8) :: POISSON
+    !
+    !.... NEXT FOR PLASTICITY
+    !
+    !
+    !.... STRAIN      :  TOTAL DEFORMATION
+    !.... EPLAS       :  deformacao plastica
+    !.... Einelas     :  PLASTICA
+    !
+    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
+    !
+    CALL SHLQ(SHLD,WD,NINTD,NEN)
+    !
+    TENSAO = 0.0D0
+    !
+    DO 500 NEL=1,NUMEL
+        !
+        MECLAW  = FNCMECLAW(GEOFORM(NEL))
+        !
+        POISSON = GEOINDIC('POISSON',GEOFORM(NEL))
+        !
+        !.... SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
+        !
+        CALL SETUPC(CBBAR,YOUNG(NEL),POISSON,NROWB,IOPT)
+        !
+        !..... ..LOCALIZE COORDINATES AND DIRICHLET B.C.
+        !
+        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
+        CALL LOCAL(conecNodaisElem(1,NEL),DTRL,DLTRL,NEN,NDOFD,NED2)
+        !
+        QUAD = .TRUE.
+        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
+        !
+        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
+        !..
+        !..... ..SETUP FOR AXISYMMETRIC OPTION
+        !..
+        IF (IOPT.EQ.2) THEN
+            DO 100 L=1,NINTD
+                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
+                DETD(L) = DETD(L)*R(L)
+100         CONTINUE
+        ENDIF
+        !
+        !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
+        !....     FOR MEAN-DILATATIONAL B-BAR FORMULATION
+        !
+        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
+        !..
+        !.... ...LOOP OVER INTEGRATION POINTS
+        !..
+        DO 400 L=1,NINTD
+            !..
+            !..... ..CLEAR INITIAL STRAIN
+            !..
+            STRAIN = 0.0D0
+            !
+            DO 200 J=1,NEN
+                !...
+                !.... ..... UPLOAD B-BAR MATRIX AT NODE J
+                !..
+                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), &
+                    &                    R(L),NROWSH,NROWB,IOPT,IBBAR)
+                !..
+                !.... ..... COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
+                !..
+                DO 200 K=1,NROWB
+                    STRAIN(K)=STRAIN(K)+ &
+                        &                    COLDOT(BBARJ(K,1:2),DLTRL(1:2,J),2)
+200         CONTINUE
+            !..
+            !.... ..... COMPUTE ELASTIC DEFORMATION
+            !..
+            DO 210 K=1,NROWB
+                EELAS(K) = STRAIN(K) - EINELAS(NEL,L,K)
+210         CONTINUE
+            !
+            !.... ..... COMPUTE STRESS
+            !..
+            CALL MULTAB(CBBAR,EELAS,TENSAO,4,4,4,4,4,1,1)
+            !
+            !.... ..... LOCATE ON STRESS FOR GLOBAL FORCE BALANCE
+            !
+            DO 250 K=1,NROWB
+                STRSSP(NEL,L,K) = TENSAO(K)
+250         CONTINUE
+            !
+400     CONTINUE
+        !
+500 CONTINUE
+    !
+    !      stop
+    RETURN
+    !
+2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X  &
+        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                  &
+        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                  &
+        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                  &
+        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
+4000 FORMAT(2X,40(1PE15.8,2X))
+4001 FORMAT('nel=',I5,x,'gauss=',I1,x,'I',i1,2X,40(1PE15.8,2X))
+5000 FORMAT(I4,2X,I1,2X,40(1PE15.8,2X))
+    !
+    END SUBROUTINE STRSS4PLAST
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine incrementMechanicSolution(conecNodaisElem, nen, nel, nnp, nsd, x)
     !function imports
-    
+    use mSolverGaussSkyline, only: solverGaussSkyline
+
     implicit none
-    
+
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
     real*8 :: x(nsd, nnp)
-    
+
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
     real*8, allocatable :: r(:,:) !r - residual
+    real*8, allocatable :: DeltaDis(:,:), dDis(:,:)
+    real*8, allocatable :: stressInc(:,:)
     real*8 :: error
-    
+
     integer :: nLoadSteps
     integer :: j, k
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     ! for now, total increment is always 10
     nLoadSteps = 10
-    
+
     ! allocate the required matrices
     if(.not.allocated(fExtT)) allocate(fExtT(ndofD, nnp))
     if(.not.allocated(fIntJ)) allocate(fIntJ(ndofD, nnp))
     if(.not.allocated(r)) allocate(r(ndofD, nnp))
-    
     fExtT = 0.d0
     fIntJ = 0.d0
+    r = 0.d0
+
+    if(.not.allocated(DeltaDis)) allocate(DeltaDis(ndofD, nnp))
+    if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
+    dDis = 0.d0
     
+    if(.not.allocated(stressInc)) allocate(stressInc(nrowB,nel))
+    stressInc = 0.d0
+
     do k = 1, nLoadSteps
+        ! initialize initial displacement with 0
+        DeltaDis = 0.d0
+
         call updateIncrementMechanic(fExtT, k, nLoadSteps, nnp)
-        
+
         error = 1
         do j = 1, 15
+            alhsD = 0.d0
+            brhsD = 0.d0
+
             ! compute the tangential stiffness matrix
-            call bbarmtrx_elast(x, conecnodaiselem, alhsD, brhsD, idiagD, lmD)
-            
+            call bbarmtrx_elast(x, conecNodaisElem, alhsD, brhsD, idiagD, lmD)
+
             ! load force vector in the right side
             call matsub(fExtT, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
-            
-            
+            if (nlvectD.gt.0) then
+                call load(idDesloc, r, brhsd, ndofD, nnp, nlvectD)
+                call ftod(idDesloc, dDis, fExtT, ndofD, nnp, nlvectD) !fExtT here is weighted dirichlet condition. Care
+            end if
+
+            ! solve using LDU decomposition, and store the result in the right array
+            call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
+            call btod(idDesloc, dDis, brhsD, ndofD, nnp)
+
+            ! add correction da to the incremental displacement vector
+            call matadd(DeltaDis, dDis, DeltaDis, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+
+            !compute stress increment for each integration point
+            call pos4Strs(x, conecNodaisElem, stressInc, divU, DeltaDis)
         end do
     end do
-    
+
     end subroutine incrementMechanicSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine updateIncrementMechanic(fExtT, curStep, nSteps, nnp)
-    
+
     implicit none
     !variables input
     integer :: curStep, nSteps, nnp
     real*8 :: fExtT(ndofD, nnp)
-    
+
     ! Variables
     integer :: i, j
     !------------------------------------------------------------------------------------------------------------------------------------
@@ -4754,9 +5619,8 @@
             fExtT(i, j) = fDesloc(i, j) / nSteps * curStep
         end do
     end do
-    
+
     end subroutine updateIncrementMechanic
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    
     end module mGeomecanica

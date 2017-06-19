@@ -4,7 +4,7 @@
 		<Platform Name="Win32"/></Platforms>
 	<Configurations>
 		<Configuration Name="Debug|Win32">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarningsAsErrors="true" Diagnostics="diagnosticsShowAll" WarnInterfaces="true" Traceback="true" RuntimeChecks="rtChecksAll" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarningsAsErrors="true" Diagnostics="diagnosticsShowAll" WarnInterfaces="true" Traceback="true" RuntimeChecks="rtChecksNone" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
 				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
@@ -41,19 +41,6 @@
 		<File RelativePath=".\data\cilindroJesus\NumericParam.inc"/>
 		<File RelativePath=".\data\cilindroJesus\randfiles.inc"/>
 		<File RelativePath=".\data\cilindroJesus\SimulatorParam.inc"/></Filter>
-		<Filter Name="exTuane">
-		<File RelativePath=".\data\exTuane\condContornoGeom.inc"/>
-		<File RelativePath=".\data\exTuane\data.inc"/>
-		<File RelativePath=".\data\exTuane\elmnt_geoformation.inc"/>
-		<File RelativePath=".\data\exTuane\geomechLayers.inc"/>
-		<File RelativePath=".\data\exTuane\hidroGalerkin.inc"/>
-		<File RelativePath=".\data\exTuane\inputDS.dat"/>
-		<File RelativePath=".\data\exTuane\layer_reference.inc"/>
-		<File RelativePath=".\data\exTuane\malha.inc"/>
-		<File RelativePath=".\data\exTuane\mcmc.inc"/>
-		<File RelativePath=".\data\exTuane\NumericParam.inc"/>
-		<File RelativePath=".\data\exTuane\randfiles.inc"/>
-		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter>
 		<Filter Name="cookMembrane">
 		<File RelativePath=".\data\cookMembrane\condContornoGeom.inc"/>
 		<File RelativePath=".\data\cookMembrane\condContornoHidro.inc"/>
@@ -69,7 +56,20 @@
 		<File RelativePath=".\data\cookMembrane\mesh_rsrv_outsburden.inc"/>
 		<File RelativePath=".\data\cookMembrane\NumericParam.inc"/>
 		<File RelativePath=".\data\cookMembrane\randfiles.inc"/>
-		<File RelativePath=".\data\cookMembrane\SimulatorParam.inc"/></Filter></Filter>
+		<File RelativePath=".\data\cookMembrane\SimulatorParam.inc"/></Filter>
+		<Filter Name="exTuane">
+		<File RelativePath=".\data\exTuane\condContornoGeom.inc"/>
+		<File RelativePath=".\data\exTuane\data.inc"/>
+		<File RelativePath=".\data\exTuane\elmnt_geoformation.inc"/>
+		<File RelativePath=".\data\exTuane\geomechLayers.inc"/>
+		<File RelativePath=".\data\exTuane\hidroGalerkin.inc"/>
+		<File RelativePath=".\data\exTuane\inputDS.dat"/>
+		<File RelativePath=".\data\exTuane\layer_reference.inc"/>
+		<File RelativePath=".\data\exTuane\malha.inc"/>
+		<File RelativePath=".\data\exTuane\mcmc.inc"/>
+		<File RelativePath=".\data\exTuane\NumericParam.inc"/>
+		<File RelativePath=".\data\exTuane\randfiles.inc"/>
+		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter></Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\fonte\driverGeocreep.F90"/>
 		<File RelativePath=".\fonte\funcoesDeForma.F90"/>
