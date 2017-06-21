@@ -411,7 +411,7 @@
     !
     !.... POST-PROCESS STRESS FIELD
     !
-    CALL POS4STRS(X, conecNodaisElem, STRSS0, DIVU, dis)
+    CALL POS4STRS(X, conecNodaisElem, STRSS0, DIVU)
     !
     !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
     !
@@ -1086,6 +1086,8 @@
     use mPropGeoFisica,    only: GEOFORM, MASCN, MASCN0
     use mHidrodinamicaRT,  only: pressaoElem, pressaoElemAnt,PRESPRODWELL,NCONDP
     use mHidrodinamicaRT,  only: vc, ve, velocLadal, fVeloc, velocNodal
+    
+    use mGeomecanica, only: disInc
 
     !
     implicit none
@@ -1196,6 +1198,7 @@
     !
     !... allocate memory for plasticity
     allocate(EINELAS(NUMEL,NINTD,NROWB)); EINELAS = 0.0d0
+    allocate(disInc(ndofD, numnp)); disInc = 0.d0
     !
     !... END GEOMECANICA
     !
@@ -1583,16 +1586,16 @@
     use mLeituraEscritaSimHidroGeoMec, only:ihgPres, reservHGPres
     !mechanics
     use mGeomecanica, only: dis0
+    use mGeomecanica, only: disInc
     use mGeomecanica, only: ndofD
     use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
-    
 
     !function imports
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
     use mHidrodinamicaGalerkin, only:montarSistemaEquacoesPressao
     use mHidrodinamicaGalerkin, only:solveGalerkinPressao
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview, escreverArqParaviewIntermed
-    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewVector
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewVector, escreverArqParaviewIntermed_CampoVetorial
     use mGeomecanica, only:stress_init
     use mGeomecanica, only:incrementMechanicSolution
 
@@ -1613,10 +1616,11 @@
     
     ! init stress and print stress
     call stress_init()
-    call escreverArqParaviewVector('dis', dis0, nDofD, numnp, nen, conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservDesloc, iDis)
+    call escreverArqParaviewVector('dis', dis0, nDofD, numnp, nen, conecNodaisElem, 2, 'total', len('t=0.0'), reservDesloc, iDis)
     
     ! solve initialization incrementally
-    call incrementMechanicSolution(conecNodaisElem, nen, numel, numnp, nsd, x)
+    call incrementMechanicSolution(conecNodaisElem, nen, numel, numnp, nsd, x, disInc)
+    call escreverArqParaviewIntermed_CampoVetorial('dis',disInc, ndofD, numnp, 'incrFinal', len('incrFinal'), 2, reservDesloc, iDis)
 
     ! mount data structure
     call montarEstruturasDadosPressaoSkyline(conecNodaisElem, nen, numel)

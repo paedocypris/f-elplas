@@ -1171,7 +1171,7 @@
     if (curTimeStep == 1) then
         if (hgNlvect >= 1) then
             call load(hgId, hgF, hgBrhs, hgNdof, nnp, hgNlvect)
-            call dirichletConditions(hgId, hgPressure, hgF, hgNdof, nnp, hgNlvect)
+            call ftod(hgId, hgPressure, hgF, hgNdof, nnp, hgNlvect)
         endif
     endif 
 
@@ -1246,9 +1246,6 @@
             call local(conecNodaisElem(1,curElement), hgPrevPressure, prevPressureL, nen, hgNdof, hgNdof) !localize dirichlet b.c.
         end if
 
-        ! set material index
-        m = mat(curElement)
-
         ! check if element has any coalesced nodes
         quad = .true.
         if (nen.eq.4.and.conecNodaisElem(3,curElement).eq.conecNodaisElem(4,curElement)) quad = .false.
@@ -1257,6 +1254,9 @@
         if(nen==3) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
         if(nen==4) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
         if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
+        
+        ! set material index
+        m = mat(curElement)
 
         ! retrieve permeabilities from material
         kX = c(1,m)

@@ -62,6 +62,8 @@
     !
     !plasticity
     !todo: inicializar tolYield, plastified, toleplas
+    real*8, allocatable :: disInc(:,:)
+    
     real*8 :: tolYield, toleplas
     logical :: plastified
     real*8 :: cohesion
@@ -218,7 +220,7 @@
 600 CONTINUE     !.... fase=='CREEP_STRSS_SIGMAT'
     VDP   = 0.0D0
     !.... POST-PROCESS STRESS FIELD
-    CALL POS4STRS(x, conecNodaisElem, AVSTRS, DIVU, DIS)
+    CALL POS4STRS(x, conecNodaisElem, AVSTRS, DIVU)
     !.... COMPUTE TRACE OF TOTAL STRESS'S (SIGMAT)
     CALL COMPTRACE(pressaoElem,AVSTRS,SIGMAT,NROWB,NUMEL,numelReserv)
     RETURN
@@ -613,7 +615,7 @@
     !
     !.... POST-PROCESS STRESS FIELD
     !
-    CALL POS4STRS(x, conecNodaisElem, strss0, divU, dis)
+    CALL POS4STRS(x, conecNodaisElem, strss0, divU)
     !
     !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
     !
@@ -4206,21 +4208,9 @@
     INTEGER :: NEL, I, J, L
 
     real*8, external :: rowdot, coldot
-
-    !     write(*,*) 'gravidade aqui ===>', grav
-    !      WRITE(101,*) 'ENTRANDO NO VECTOR SOURCE'
-    !      do 210 i=1,neqd
-    !         write(101,*) i,brhsd(i)
-    !210   continue
-    !      write(*,*) 'entrando vector', grav(1), grav(2), grav(3)
     !
     CALL SHLQ3D(SHLD,WD,NINTD,NEN)
     !
-    !      write(*,*) 'entrando source 3d'
-    !      do 110 j=1,nen
-    !        do 110 i=1,nintd
-    !           write(3031,2001) i, j, (shLd(k,j,i),k=1,nrowsh)
-    !110     continue
     !
     DO 500 NEL=1,NUMEL
         !
@@ -4232,11 +4222,6 @@
         !
         CALL DENSLOC(RHOTOTAL,PRESSURE,GEOPRSR(nel),&
             &                P(1,nel),satElem(nel),NEL,LDRAINED)
-        !
-        !         WRITE(3031,3500) NEL, rhototal, denfluid, densolid
-        !.... SETUP ELEMENT PRESSURE VECTOR 3-D MODEL
-        !
-        !         pressure = 0.0D0
         !
         !... CLEAR LOCAL STIFFNESS MATRIX AND FORCE ARRAY
         !
@@ -4401,7 +4386,7 @@
     !
     !**** NEW **** FOR VISCOELASTICITY ***************************************
     !
-    SUBROUTINE POS4STRS(x, conecNodaisElem, STRESS, DIVU, u)
+    SUBROUTINE POS4STRS(x, conecNodaisElem, STRESS, DIVU)
     !
     use mLeituraEscritaSimHidroGeoMec,   only: CODERROR
     use mMalha,            only: nen, LOCAL
@@ -4418,7 +4403,6 @@
     !
     INTEGER, intent(in)             :: conecNodaisElem(NEN,NUMEL)
     REAL(8), intent(in)             :: X(NSD,NUMNP)
-    real*8, intent(in) :: u(ndofD, numnp)
     
     REAL(8), DIMENSION(NROWB,NUMEL) :: STRESS
     REAL(8), DIMENSION(NUMEL)       :: DIVU
@@ -4463,7 +4447,7 @@
         !...  ..LOCALIZE COORDINATES AND DIRICHLET B.C.
         !
         CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL), u, DISL, NEN, NDOFD, NED2)
+        CALL LOCAL(conecNodaisElem(1,NEL), DIS, DISL, NEN, NDOFD, NED2)
         !
         QUAD = .TRUE.
         IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
@@ -4555,7 +4539,133 @@
     !
 4000 FORMAT(2X,40(1PE15.8,2X))
     !
-    END SUBROUTINE
+    END SUBROUTINE POS4STRS
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine pos4inc(x, conecNodaisElem, u, strain, stress)
+    !
+    !.... Program to compute the strain, stress and internal force given an incremental displacement
+    !
+    
+    !function imports
+    use mLeituraEscritaSimHidroGeoMec,   only: CODERROR
+    use mMalha,            only: nen, LOCAL
+    use mMalha,            only: nsd, numnp, numel
+    use mGlobaisEscalares, only: nrowsh
+    use mFuncoesDeForma,   only: shgq, shlq
+    use mPropGeoFisica,    only: YOUNG
+    use mPropGeoFisica,    only: GEOFORM, GEOINDIC
+    !variables input
+    implicit none
+    integer, intent(in)             :: conecNodaisElem(nen,numel)
+    real(8), intent(in)             :: x(nsd,numnp)
+    real*8, intent(in) :: u(ndofD, numnp)
+    real*8 :: stress(nrowb, numel)
+    real*8 :: strain(nrowb, numel)
+    
+    !variables
+    real*8, external :: rowdot, coldot
+    !
+    logical quad
+    real(8), dimension(nesd,nen)         :: xl
+    real(8), dimension(ned2,nen)         :: disl
+    real(8), dimension(nintd)            :: wd, detd, r
+    real(8), dimension(nrowsh,nen,nintd) :: shld,shgd
+    real(8), dimension(nrowsh,nen)       :: shgbr
+    real(8), dimension(nrowb,nrowb)      :: cbbar
+    real(8), dimension(nrowb,nesd)  :: bbarj
+    real(8), dimension(4)           :: unitvec
+    !
+    real*8  :: poisson, area, c1, root3d2
+    integer :: nel, l, j, k
+    !
+    !-------------------------------------------------------------------------------------------------------------------
+    !clean stress, strain and initial force
+    strain = 0.d0
+    stress = 0.d0
+    
+    unitVec(1) = 1.0d0
+    unitVec(2) = 1.0d0
+    unitVec(3) = 0.0d0
+    unitVec(4) = 1.0d0
+    root3d2    = 1.224744871391589d0
+    !
+    !.... generation of local shape functions and weight values
+    !
+    call shlq(shld,wd,nintd,nen)
+    !
+    do nel=1,numel
+        !
+        poisson = geoindic('poisson',geoform(nel))
+        !
+        !.... ..setup stochastic elasticity tensor for bbar method
+        !
+        call setupc(cbbar, young(nel),poisson,nrowb,iopt)
+        !
+        !...  ..localize coordinates and dirichlet b.c.
+        !
+        call local(conecNodaisElem(1,nel), x, xl, nen, nsd, nesd)
+        call local(conecNodaisElem(1,nel), u, disl, nen, ndofd, ned2)
+        !
+        quad = .true.
+        if (conecNodaisElem(3,nel).eq.conecNodaisElem(4,nel)) quad = .false.
+        !
+        call shgq(xl,detd,shld,shgd,nintd,nel,quad,nen)
+        !..
+        !.... ...define element area
+        !..
+        area = 0.0d0
+        !..
+        !.... ...setup for axisymmetric option
+        !..
+        if (iopt.eq.2) then
+            do l=1,nintd
+                r(l)    = rowdot(shgd(nrowsh,1,l),xl,nrowsh,nesd,nen)
+                detd(l) = detd(l)*r(l)
+            end do
+        endif
+        !
+        !.... ..calculate mean values of shape function global derivatives
+        !.... ..for mean-dilatational b-bar formulation
+        !
+        call xmeansh(shgbr,wd,detd,r,shgd,nen,nintd,iopt,nesd,nrowsh)
+        !
+        !.... ..loop over integrationn points
+        !
+        do l=1,nintd
+            !
+            c1=wd(l)*detd(l)
+            area = area + c1
+            !
+            do j=1,nen
+                !
+                !.... ..upload b-bar matrix at node j
+                !
+                call setbb(bbarj,shgd(1:nrowsh,j,l),shgbr(1:nrowsh,j), r(l),nrowsh,nrowb,iopt,ibbar)
+                !
+                !.... ..compute strains within intrinsic b-bar formulation
+                !
+                ! B \cdot a
+                do k=1,nrowb
+                    strain(k, nel)=strain(k, nel) + coldot(bbarj(k,1:2),disl(1:2,j),2)*c1
+                end do
+            end do
+        end do
+        
+        ! compute mean deformation over element
+        do k=1,nrowb
+            strain(k, nel)=strain(k, nel)/area
+        end do
+        
+        !compute mean stress
+        do k = 1, nrowb
+            stress(k, nel) = coldot(cbbar(k, 1:4), strain(1:4, nel), 4)
+        end do
+    end do
+    
+    end subroutine pos4inc
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     !
     !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
     !
@@ -5529,32 +5639,44 @@
     END SUBROUTINE STRSS4PLAST
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicSolution(conecNodaisElem, nen, nel, nnp, nsd, x)
+    subroutine incrementMechanicSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
-
+    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial
+    
+    !variables import
+    use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
+    
     implicit none
 
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
-    real*8 :: x(nsd, nnp)
+    real*8 :: x(nsd, nnp), u(ndofD,nnp)
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
+    real*8, allocatable :: fExtNeumann(:,:), fExtDirichlet(:,:) !fExtT with zeros on dirichlet/neumann nodes
     real*8, allocatable :: r(:,:) !r - residual
     real*8, allocatable :: DeltaDis(:,:), dDis(:,:)
-    real*8, allocatable :: stressInc(:,:)
+    real*8, allocatable :: strainInc(:,:), stressInc(:,:)
     real*8 :: error
+    
+    real*8, external :: coldot
 
     integer :: nLoadSteps
     integer :: j, k
+    
+    real*8 :: tolNewton
+    logical :: converged
 
     !------------------------------------------------------------------------------------------------------------------------------------
     ! for now, total increment is always 10
-    nLoadSteps = 10
+    nLoadSteps = 1
 
     ! allocate the required matrices
     if(.not.allocated(fExtT)) allocate(fExtT(ndofD, nnp))
+    if(.not.allocated(fExtNeumann)) allocate(fExtNeumann(ndofD, nnp))
+    if(.not.allocated(fExtDirichlet)) allocate(fExtDirichlet(ndofD, nnp))
     if(.not.allocated(fIntJ)) allocate(fIntJ(ndofD, nnp))
     if(.not.allocated(r)) allocate(r(ndofD, nnp))
     fExtT = 0.d0
@@ -5565,16 +5687,27 @@
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     dDis = 0.d0
     
+    if(.not.allocated(strainInc)) allocate(strainInc(nrowB,nel))
     if(.not.allocated(stressInc)) allocate(stressInc(nrowB,nel))
+    strainInc = 0.d0
     stressInc = 0.d0
-
+    
+    tolNewton = 1.0e-8
+    
+    u = 0.d0
     do k = 1, nLoadSteps
         ! initialize initial displacement with 0
         DeltaDis = 0.d0
 
+        !compute the new external force vector, and split into two, a dirichlet and a neumann one
         call updateIncrementMechanic(fExtT, k, nLoadSteps, nnp)
+        call splitBoundaryCondition(idDesloc,fExtT,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
 
         error = 1
+        !initialize residual
+        call matsub(fExtNeumann, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+        
+        converged = .false.
         do j = 1, 15
             alhsD = 0.d0
             brhsD = 0.d0
@@ -5583,22 +5716,40 @@
             call bbarmtrx_elast(x, conecNodaisElem, alhsD, brhsD, idiagD, lmD)
 
             ! load force vector in the right side
-            call matsub(fExtT, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
             if (nlvectD.gt.0) then
                 call load(idDesloc, r, brhsd, ndofD, nnp, nlvectD)
-                call ftod(idDesloc, dDis, fExtT, ndofD, nnp, nlvectD) !fExtT here is weighted dirichlet condition. Care
+                call ftod(idDesloc, dDis, fExtDirichlet, ndofD, nnp, nlvectD) !fExtT here is weighted dirichlet condition. Care
             end if
 
             ! solve using LDU decomposition, and store the result in the right array
             call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
             call btod(idDesloc, dDis, brhsD, ndofD, nnp)
+            
+            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'j1', len('j1'), 2, reservDesloc, iDis)
+            if (j == 2) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'j2', len('j2'), 2, reservDesloc, iDis)
 
             ! add correction da to the incremental displacement vector
             call matadd(DeltaDis, dDis, DeltaDis, ndofD, ndofD, ndofD, ndofD, nnp, 1)
 
-            !compute stress increment for each integration point
-            call pos4Strs(x, conecNodaisElem, stressInc, divU, DeltaDis)
+            !computes the strain and stress
+            call pos4inc(x, conecNodaisElem, DeltaDis, strainInc, stressInc)
+            
+            !computes the internal force
+            call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stressInc, fIntJ)
+            
+            !updates the residual and check the stop condition
+            call matsub(fExtNeumann, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            error = dsqrt(coldot(r,r,nee))
+            if (error < tolNewton) then
+                converged = .true.
+                exit
+            end if
         end do
+        if (converged.eqv..false.) write(*,*) 'deu pau'
+        
+        ! load the displacement into the answer
+        call matadd(u, DeltaDis, u, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+        
     end do
 
     end subroutine incrementMechanicSolution
@@ -5613,6 +5764,7 @@
 
     ! Variables
     integer :: i, j
+    
     !------------------------------------------------------------------------------------------------------------------------------------
     do j = 1, nnp
         do i = 1, ndofD
@@ -5621,6 +5773,88 @@
     end do
 
     end subroutine updateIncrementMechanic
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
+    !function import
+    use mFuncoesDeForma, only: shgq, shlq
+    use mMalha, only: local
+    
+    !variables import
+    use mGlobaisEscalares, only: nrowsh
+    
+    implicit none
+    !variables input
+    integer :: conecNodaisElem(nen,nel), nen, nel, nnp, nsd
+    real*8 :: x(nsd, nnp)
+    real*8 :: stress(nrowb,nel), fIntJ(ndofD, nnp)
+    
+    ! variables
+    real*8 :: xl(nesd, nen), disL(ned2, nen)
+    real*8 :: shG(nrowsh,nen,nintD), shL(nrowsh,nen,nintD) !global shape function with derivative, local shape function with derivative
+    real*8 :: det(nintD), w(nintD) ! jacobian determinant, gauss integration weight
+    real*8 :: shgbr(nrowsh, nen), bbarJ(nrowb, nesD)
+    real*8, allocatable :: fIntLoc(:,:)
+    real*8, allocatable :: tempVect(:,:)
+    
+    real*8 :: r(nintD)
+    real*8 :: cl
+    
+    logical :: quad
+    integer :: curElement, l, i, j
+    integer :: gnn
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    if (.not.allocated(fIntLoc)) allocate(fIntLoc(ndofD, nen))
+    if (.not.allocated(tempVect)) allocate(tempVect(ndofD, nen))
+    fIntJ = 0.d0
+    fIntLoc = 0.d0
+    tempVect = 0.d0
+    
+    call shlq(shL,w,nintd,nen) ! generation of local shape functions
+    
+    do curElement = 1, nel ! foreach element
+        
+        !localize coordinates and dirichlet b.c.
+        call local(conecnodaiselem(1,nel),x,xl,nen,nsd,nesd)
+        call local(conecnodaiselem(1,nel),dis,disl,nen,ndofd,ned2)
+        
+        ! check if element has any coalesced nodes
+        quad = .true.
+        if (nen.eq.4.and.conecNodaisElem(3,curElement).eq.conecNodaisElem(4,curElement)) quad = .false.
+        
+        ! calculates global derivatives of shape functions and jacobian determinants
+        if(nen==3) call shgq  (xl,det,shL,shG,nintD,nel,quad,nen)
+        if(nen==4) call shgq  (xl,det,shL,shG,nintD,nel,quad,nen)
+        
+        !.... ..calculate mean values of shape function global derivatives
+        !.... ..for mean-dilatational b-bar formulation
+        call xmeansh(shgbr,w,det,r,shg,nen,nintd,iopt,nesd,nrowsh)
+        
+        do l=1, nintD
+            cl = w(l)*det(l)
+            
+            do j=1, nen
+                call setbb(bbarj,shg(1:nrowsh,j,l),shgbr(1:nrowsh,j), r(l),nrowsh,nrowb,iopt,ibbar)
+
+                !multiply B'\sigma
+                call matMulmTn(bbarj, stress(1:nrowb,curElement), tempVect(1:ndofD, j), nrowb, nesD, nrowb, 1, ndofD, 1)
+                do i = 1, ndofD
+                    fIntLoc(i, j) = fIntLoc(i, j) + tempVect(i, j) * cl
+                end do
+            end do
+        end do
+        
+        !assemble
+        do j=1, nen
+            gnn = conecNodaisElem(j, curElement) !get global node coordinate
+            do i=1, ndofD
+                fIntJ(i, gnn) = fIntJ(i, gnn) + fIntLoc(i, j)
+            end do
+        end do
+    end do
+    
+    end subroutine calcInternalForce
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     end module mGeomecanica

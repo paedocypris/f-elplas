@@ -281,44 +281,39 @@
     !
     return
     end subroutine
+    
+    subroutine splitBoundaryCondition(id,f,fDirichlet, fNeumann,ndof,numnp,nlvect)
     !
-    !**** new **********************************************************************
-    !
-    subroutine dirichletConditions(id,d,f,ndof,numnp,nlvect)
-    !
-    !.... program to compute displacement boundary conditions
+    !.... program to split the force vector into two vectors, a dirichlet and a neumann one
     !
     implicit none
     !
     !.... remove above card for single-precision operation
     !
-    integer*4:: ndof, numnp, nlvect
-    integer*4:: id(ndof,numnp)
-    real*8  :: d(ndof,numnp),f(ndof,numnp,nlvect)
+    integer :: id(ndof,numnp)
+    real*8  :: f(ndof,numnp,nlvect), fDirichlet(ndof,numnp,nlvect), fNeumann(ndof,numnp,nlvect)
+    integer :: ndof, numnp, nlvect
     !
-    integer*4:: i, j, k, lv
-    real*8  :: val
+    integer :: nlv
+    integer :: i, j, k
     !
-    !
-    do 300 i=1,ndof
-        !
-        do 200 j=1,numnp
-            !
+    do i=1,ndof
+        do j=1,numnp
             k = id(i,j)
-            if (k.gt.0) go to 200
-            val = 0.d0
-            do 100 lv=1,nlvect
-                val = val + f(i,j,lv)
-100         continue
-            !
-            d(i,j) = val
-            !
-200     continue
-        !
-300 continue
-
+            if (k.gt.0) then
+                do nlv=1,nlvect
+                    fNeumann(i,j,nlv) = f(i,j,nlv)
+                end do
+            else
+                do nlv=1,nlvect
+                    fDirichlet(i,j,nlv) = f(i,j,nlv)
+                end do
+            endif
+        end do
+    end do
+    !
+    return
     end subroutine
-
 
     SUBROUTINE LOADTIME(id,f,brhs,ndof,numnp,nlvect,XTIME)
     !
@@ -722,6 +717,29 @@
      return
 
     end subroutine matsub
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine matMulmTn(a, b, c, ani, anj, bni, bnj, cni, cnj)
+    !variables input
+    
+    integer :: ani, anj, bni, bnj, cni, cnj
+    real*8 :: a(ani, anj), b(bni, bnj), c(cni, cnj)
+    
+    !variables
+    integer :: i, j, k
+    real*8 :: sum
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do j=1, cnj
+        do i=1, cni
+            sum = 0
+            do k = 1, ani
+                sum = sum + a(k, i) * b(k, j)
+            end do
+            c(i, j) = sum
+        end do
+    end do
+    
+    end subroutine matMulmTn
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     FUNCTION DETM3X3(XM)
