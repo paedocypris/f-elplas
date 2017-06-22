@@ -5652,6 +5652,7 @@
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
     real*8, allocatable :: fExtNeumann(:,:), fExtDirichlet(:,:) !fExtT with zeros on dirichlet/neumann nodes
+    real*8, allocatable :: fIntDirichlet(:,:), fIntAllElse(:,:) !fint with zeros on dirichlet/ everythin else nodes
     real*8, allocatable :: r(:,:) !r - residual
     real*8, allocatable :: DeltaDis(:,:), dDis(:,:)
     real*8, allocatable :: strainInc(:,:), stressInc(:,:)
@@ -5674,6 +5675,8 @@
     if(.not.allocated(fExtNeumann)) allocate(fExtNeumann(ndofD, nnp))
     if(.not.allocated(fExtDirichlet)) allocate(fExtDirichlet(ndofD, nnp))
     if(.not.allocated(fIntJ)) allocate(fIntJ(ndofD, nnp))
+    if(.not.allocated(fIntDirichlet)) allocate(fIntDirichlet(ndofD, nnp))
+    if(.not.allocated(fIntAllElse)) allocate(fIntAllElse(ndofD, nnp))
     if(.not.allocated(r)) allocate(r(ndofD, nnp))
     fExtT = 0.d0
     fIntJ = 0.d0
@@ -5736,14 +5739,16 @@
             if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis', fExtNeumann, ndofD, nnp, 'fExtJ1', len('fExtJ1'), 2, reservDesloc, iDis)
             
             !updates the residual and check the stop condition
-            call matsub(fExtNeumann, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
+            
+            call matsub(fExtNeumann, fIntAllElse, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
             error = dsqrt(coldot(r,r,nee))
             if (error < tolNewton) then
                 converged = .true.
                 exit
             end if
         end do
-        if (converged.eqv..false.) write(*,*) 'deu pau'
+        if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
         
         ! load the displacement into the answer
         call matadd(u, DeltaDis, u, ndofD, ndofD, ndofD, ndofD, nnp, 1)
@@ -5811,8 +5816,6 @@
     call shlq(shL,w,nintd,nen) ! generation of local shape functions
     
     do curElement = 1, nel ! foreach element
-        fIntLoc = 0.d0
-        
         !localize coordinates and dirichlet b.c.
         call local(conecnodaiselem(1,nel),x,xl,nen,nsd,nesd)
         call local(conecnodaiselem(1,nel),dis,disl,nen,ndofd,ned2)
@@ -5829,6 +5832,7 @@
         !.... ..for mean-dilatational b-bar formulation
         call xmeansh(shgbr,w,det,r,shg,nen,nintd,iopt,nesd,nrowsh)
         
+        fIntLoc = 0.d0 ! resets the local internal force
         do l=1, nintD
             cl = w(l)*det(l)
             
