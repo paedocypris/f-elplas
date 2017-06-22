@@ -1311,7 +1311,6 @@
         !
         CALL SETUPC(CBBAR,YOUNGMOD,POISSON,NROWB,IOPT)
         !
-        !      write(3030,4500) nel,young(nel), poisson!, ,geoform(nel)
         !.... FORM STIFFNESS MATRIX
         !
         !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
@@ -1470,9 +1469,6 @@
     !
     !..... SET MATERIAL PARAMETERS FOR OUT-OF-PLANE COMPONENTS
     !
-    !      C(5,M) == YOUNG   e   C(6,M)==POISSON
-    !          AMU2 = YOUNG/(ONE+POISSON)
-    !          ALAM = AMU2*POISSON/(ONE-TWO*POISSON)
     !
     CBBAR = 0.0
     AMU2 = YOUNG/(1.0D0+POISSON)
@@ -5642,7 +5638,7 @@
     subroutine incrementMechanicSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
-    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial
+    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoTensorialElemento
     
     !variables import
     use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
@@ -5725,17 +5721,19 @@
             call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
             call btod(idDesloc, dDis, brhsD, ndofD, nnp)
             
-            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'j1', len('j1'), 2, reservDesloc, iDis)
-            if (j == 2) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'j2', len('j2'), 2, reservDesloc, iDis)
+            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'uJ1', len('uJ1'), 2, reservDesloc, iDis)
 
             ! add correction da to the incremental displacement vector
             call matadd(DeltaDis, dDis, DeltaDis, ndofD, ndofD, ndofD, ndofD, nnp, 1)
 
             !computes the strain and stress
             call pos4inc(x, conecNodaisElem, DeltaDis, strainInc, stressInc)
+            if (j == 1) call escreverArqParaviewIntermed_CampoTensorialElemento(stressInc, nrowB, nel, 'stressJ1', len('stressJ1'), iDis)
             
             !computes the internal force
             call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stressInc, fIntJ)
+            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis', fIntJ, ndofD, nnp, 'fIntJ1', len('fIntJ1'), 2, reservDesloc, iDis)
+            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis', fExtNeumann, ndofD, nnp, 'fExtJ1', len('fExtJ1'), 2, reservDesloc, iDis)
             
             !updates the residual and check the stop condition
             call matsub(fExtNeumann, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
@@ -5808,12 +5806,12 @@
     if (.not.allocated(fIntLoc)) allocate(fIntLoc(ndofD, nen))
     if (.not.allocated(tempVect)) allocate(tempVect(ndofD, nen))
     fIntJ = 0.d0
-    fIntLoc = 0.d0
     tempVect = 0.d0
     
     call shlq(shL,w,nintd,nen) ! generation of local shape functions
     
     do curElement = 1, nel ! foreach element
+        fIntLoc = 0.d0
         
         !localize coordinates and dirichlet b.c.
         call local(conecnodaiselem(1,nel),x,xl,nen,nsd,nesd)

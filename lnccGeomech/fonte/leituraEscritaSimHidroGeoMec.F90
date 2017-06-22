@@ -105,7 +105,7 @@
     integer :: npcontpres,npcontsat,npcontphi,npcontvel,npcontvelc,npcontdis, npcontmasc, npcontten, npcontyoung
     integer :: npHGPres !galerkin
     integer :: npIMDis !incremental Mechanic
-    
+
 
     character(len=15) :: reservSat, reservVel, reservVelC, reservPres, reservDesloc, reservTensao
     character(len=15) :: reservPhi, reservPerm, reservBalMassa, reservMassaAgua, reservMasc
@@ -118,6 +118,8 @@
     CHARACTER(LEN=14) :: PATHDX
     LOGICAL :: SOLIDONLY, CYLINDER
     INTEGER :: NCREEP
+    
+    integer :: tipoLeitura
     !
     contains
     !
@@ -298,7 +300,7 @@
     !galerkin
     keyword_name = "impressao_da_pressaoGalerkin"
     call readOutFlagKeyword(keyword_name, iflag_hgPres, ifhgPres_out, npHgPres, reservHGPres, ierr)
-    
+
     !incremental mechanic
     keyword_name = "impressao_do deslocamentoIncremental"
     call readOutFlagKeyword(keyword_name, iflag_imDis, ifimDis_out, npIMDis, reservIMDis, ierr)
@@ -1008,7 +1010,7 @@
             ifhgPres_out = trim(ifhgPres_out)//'resultadoHGPres-'
         end if
     end if
-    
+
     !incremental displacement
     if(iflag_imDis==1)then
         if(iflag_tipoPrint==0) then
@@ -1981,8 +1983,8 @@
     write(iparaview,'(a,i10)')'CELL_TYPES ', numElementos
     call escreverTiposElementos(iparaview, numElementos, nsd)
     !
+    tipoLeitura = tipo
     if(tipo==1) write(iparaview,'(a,i10)')'CELL_DATA ', numElementos
-
     if(tipo==2) write(iparaview,'(a,i10)')'POINT_DATA',  numPontos
 
     if(label=='ten') then
@@ -3758,15 +3760,38 @@
         write(arquivo,'(3a,i5)')'SCALARS ', trim(rotulo), ' float ', dim1
         write(arquivo,'(a)')'LOOKUP_TABLE default'
     else
+        if (tipo /= tipoLeitura) then
+            if(tipo==1) write(arquivo,'(a,i10)')'CELL_DATA ', dim2
+            if(tipo==2) write(arquivo,'(a,i10)')'POINT_DATA ', dim2
+            tipoLeitura = tipo
+        end if
         write(arquivo,'(3a,i5)')'VECTORS ', trim(rotulo), ' float '
     endif
 
-    call escreverVetoresNodais(label, campo, dim1, dim2, tipo, reserv, arquivo)    
+    call escreverVetoresNodais(label, campo, dim1, dim2, tipo, reserv, arquivo)
 
     end subroutine escreverArqParaviewIntermed_CampoVetorial
-    !
-    !**** new **********************************************************************
-    !
+    !********************************************************************************************************************
+    !********************************************************************************************************************
+    subroutine escreverArqParaviewIntermed_CampoTensorialElemento(campo, dim1, dim2, rotulo, tamRot, arquivo)
+    !variables input
+    implicit none
+    integer, intent(in) :: arquivo,dim1, dim2
+    real*8 :: campo(dim1, dim2)
+    integer :: tamRot
+    character(len=tamRot) :: rotulo
+    !--------------------------------------------------------------------------------------------------------------------
+    if (tipoLeitura /= 1) then
+        tipoLeitura = 1
+        write(arquivo,'(a,i10)') 'CELL_DATA ', dim2
+    end if
+    
+    write(arquivo,'(3a,i5)')'TENSORS ', trim(rotulo), ' float '
+    call escreverTensores(campo, dim1, dim2, arquivo)
+    
+    end subroutine escreverArqParaviewIntermed_CampoTensorialElemento
+    !********************************************************************************************************************
+    !********************************************************************************************************************
     subroutine escreverVetoresNodais(label, campo, tam1, tam2, tipo, reserv, arquivo)
 
     use mMalha, only: nsd, numnp, numnpReserv, numel, numelReserv
@@ -3776,7 +3801,7 @@
     character(len=3)      :: label
     integer,   intent(in) :: tam1,tam2
     real*8, intent(in)    :: campo(tam1,tam2)
-    integer               :: tipo, arquivo
+    integer               :: arquivo, tipo
     character(len=*)      :: reserv
     !
     integer   :: j
@@ -3784,6 +3809,10 @@
     integer   :: numPontosReserv, numPontosTotal
     real*8    :: minimo(tam1)
 
+    limite=1.e-15
+    minimo=0.0d0
+    zero  =0.0d0
+    
     if(tipo==1) then
         numPontosReserv=numelReserv
         numPontosTotal=numel
@@ -3791,10 +3820,6 @@
         numPontosReserv=numnpReserv
         numPontosTotal=numnp
     endif
-
-    limite=1.e-15
-    minimo=0.0d0
-    zero  =0.0d0
 
     if(trim(reserv)=='reservatorio') then
         if(label=='ten') then
@@ -3829,12 +3854,36 @@
         endif
     endif
     !
-1000 format(6(e15.7,5x))
+1000 format(6(E15.7E3,5x))
 
     end subroutine escreverVetoresNodais
+    !********************************************************************************************************************
+    !********************************************************************************************************************
+    subroutine escreverTensores(campo, tam1, tam2, arquivo)
+    !variables import
+    
+    !variables input
+    implicit none
     !
-    !********************************************************************************
-    !
+    integer :: tam1,tam2
+    real*8 :: campo(tam1,tam2)
+    integer :: arquivo
+    
+    !variables
+    integer   :: j
+
+    do j=1, tam2
+        write(arquivo,1000) campo(1, j), campo(3, j), 0.d0
+        write(arquivo,1000) campo(3, j), campo(2, j), 0.d0
+        write(arquivo,1000) 0.d0, 0.d0, campo(4, j)
+        write(arquivo,*) ''
+    end do
+    
+1000 format(6(e15.7,5x))
+
+    end subroutine escreverTensores
+    !********************************************************************************************************************
+    !********************************************************************************************************************
     subroutine escreverArqParaviewIntermed(arquivo, campo, dim1, dim2, rotulo, tamRot)
 
     implicit none

@@ -36,10 +36,8 @@
 		<File RelativePath=".\data\cilindroJesus\inputDS.dat"/>
 		<File RelativePath=".\data\cilindroJesus\layer_reference.inc"/>
 		<File RelativePath=".\data\cilindroJesus\malha.inc"/>
-		<File RelativePath=".\data\cilindroJesus\mcmc.inc"/>
 		<File RelativePath=".\data\cilindroJesus\mesh_rsrv_outsburden.inc"/>
 		<File RelativePath=".\data\cilindroJesus\NumericParam.inc"/>
-		<File RelativePath=".\data\cilindroJesus\randfiles.inc"/>
 		<File RelativePath=".\data\cilindroJesus\SimulatorParam.inc"/></Filter>
 		<Filter Name="cookMembrane">
 		<File RelativePath=".\data\cookMembrane\condContornoGeom.inc"/>
@@ -52,10 +50,8 @@
 		<File RelativePath=".\data\cookMembrane\inputDS.dat"/>
 		<File RelativePath=".\data\cookMembrane\layer_reference.inc"/>
 		<File RelativePath=".\data\cookMembrane\malha.inc"/>
-		<File RelativePath=".\data\cookMembrane\mcmc.inc"/>
 		<File RelativePath=".\data\cookMembrane\mesh_rsrv_outsburden.inc"/>
 		<File RelativePath=".\data\cookMembrane\NumericParam.inc"/>
-		<File RelativePath=".\data\cookMembrane\randfiles.inc"/>
 		<File RelativePath=".\data\cookMembrane\SimulatorParam.inc"/></Filter>
 		<Filter Name="exTuane">
 		<File RelativePath=".\data\exTuane\condContornoGeom.inc"/>
@@ -66,10 +62,21 @@
 		<File RelativePath=".\data\exTuane\inputDS.dat"/>
 		<File RelativePath=".\data\exTuane\layer_reference.inc"/>
 		<File RelativePath=".\data\exTuane\malha.inc"/>
-		<File RelativePath=".\data\exTuane\mcmc.inc"/>
 		<File RelativePath=".\data\exTuane\NumericParam.inc"/>
-		<File RelativePath=".\data\exTuane\randfiles.inc"/>
-		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter></Filter>
+		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter>
+		<Filter Name="barra1D">
+		<File RelativePath=".\data\barra1D\condContornoGeom.inc"/>
+		<File RelativePath=".\data\barra1D\condContornoHidro.inc"/>
+		<File RelativePath=".\data\barra1D\data.inc"/>
+		<File RelativePath=".\data\barra1D\dome_reference_layer.in"/>
+		<File RelativePath=".\data\barra1D\elmnt_geoformation.inc"/>
+		<File RelativePath=".\data\barra1D\geomechLayers.inc"/>
+		<File RelativePath=".\data\barra1D\inputDS.dat"/>
+		<File RelativePath=".\data\barra1D\layer_reference.inc"/>
+		<File RelativePath=".\data\barra1D\malha.inc"/>
+		<File RelativePath=".\data\barra1D\mesh_rsrv_outsburden.inc"/>
+		<File RelativePath=".\data\barra1D\NumericParam.inc"/>
+		<File RelativePath=".\data\barra1D\SimulatorParam.inc"/></Filter></Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\fonte\driverGeocreep.F90"/>
 		<File RelativePath=".\fonte\funcoesDeForma.F90"/>

@@ -29,9 +29,6 @@ COOK'S MEMBRANE
          1
 }
 *include{
-hidroGalerkin.inc
-}
-*include{
 malha.inc
 }
 *include{
@@ -70,17 +67,11 @@ elmnt_geoformation.inc
 *include{
 data.inc
 }
-*uinclude{
-randfiles.inc
-}
 *include{
 geomechLayers.inc
 }
 *include{
 NumericParam.inc
-}
-*uinclude{
-mcmc.inc
 }
 *include{
 SimulatorParam.inc

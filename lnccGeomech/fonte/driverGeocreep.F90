@@ -1616,7 +1616,7 @@
     
     ! init stress and print stress
     call stress_init()
-    call escreverArqParaviewVector('dis', dis0, nDofD, numnp, nen, conecNodaisElem, 2, 'total', len('t=0.0'), reservDesloc, iDis)
+    call escreverArqParaviewVector('dis', dis0, nDofD, numnp, nen, conecNodaisElem, 2, 'deslocTotal', len('deslocTotal'), reservDesloc, iDis)
     
     ! solve initialization incrementally
     call incrementMechanicSolution(conecNodaisElem, nen, numel, numnp, nsd, x, disInc)

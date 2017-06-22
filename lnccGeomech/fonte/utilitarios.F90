@@ -297,6 +297,8 @@
     integer :: nlv
     integer :: i, j, k
     !
+    fNeumann = 0.d0
+    fDirichlet = 0.d0
     do i=1,ndof
         do j=1,numnp
             k = id(i,j)
