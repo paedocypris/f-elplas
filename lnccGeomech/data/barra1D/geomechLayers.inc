@@ -28,6 +28,9 @@
 *porosity_reservoir_region{
 0.25D+0
 }
+*epMisesYieldSurface_reservoir_region{
+  +3.55e+8
+}
 *stress-strain_relation_reservoir_region{
 ELASTIC
 }
@@ -61,6 +64,9 @@ ELASTIC
 }
 *porosity_rift_under_region{
 0.05d+0
+}
+*epMisesYieldSurface_under_region{
+  +3.55e+8
 }
 *stress-strain_relation_rift_under_region{
 ELASTIC
@@ -98,6 +104,9 @@ ELASTIC
 *porosity_right_side_burden{
 0.25d+0
 }
+*epMisesYieldSurface_right_side_burden{
+  +3.55e+8
+}
 *stress-strain_relation_right_side_burden{
 ELASTIC
 }
@@ -133,6 +142,9 @@ ELASTIC
 }
 *porosity_saline_cap_region{
 0.00d+0
+}
+*epMisesYieldSurface_saline_cap_region{
+  +3.55e+8
 }
 *stress-strain_relation_saline_cap_region{
 ELASTIC
@@ -170,6 +182,9 @@ ELASTIC
 *porosity_left_side_burden{
 0.25d+0
 }
+*epMisesYieldSurface_left_side_burden{
+  +3.55e+8
+}
 *stress-strain_relation_left_side_burden{
 ELASTIC
 }
@@ -203,6 +218,9 @@ ELASTIC
 }
 *porosity_post_salt_region{
 0.1d+0
+}
+*epMisesYieldSurface_post_salt_region{
+  +3.55e+8
 }
 *stress-strain_relation_post_salt_region{
 ELASTIC

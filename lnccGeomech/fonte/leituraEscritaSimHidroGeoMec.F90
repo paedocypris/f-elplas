@@ -544,6 +544,7 @@
     use mPropgeoFisica,    only: MEANRHOW, MEANRHOO, MEANDENS
     use mPropgeoFisica,    only: MEANBLKW, MEANBLKO, MEANBULK
     use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
+    use mPropGeoFisica,    only: misesYield
     use mInputReader, only: readIntegerKeywordValue,readRealKeywordValue
     use mInputReader, only: readStringKeywordValue,readOutFlagKeyword
     use mMalha,       only: nsd
@@ -634,6 +635,10 @@
         call readRealKeywordValue(keyword_name, PORELAGR(IREGION), PORELAGR(IREGION), ierr)
         !..TEST BIOT COEFICIENT GREATER THAN POROSITY
         GRBULK=GRBULK*(1.0D0-PORELAGR(IREGION))
+        
+        keyword_name = "epMisesYieldSurface_"//trim(REGION(iRegion))
+        call readRealKeywordValue(keyword_name, misesYield(iRegion), misesYield(iRegion), ierr)
+        
         !
         IF (GRBULK.LE.BULK(YOUNG,POISSON,S3DIM)) THEN
             WRITE(*,*) '..TEST BIOT COEFICIENT GREATER THAN POROSITY '
@@ -667,7 +672,7 @@
     subroutine lerNumericParam_DS
     !
     use mPropGeoFisica,     only : TOLCREEP
-    use mGlobaisEscalares,  only : NITGEO, NITHIDRO, SPLITT, IBBAR
+    use mGlobaisEscalares,  only : NITGEO, NITHIDRO, IBBAR, SPLITT
     use mGlobaisEscalares,  only : MAXITERC, TOLSIGMA, TOLVELOC
     use mInputReader, only: readIntegerKeywordValue,readRealKeywordValue
     use mInputReader, only: readStringKeywordValue

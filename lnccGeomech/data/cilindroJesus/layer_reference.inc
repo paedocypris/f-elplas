@@ -2,13 +2,13 @@
 0
 }
 *top_post_salt_horizontal_y_axis{
-1.00000000E+02
+2.00000000E+02
 }
 *salt_dome_top_horizontal_y_axis{
-1.00000000E+02
+2.00000000E+02
 }
 *top_reservoir_horizontal_y_axis{
-1.00000000E+02
+2.00000000E+02
 }
 *bottom_reservoir_horizontal_y_axis{
 0.00000000E+00
@@ -20,7 +20,7 @@
 0.00000000E+00
 }
 *right_reservoir_vertical_x_axis{
-1.00000000E+03
+2.00000000E+02
 }
 *reference_for_sismic_dome{
 0

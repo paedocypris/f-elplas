@@ -103,6 +103,7 @@
     REAL(8), DIMENSION(9) :: MEANBLKO
     REAL(8), DIMENSION(9) :: MEANBULK
     REAL(8), DIMENSION(9) :: MEANDENS
+    real*8 :: misesYield(9)
     !
     CHARACTER(5), DIMENSION(9) :: GEOMECLAW
 
@@ -846,24 +847,8 @@
         call MAPEIARESERVATORIO(permky,perm,conecNodaisElem,x,xlx,xly,xlz, &
             nelemx,nelemy,nelemz,nelem,nen,nsd)
         !
-        !         DO 100 NEL=1,NUMELRESERV
-        !            PERMKX(NEL) = PERM(NEL)
-        !100      CONTINUE
-        !comentado para translaccao
-        !         call mapeando(permkx,perm,conecNodaisElem,x,xlx,xly,xlz,nelemx,nelemy,nelemz,nelem,nen,nsd)
-        !
-        !         call readperm(perm_iny,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-        !
-        !         DO 200 NEL=1,NUMELRESERV
-        !            PERMKY(NEL) = PERM(NEL)
-        !200      CONTINUE
-        !comentado para translaccao
-        !         call mapeando(permky,perm,conecNodaisElem,x,xlx,xly,xlz,nelemx,nelemy,nelemz,nelem,nen,nsd)
-        !
         if (nsd==3) then
             call readperm(perm_inz,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-            !comentado para translaccao
-            !            call mapeando(permkz,perm,conecNodaisElem,x,xlx,xly,xlz,nelemx,nelemy,nelemz,nelem,nen,nsd)
         endif
     else
         !
@@ -880,8 +865,6 @@
         call readphi(phi0,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
         call MAPEIARESERVATORIO(phi,phi0,conecNodaisElem,x,xlx,xly,xlz, &
             nelemx,nelemy,nelemz,nelem,nen,nsd)
-        !comentado para translaccao
-        !         call mapeando(phi,phi0,conecNodaisElem,x,xlx,xly,xlz,nelemx,nelemy,nelemz,nelem,nen,nsd)
     else
         call atribuirPhiBloco(nsd,numelReserv,phi,xc)
     end if
@@ -892,8 +875,6 @@
         call readbeta(beta_in,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
         call MAPEIARESERVATORIO(phi,phi0,conecNodaisElem,x,xlx,xly,xlz, &
             nelemx,nelemy,nelemz,nelem,nen,nsd)
-        !comentado para translaccao
-        !         call mapeando(beta,perm,conecNodaisElem,x,xlx,xly,xlz,nelemx,nelemy,nelemz,nelem,nen,nsd)
     else
         if(ligarBlocosHetBeta.eqv..true.) call atribuirBetaBloco(nsd,numel,beta,xc)
     end if
@@ -1754,101 +1735,111 @@
     !
     !**** NEW ***** FOR SISMIC REPRESENTATION ******************************
     !
-    FUNCTION GEOINDIC(TASK,GEOF)
+    function geoindic(task,geof)
     !
-    use mMalha, only: NSD
+    use mmalha, only: nsd
     !
-    !.... FUNCTION TO CALL MECHANICAL PARAMETERS AND DENSITIES OF
-    !....         GEOLOGICAL FORMATION
+    !.... function to call mechanical parameters and densities of
+    !....         geological formation
     !
-    IMPLICIT NONE
-    !... VECTORS: POISVECT, YUNGVECT, RHODVECT, ARE DEFINED ON "lerDataIn"
-    INTEGER      :: I, J, JUMP, LASTREGION
-    CHARACTER*7  :: TASK
-    CHARACTER*12 :: GEOF
-    CHARACTER*12, DIMENSION(9) :: REFGEO
-    CHARACTER*18 , DIMENSION(8) :: REFTASK
-    REAL*8                     :: GEOLOC, GEOINDIC
+    implicit none
+    !... vectors: poisvect, yungvect, rhodvect, are defined on "lerdatain"
+    integer      :: i, lastregion
+    character*7  :: task
+    character*12 :: geof
+    character*12, dimension(9) :: refgeo
+    real*8                     :: geoloc, geoindic
     !
-    DATA REFGEO(1)     ,     REFGEO(2),     REFGEO(3)/ &
+    data refgeo(1)     ,     refgeo(2),     refgeo(3)/ &
         &     'RESERVATORIO','RIFT_CAPROCK','RIGHT_RESERV'/ &
-        &     REFGEO(4)     ,     REFGEO(5),     REFGEO(6)/ &
+        &     refgeo(4)     ,     refgeo(5),     refgeo(6)/ &
         &     'SALT_CAPROCK','LEFT__RESERV','POS_SAL_OVER'/ &
-        &     REFGEO(7)     ,     REFGEO(8),     REFGEO(9)/ &
+        &     refgeo(7)     ,     refgeo(8),     refgeo(9)/ &
         &     'FRONT_RESERV','BASE_CAPROCK','BACK__RESERV'/
+
+    !--------------------------------------------------------------------------------------
+    geoindic = 0.0d0
+    lastregion = 3*nsd
+
+    select case (task)
+    case ('POISSON')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = poisvect(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('YOUNGMD')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = yungvect(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('ROKDENS')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = rhodvect(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('BLKGRIN')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = grainblk(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('POROSTY')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = porelagr(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('MEANSAT')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = meansatr(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('FLUDENS')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = meandens(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('BLKFLUD')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = meanbulk(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('MISESYI')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = misesYield(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+
+        case default
+        write(*,*)  "Hmmmm, I don't know"
+    end select
     !
-    DATA REFTASK(1),REFTASK(2),REFTASK(3),REFTASK(4)/ &
-        &     'POISSON' ,'YOUNGMD' ,'ROKDENS' ,'BLKGRIN' / &
-        &     REFTASK(5),REFTASK(6),REFTASK(7),REFTASK(8)/ &
-        &     'POROSTY' ,'MEANSAT' ,'FLUDENS' ,'BLKFLUD'/
-    !
-    GEOINDIC = 0.0D0
-    LASTREGION = 3*NSD
-    !
-    DO 10 J=1,8
-        IF (REFTASK(J).EQ.TASK) JUMP=J
-10  CONTINUE
-    !
-    GOTO (100,200,300,400,500,600,700,800) JUMP
-    !
-100 CONTINUE  !     IF (TASK.EQ.'POISSON') THEN
-    !
-    DO 110 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = POISVECT(I)
-110 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-200 CONTINUE  !     IF (TASK.EQ.'YOUNGMD') THEN
-    DO 210 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = YUNGVECT(I)
-210 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-300 CONTINUE !      IF (TASK.EQ.'ROKDENS') THEN
-    DO 310 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = RHODVECT(I)
-310 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-400 CONTINUE !      IF (TASK.EQ.'BLKGRIN') THEN
-    DO 410 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = GRAINBLK(I)
-410 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-500 CONTINUE !      IF (TASK.EQ.'POROSTY') THEN
-    DO 510 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = PORELAGR(I)
-510 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-600 CONTINUE !      IF (TASK.EQ.'MEANSAT') THEN
-    DO 610 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = MEANSATR(I)
-610 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-700 CONTINUE  !      IF (TASK.EQ.'FLUDENS') THEN
-    DO 710 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = MEANDENS(I)
-710 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-800 CONTINUE  !      IF (TASK.EQ.'BLKFLUD') THEN
-    DO 810 I=1,LASTREGION
-        IF (REFGEO(I).EQ.GEOF) GEOLOC = MEANBULK(I)
-810 CONTINUE
-    GEOINDIC = GEOLOC
-    RETURN
-    !
-    END FUNCTION
+    end function
     !
     !**** NEW ***** FOR GEOLOGICAL FORMATION ******************************
     !                        123456789+12

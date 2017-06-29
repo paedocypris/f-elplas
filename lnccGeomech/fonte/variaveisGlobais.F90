@@ -67,7 +67,7 @@
     REAL(8)           :: YEARINJ, S3DIM
     CHARACTER*25      :: TypeProcess
     INTEGER           :: NITGEO, NUMDX, NCREEP
-    INTEGER           :: NITHIDRO, IBBAR, MAXITERC
+    INTEGER           :: NITHIDRO, MAXITERC, IBBAR
     LOGICAL           :: INITS3, SALTCREEP, LDRAINED
     REAL(8)           :: TOLSIGMA, TOLVELOC
     

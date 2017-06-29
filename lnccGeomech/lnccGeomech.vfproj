@@ -26,6 +26,19 @@
 	<Files>
 		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe">
+		<Filter Name="barra1D">
+		<File RelativePath=".\data\barra1D\condContornoGeom.inc"/>
+		<File RelativePath=".\data\barra1D\condContornoHidro.inc"/>
+		<File RelativePath=".\data\barra1D\data.inc"/>
+		<File RelativePath=".\data\barra1D\dome_reference_layer.in"/>
+		<File RelativePath=".\data\barra1D\elmnt_geoformation.inc"/>
+		<File RelativePath=".\data\barra1D\geomechLayers.inc"/>
+		<File RelativePath=".\data\barra1D\inputDS.dat"/>
+		<File RelativePath=".\data\barra1D\layer_reference.inc"/>
+		<File RelativePath=".\data\barra1D\malha.inc"/>
+		<File RelativePath=".\data\barra1D\mesh_rsrv_outsburden.inc"/>
+		<File RelativePath=".\data\barra1D\NumericParam.inc"/>
+		<File RelativePath=".\data\barra1D\SimulatorParam.inc"/></Filter>
 		<Filter Name="cilindroJesus">
 		<File RelativePath=".\data\cilindroJesus\condContornoGeom.inc"/>
 		<File RelativePath=".\data\cilindroJesus\condContornoHidro.inc"/>
@@ -63,20 +76,7 @@
 		<File RelativePath=".\data\exTuane\layer_reference.inc"/>
 		<File RelativePath=".\data\exTuane\malha.inc"/>
 		<File RelativePath=".\data\exTuane\NumericParam.inc"/>
-		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter>
-		<Filter Name="barra1D">
-		<File RelativePath=".\data\barra1D\condContornoGeom.inc"/>
-		<File RelativePath=".\data\barra1D\condContornoHidro.inc"/>
-		<File RelativePath=".\data\barra1D\data.inc"/>
-		<File RelativePath=".\data\barra1D\dome_reference_layer.in"/>
-		<File RelativePath=".\data\barra1D\elmnt_geoformation.inc"/>
-		<File RelativePath=".\data\barra1D\geomechLayers.inc"/>
-		<File RelativePath=".\data\barra1D\inputDS.dat"/>
-		<File RelativePath=".\data\barra1D\layer_reference.inc"/>
-		<File RelativePath=".\data\barra1D\malha.inc"/>
-		<File RelativePath=".\data\barra1D\mesh_rsrv_outsburden.inc"/>
-		<File RelativePath=".\data\barra1D\NumericParam.inc"/>
-		<File RelativePath=".\data\barra1D\SimulatorParam.inc"/></Filter></Filter>
+		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter></Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\fonte\driverGeocreep.F90"/>
 		<File RelativePath=".\fonte\funcoesDeForma.F90"/>
