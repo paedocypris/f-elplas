@@ -676,6 +676,7 @@
     use mGlobaisEscalares,  only : MAXITERC, TOLSIGMA, TOLVELOC
     use mInputReader, only: readIntegerKeywordValue,readRealKeywordValue
     use mInputReader, only: readStringKeywordValue
+    use mGlobaisEscalares, only: tolYield, toleplas
     !
     IMPLICIT NONE
 
@@ -700,10 +701,16 @@
 
     keyword_name="maximum_number_of_creep_iterations"
     call readIntegerKeywordValue(keyword_name, MAXITERC, MAXITERC, ierr)
-    !
+    
     keyword_name="tolerance_for_creep_convergence"
     call readRealKeywordValue(keyword_name, TOLCREEP, TOLCREEP, ierr)
-    !
+    
+    keyword_name="tolerancePlasticYield"
+    call readRealKeywordValue(keyword_name, tolYield, tolYield, ierr)
+    
+    keyword_name="tolerancePlasticDeformation"
+    call readRealKeywordValue(keyword_name, toleplas, toleplas, ierr)
+    
     keyword_name="bbar_method"
     call readIntegerKeywordValue(keyword_name, IBBAR, IBBAR, ierr)
     !
@@ -836,11 +843,11 @@
     if(iflag_sat==1)then
         if(iflag_tipoPrint==0) then
             ifsat_out=trim(ifsat_out)//'sat_amostra.res'
-            open(unit=isat,file=ifsat_out,status='unknown')
+            open(unit=isat,file=ifsat_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifsat_out=trim(ifsat_out)//'resultadoSat.vtk'
-            open(unit=isat,file=ifsat_out,status='unknown')
+            open(unit=isat,file=ifsat_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifsat_out=trim(ifsat_out)//'resultadoSat-'
@@ -850,11 +857,11 @@
     if(iflag_pres==1)then
         if(iflag_tipoPrint==0) then
             ifpres_out=trim(ifpres_out)//'pres_amostra.res'
-            open(unit=ipres,file=ifpres_out,status='unknown')
+            open(unit=ipres,file=ifpres_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifpres_out=trim(ifpres_out)//'resultadoPressao.vtk'
-            open(unit=ipres,file=ifpres_out,status='unknown')
+            open(unit=ipres,file=ifpres_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifpres_out=trim(ifpres_out)//'resultadoPressao-'
@@ -864,11 +871,11 @@
     if(iflag_vel==1)then
         if(iflag_tipoPrint==0) then
             ifvel_out=trim(ifvel_out)//'velNodal_amostra.res'
-            open(unit=ivel,file=ifvel_out,status='unknown')
+            open(unit=ivel,file=ifvel_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifvel_out=trim(ifvel_out)//'resultadoVelNodal.vtk'
-            open(unit=ivel,file=ifvel_out,status='unknown')
+            open(unit=ivel,file=ifvel_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifvel_out=trim(ifvel_out)//'resultadoVelNodal-'
@@ -878,11 +885,11 @@
     if(iflag_velc==1)then
         if(iflag_tipoPrint==0) then
             ifvelc_out=trim(ifvelc_out)//'velCentro_amostra.res'
-            open(unit=ivelc,file=ifvelc_out,status='unknown')
+            open(unit=ivelc,file=ifvelc_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifvelc_out=trim(ifvelc_out)//'resultadoVelCentro.vtk'
-            open(unit=ivelc,file=ifvelc_out,status='unknown')
+            open(unit=ivelc,file=ifvelc_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifvelc_out=trim(ifvelc_out)//'resultadoVelCentro-'
@@ -892,11 +899,11 @@
     if(iflag_disp==1)then
         if(iflag_tipoPrint==0) then
             ifdis_out=trim(ifdis_out)//'dis_amostra.res'
-            open(unit=idis,file=ifdis_out,status='unknown')
+            open(unit=idis,file=ifdis_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifdis_out=trim(ifdis_out)//'resultadoDis.vtk'
-            open(unit=idis,file=ifdis_out,status='unknown')
+            open(unit=idis,file=ifdis_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifdis_out=trim(ifdis_out)//'resultadoDis-'
@@ -906,11 +913,11 @@
     if(iflag_tens==1)then
         if(iflag_tipoPrint==0) then
             iften_out=trim(iften_out)//'tens_amostra.res'
-            open(unit=iten,file=iften_out,status='unknown')
+            open(unit=iten,file=iften_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             iften_out=trim(iften_out)//'resultadoTensoes.vtk'
-            open(unit=iten,file=iften_out,status='unknown')
+            open(unit=iten,file=iften_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             iften_out=trim(iften_out)//'resultadoTen-'
@@ -921,11 +928,11 @@
     if(iflag_phi==1)then
         if(iflag_tipoPrint==0) then
             ifphi_out=trim(ifphi_out)//'phi_amostra.res'
-            open(unit=iphi, file=ifphi_out, status='unknown')
+            open(unit=iphi, file=ifphi_out, status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifphi_out= trim(ifphi_out)//'resultadoPhi.vtk'
-            open(unit=iphi, file=ifphi_out, status='unknown')
+            open(unit=iphi, file=ifphi_out, status='replace')
         end if
         if(iflag_tipoPrint==2) then
             aux = ifphi_out
@@ -937,11 +944,11 @@
     if(iflag_phi==1)then
         if(iflag_tipoPrint==0) then
             ifperm_out=trim(ifphi_out)//'perm_amostra.res'
-            open(unit=iperm,file=ifperm_out,status='unknown')
+            open(unit=iperm,file=ifperm_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifperm_out= trim(ifperm_out)//'resultadoPerm.vtk'
-            open(unit=iperm, file=ifperm_out, status='unknown')
+            open(unit=iperm, file=ifperm_out, status='replace')
         end if
         if(iflag_tipoPrint==2) then
             aux = ifperm_out
@@ -952,11 +959,11 @@
     if(iflag_masc==1)then
         if(iflag_tipoPrint==0) then
             ifmasc_out=trim(ifmasc_out)//'mascont_amostra.res'
-            open(unit=imasc,file=ifmasc_out,status='unknown')
+            open(unit=imasc,file=ifmasc_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifmasc_out=trim(ifmasc_out)//'resultadoContMassa.vtk'
-            open(unit=imasc,file=ifmasc_out,status='unknown')
+            open(unit=imasc,file=ifmasc_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifmasc_out=trim(ifmasc_out)//'resultadoContMassa-'
@@ -966,11 +973,11 @@
     if(iflag_young==1)then
         if(iflag_tipoPrint==0) then
             ifyou_out=trim(ifyou_out)//'young_amostra.res'
-            open(unit=iyng,file=ifyou_out,status='unknown')
+            open(unit=iyng,file=ifyou_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifyou_out=trim(ifyou_out)//'resultadoYoung.vtk'
-            open(unit=iyng,file=ifyou_out,status='unknown')
+            open(unit=iyng,file=ifyou_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifyou_out=trim(ifyou_out)//'resultadoYoung-'
@@ -980,11 +987,11 @@
     if(iflag_qtrial==1)then
         if(iflag_tipoPrint==0) then
             ifqtrial_out=trim(ifqtrial_out)//'qtrial_amostra.res'
-            open(unit=iqtrial,file=ifqtrial_out,status='unknown')
+            open(unit=iqtrial,file=ifqtrial_out,status='replace')
         end if
         if(iflag_tipoPrint==1) then
             ifqtrial_out=trim(ifqtrial_out)//'resultadoQtrial.vtk'
-            open(unit=iqtrial,file=ifqtrial_out,status='unknown')
+            open(unit=iqtrial,file=ifqtrial_out,status='replace')
         end if
         if(iflag_tipoPrint==2) then
             ifqtrial_out=trim(ifqtrial_out)//'resultadoQtrial-'
@@ -993,23 +1000,23 @@
     !
     if(iflag_mass==1)then
         ifmass_out=trim(ifmass_out)//'mass_amostra'
-        open(unit=imass,file=ifmass_out,status='unknown')
+        open(unit=imass,file=ifmass_out,status='replace')
     end if
 
     if(iflag_masl==1)then
         ifmasl_out=trim(ifmasl_out)//'bal_mass_amostra.res'
-        open(unit=imasl,file=ifmasl_out,status='unknown')
+        open(unit=imasl,file=ifmasl_out,status='replace')
     end if
 
     !galerkin
     if(iflag_hgPres==1)then
         if(iflag_tipoPrint==0) then
             ifhgPres_out = trim(ifhgPres_out)//'resultadoHGPres.res'
-            open(unit=ihgPres,file=ifhgPres_out,status='unknown',action='write')
+            open(unit=ihgPres,file=ifhgPres_out,status='replace',action='write')
         end if
         if(iflag_tipoPrint==1) then
             ifhgPres_out = trim(ifhgPres_out)//'resultadoHGPres.vtk'
-            open(unit=ihgPres,file=ifhgPres_out,status='unknown',action='write')
+            open(unit=ihgPres,file=ifhgPres_out,status='replace',action='write')
         end if
         if(iflag_tipoPrint==2) then
             ifhgPres_out = trim(ifhgPres_out)//'resultadoHGPres-'
@@ -1020,11 +1027,11 @@
     if(iflag_imDis==1)then
         if(iflag_tipoPrint==0) then
             ifhgPres_out = trim(ifIMDis_out)//'resultadoIMDis.res'
-            open(unit=iimDis,file=ifIMDis_out,status='unknown',action='write')
+            open(unit=iimDis,file=ifIMDis_out,status='replace',action='write')
         end if
         if(iflag_tipoPrint==1) then
             ifhgPres_out = trim(ifIMDis_out)//'resultadoIMDis.vtk'
-            open(unit=iimDis,file=ifIMDis_out,status='unknown',action='write')
+            open(unit=iimDis,file=ifIMDis_out,status='replace',action='write')
         end if
         if(iflag_tipoPrint==2) then
             ifhgPres_out = trim(ifimDis_out)//'resultadoIMDis-'
@@ -1458,7 +1465,7 @@
                 npcontsat=npcontsat+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(isat, sat, ndofV, numelReserv, trim(labelTransp), &
-                    len(trim(labelTransp)), reservSat)
+                    len(trim(labelTransp)), 1, reservSat)
             end if
         endif
         if(iflag_tipoPrint==2) then
@@ -1483,7 +1490,7 @@
                 npcontpres=npcontpres+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(ipres, pressaoElem, ndofP, numelReserv, trim(labelTransp), &
-                    len(trim(labelTransp)), reservPres)
+                    len(trim(labelTransp)), 1, reservPres)
             endif
         end if
         if(iflag_tipoPrint==2) then
@@ -1614,7 +1621,7 @@
                 npcontphi=npcontphi+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(iphi, PORE, ndofP, numelReserv, &
-                    & trim(labelTransp), len(trim(labelTransp)), reservPhi)
+                    & trim(labelTransp), len(trim(labelTransp)), 1, reservPhi)
             endif
         end if
         if(iflag_tipoPrint==2) then
@@ -1640,7 +1647,7 @@
                 npcontmasc=npcontmasc+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(imasc, MASCN, ndofV, numelReserv, trim(labelTransp), &
-                    len(trim(labelTransp)), reservMasc)
+                    len(trim(labelTransp)), 1, reservMasc)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1666,7 +1673,7 @@
                 npcontyoung=npcontyoung+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(iyng, YOUNG, ndofV, numel, trim(labelTransp), &
-                    len(trim(labelTransp)), reservYoung)
+                    len(trim(labelTransp)), 1, reservYoung)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -3571,9 +3578,8 @@
     write(iunit,*)
     !
     end subroutine
-
-    !**** new *******************************************************************
-    !
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     subroutine escreverArqParaview(arquivo, campo, dim1, dim2, nen, conectElem, tipo, rotulo, tamRot, reserv)
     use mMalha, only: x, nsd, numel,numelReserv, numnp, numnpReserv
     !
@@ -3626,8 +3632,45 @@
 
     if (tipo == 1) call escreverEscalares(campo, dim1, dim2, rotulo, tamRot, reserv, arquivo)
     if (tipo == 2) call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
+    
+    tipoLeitura = tipo
     !
     end subroutine escreverArqParaview
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine escreverArqParaviewOpening(arquivoNome, campo, dim1, dim2, nen, conectElem, tipo, rotulo, tamRot, reserv, timeStep, unitNumber)
+    !function imports
+    
+    !variables import
+    use mMalha, only: numel
+    
+    implicit none
+    
+    !variables input
+    integer, intent(in) :: dim1, dim2
+    double precision, intent(in) :: campo(dim1, dim2)
+    integer :: nen
+    integer :: conectElem(nen,numel)
+    integer :: tipo  !tipo=1 para elemento, e tipo=2 para no
+    integer :: tamRot
+    character(len=*) :: reserv
+    character(len=*) :: arquivoNome
+    character(len=tamRot) :: rotulo
+    integer :: timeStep
+    integer :: unitNumber
+    
+    !variables
+    character(len=3) :: nChar
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    write (nChar, "(I0.3)") timeStep
+    open(unitNumber, file="out/" // trim(arquivoNome) // nChar // ".vtk", status='replace')
+    
+    call escreverArqParaview(unitNumber, campo, dim1, dim2, nen, conectElem, tipo, rotulo, tamRot, reserv)
+    
+    end subroutine escreverArqParaviewOpening
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     !
     !**** new *******************************************************************
     !
@@ -3730,16 +3773,22 @@
     end subroutine escreverEscalaresNodais
     !
     !**** new *******************************************************************
-    subroutine escreverArqParaviewIntermed_CampoEscalar(arquivo, campo, dim1, dim2, rotulo, tamRot, reserv)
+    subroutine escreverArqParaviewIntermed_CampoEscalar(arquivo, campo, dim1, dim2, rotulo, tamRot, tipo, reserv)
 
     implicit none
     integer, intent(in) :: arquivo,dim1, dim2
     character(len=*) :: reserv
     double precision, intent(in) :: campo(dim1, dim2)
+    integer :: tipo
 
     integer :: tamRot
     character(len=tamRot) :: rotulo
-
+    
+    if (tipo /= tipoLeitura) then
+        if(tipo==1) write(arquivo,'(a,i10)')'CELL_DATA ', dim2
+        if(tipo==2) write(arquivo,'(a,i10)')'POINT_DATA ', dim2
+        tipoLeitura = tipo
+    end if
     write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' float '
     write(arquivo,'(a)')'LOOKUP_TABLE default'
 
@@ -3778,21 +3827,21 @@
     end subroutine escreverArqParaviewIntermed_CampoVetorial
     !********************************************************************************************************************
     !********************************************************************************************************************
-    subroutine escreverArqParaviewIntermed_CampoTensorialElemento(campo, dim1, dim2, rotulo, tamRot, arquivo)
+    subroutine escreverArqParaviewIntermed_CampoTensorialElemento(campo, dim1, dim2, dim3, rotulo, tamRot, arquivo)
     !variables input
     implicit none
-    integer, intent(in) :: arquivo,dim1, dim2
-    real*8 :: campo(dim1, dim2)
+    integer, intent(in) :: arquivo,dim1, dim2, dim3
+    real*8 :: campo(dim1, dim2, dim3)
     integer :: tamRot
     character(len=tamRot) :: rotulo
     !--------------------------------------------------------------------------------------------------------------------
     if (tipoLeitura /= 1) then
         tipoLeitura = 1
-        write(arquivo,'(a,i10)') 'CELL_DATA ', dim2
+        write(arquivo,'(a,i10)') 'CELL_DATA ', dim3
     end if
     
     write(arquivo,'(3a,i5)')'TENSORS ', trim(rotulo), ' float '
-    call escreverTensores(campo, dim1, dim2, arquivo)
+    call escreverTensores(campo, dim1, dim2, dim3, arquivo)
     
     end subroutine escreverArqParaviewIntermed_CampoTensorialElemento
     !********************************************************************************************************************
@@ -3864,23 +3913,33 @@
     end subroutine escreverVetoresNodais
     !********************************************************************************************************************
     !********************************************************************************************************************
-    subroutine escreverTensores(campo, tam1, tam2, arquivo)
+    subroutine escreverTensores(campo, dim1, dim2, dim3, arquivo)
     !variables import
     
     !variables input
     implicit none
     !
-    integer :: tam1,tam2
-    real*8 :: campo(tam1,tam2)
+    integer :: dim1,dim2,dim3
+    real*8 :: campo(dim1,dim2,dim3)
     integer :: arquivo
     
     !variables
-    integer   :: j
+    real*8 :: campoElemento(dim1)
+    integer   :: k, j, i
 
-    do j=1, tam2
-        write(arquivo,1000) campo(1, j), campo(3, j), 0.d0
-        write(arquivo,1000) campo(3, j), campo(2, j), 0.d0
-        write(arquivo,1000) 0.d0, 0.d0, campo(4, j)
+    !--------------------------------------------------------------------------------------------------------------------
+    do k=1, dim3
+        do i = 1, dim1
+            campoElemento(i) = 0
+            do j=1, dim2
+                campoElemento(i) = campoElemento(i) + campo(i,j,k)
+            end do
+            campoElemento(i) = campoElemento(i)/dim2
+        end do
+        
+        write(arquivo,1000) campoElemento(1), campoElemento(3), 0.d0
+        write(arquivo,1000) campoElemento(3), campoElemento(2), 0.d0
+        write(arquivo,1000) 0.d0, 0.d0, campoElemento(4)
         write(arquivo,*) ''
     end do
     
@@ -3904,8 +3963,8 @@
     call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
 
     end subroutine escreverArqParaviewIntermed
-    !
-    !**************************************************************************************
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     subroutine escreverEscalares(campo, tam1, tam2, rotulo, tamRot, reserv, arquivo)
     !
     use mMalha, only: numelReserv, numel

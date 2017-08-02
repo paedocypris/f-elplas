@@ -1,5 +1,5 @@
 *numeroPassosTempoP{
-        50
+        10
 }
 *tempoTotal{
       12.0
@@ -20,8 +20,8 @@
 
 # Pressão prescrita nas bordas esquerda e direita
 *valores_cond_contorno_fluxo{
-         1         2     6.0d7
-                         6.0d7
+         1         2     5.0d7
+                         5.0d7
         50       101
        101         2     3.5d7
                          3.5d7

@@ -126,7 +126,7 @@
     character(LEN=8)  :: date
     character(LEN=10) :: minhaHora
     character(LEN=5)  :: zone
-    integer,dimension(8) :: values
+    integer :: values(8)
     integer ::  horas, minutos, segundos, milesimosSeg
     !
     call date_and_time(date,minhaHora,zone,values);
@@ -669,78 +669,6 @@
     end subroutine
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine mataddrank3(a,b,n1,n2,n3)
-    !program to sum two rank 3 matrixes and store the result into matrix "a"
-    
-    ! variables input
-    integer :: n1, n2, n3
-    real*8 :: a(n1,n2,n3), b(n1,n2,n3)
-    !variables
-    integer :: i, j, k
-    !------------------------------------------------------------------------------------------------------------------------------------
-    do k = 1, n3
-        do j = 1, n2
-            do i = 1, n1
-            	a(i,j,k) = a(i,j,k) + b(i,j,k)
-            end do
-        end do
-    end do
-    
-    end subroutine mataddrank3
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    subroutine matsub(a,b,c,ma,mb,mc,m,n,iopt)
-
-    !
-    !.... program to subtract rectangular matrices
-    !
-    implicit none
-    !
-    !.... remove above card for single-precision operation
-    !
-    real*8  :: a(ma,*),b(mb,*),c(mc,*)
-    integer :: ma,mb,mc,m,n,iopt
-    !
-    integer :: i,j
-    !
-    go to (1000,2000,3000),iopt
-    !
-    !.... iopt = 1, subtract entire matrices
-    !
-1000 do 1200 j=1,n
-        !
-        do 1100 i=1,m
-            c(i,j) = a(i,j) - b(i,j)
-1100    continue
-        !
-1200 continue
-    return
-    !
-    !.... iopt = 2, subtract lower triangular and diagonal elements
-    !
-2000 do 2200 j=1,n
-        !
-        do 2100 i=j,m
-            c(i,j) = a(i,j) - b(i,j)
-2100    continue
-        !
-2200 continue
-    return
-    !
-    !.... iopt = 3, subtract upper triangular and diagonal elements
-    !
-3000 do 3200 j=1,n
-        !
-        do 3100 i=1,j
-            c(i,j) = a(i,j) - b(i,j)
-3100    continue
-        !
-3200 continue
-     return
-
-    end subroutine matsub
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
     subroutine matMulmTn(a, b, c, ani, anj, bni, bnj, cni, cnj)
     !variables input
     
@@ -871,9 +799,35 @@
     !
     return
     end subroutine
-    !
-    !----------------------------------------------------------------------
-    !
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function matrixNorm(a, ni, nj)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: ni, nj
+    real*8 :: a(ni,nj)
+    
+    !variables
+    real*8 :: matrixNorm
+    integer :: j, i
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    matrixNorm = 0
+    do j = 1, nj
+        do i = 1, ni
+        	matrixNorm = matrixNorm + a(i,j)*a(i,j)
+        end do
+    end do
+    
+    matrixNorm = sqrt(matrixNorm)
+    
+    end function matrixNorm
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     subroutine solverGaussBanda(s,x,r,ns,lb)
     implicit none
 

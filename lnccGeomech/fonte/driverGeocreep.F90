@@ -22,7 +22,6 @@
     !
     use mLeituraEscrita,   only: fecharArquivosBase, abrirArquivosInformacoesMalha
     use mLeituraEscritaSimHidroGeoMec,   only: fecharArquivosSimHidroGeoMec
-    use mgeomecanica,      only: STRESS_INIT
     !
     implicit none
     !
@@ -46,7 +45,7 @@
     print*, "Iniciando o PROCESSAMENTO..."
 
     !processa o escoamento
-    call processamentoGalerkinElastico()
+    call processamentoOneWay()
 
     !
     call fecharArquivosBase()
@@ -86,14 +85,13 @@
     use mLeituraEscritaSimHidroGeoMec,   only: SETUPDX, abrirArquivosResultados, lerSimulatorParam_DS, lerRandfilesIn_DS
     use mLeituraEscritaSimHidroGeoMec,   only: readSetupPhaseDS
     !
-    use mPropGeoFisica,    only: lerPropriedadesFisicas
     use mPropGeoFisica,    only: nelx, nely, nelz
     use mPropGeoFisica,    only: nr
     use mPropGeoFisica,    only: nelxReserv, nelyReserv, nelzReserv
     use mPropGeoFisica,    only: XTERLOAD, GEOMECLAW
     !
     use mHidrodinamicaRT,  only: fVeloc, leituraCoordenadasPoco
-    use mHidroDinamicaRT,  only: NCONDP,PCONDP, lerParametrosHidrodinamica_DS, optSolverV
+    use mHidroDinamicaRT,  only: lerParametrosHidrodinamica_DS, optSolverV
     use mGeomecanica,      only: fDesloc, InSeaLoad, optSolverD, simetriaGeo
     use mTransporte,       only: satElem, satinit
     use mInputReader,      only: readInputFileDS, LEIturaGERacaoCOORdenadasDS
@@ -209,8 +207,8 @@
     !
     !.... input coordinate data well
     !
-    print*,"leituraCoordenadasPoco"
-    call leituraCoordenadasPoco(NCONDP,PCONDP)
+    !print*,"leituraCoordenadasPoco"
+    !call leituraCoordenadasPoco(NCONDP,PCONDP)
     !
     call alocarMemoria()
     !
@@ -360,338 +358,6 @@
 
     end subroutine
     !
-    !**** new *******************************************************************
-    !
-    SUBROUTINE CREEP_EXAMPLE()
-    !
-    use mGlobaisEscalares
-    use mLeituraEscrita,   only : iflag_tipoPrint
-    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXMESH
-    !
-    use mMalha,            only : x, conecNodaisElem
-    !
-    use mPropGeoFisica,    only : YOUNG, PERMKX
-    use mPropGeoFisica,    only : TOLCREEP
-    !
-    use mGeomecanica,      only : DIS, DTRL, DIS0
-    use mGeomecanica,      only : DIVU, STRSS0, GEOPRSR, POS4STRS
-    use mGeomecanica,      only : NWTNITER, RESIDUAL, RESMAX
-    use mGeomecanica,      only: geomechanic
-    !
-    implicit none
-    !
-    LOGICAL  :: LJUMP
-    REAL(8)  :: ERRSIZE
-    !
-    LJUMP = .FALSE.
-    !
-    !.... MOUNT STIFFNESS MATRIX OF GEOMECHANIC
-    !
-50  CONTINUE
-    !....
-    NWTNITER = NWTNITER + 1
-    WRITE(*,2500) NWTNITER
-    !....
-    IF (NWTNITER.GT.MAXITERC) LJUMP = .TRUE.
-    !
-    CALL GEOMECHANIC('GEOMECHANICS_CREEP')
-    ERRSIZE = RESIDUAL/RESMAX
-    write(*,5000) ERRSIZE
-    ! !
-    !.... ..TEST RESIDUAL NORM WITH TOLERANCE CRITERIA 4 CREEP
-    !
-    IF ((ERRSIZE.GT.TOLCREEP).AND.(.NOT.LJUMP)) GOTO 50
-
-    !....
-70  CONTINUE
-    !
-    !.... UPDATE DISPLACEMENT
-    !
-    DIS = DTRL
-    !
-    !.... POST-PROCESS STRESS FIELD
-    !
-    CALL POS4STRS(X, conecNodaisElem, STRSS0, DIVU)
-    !
-    !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
-    !
-    DIS0 = DIS
-    !
-    !.... PRINT GEOMECHANICAL INITIAL CONDITIONS
-    !
-    if(iflag_tipoPrint.eq.3)then
-        CALL PRINT_DXMESH(X,DIS0,GEOPRSR,STRSS0,conecNodaisElem, &
-            &     YOUNG,PERMKX)
-    end if
-    !
-    DIS  = 0.0D0
-    DIVU = 0.0D0
-    !
-    WRITE(*,*) "  "
-    WRITE(*,*) "*** ************* ************* ************* ***"
-    WRITE(*,*) "***                                           ***"
-    WRITE(*,*) "***    END OF NON-LINEAR CREEP EXAMPLE        ***"
-    WRITE(*,*) "***  SEE FILE 'dxcreep01.ht01/cilindr.dat'    ***"
-    WRITE(*,*) "***     FOR RADIAL STRESS OUTPUT              ***"
-    WRITE(*,*) "***                                           ***"
-    WRITE(*,*) "*** ************* ************* ************* ***"
-    WRITE(*,*) "  "
-    !
-    RETURN
-    !
-2500 FORMAT('    NEWTON ITERATION COUNTER =',I5)
-4500 FORMAT(I8,X,40(1PE15.8,2X))
-5000 FORMAT('    RESIDUAL/RMAX = ',1PE15.8)
-    !
-    END SUBROUTINE
-    !
-    !**** new *******************************************************************
-    !
-    subroutine processamento_elast()
-    !
-    use mGlobaisEscalares
-    use mLeituraEscrita, only: iflag_tipoPrint
-    use mGeomecanica, only: ndofD
-    use mHidrodinamicaRT, only: ndofV, ndofP
-    !
-    use mLeituraEscritaSimHidroGeoMec,   only : imprimirCondicoesIniciais
-    use mLeituraEscritaSimHidroGeoMec,   only : imprimirSolucaoNoTempo
-    use mLeituraEscritaSimHidroGeoMec,   only : isat,escreverArqParaviewIntermed
-    use mLeituraEscritaSimHidroGeoMec,   only : iflag_sat
-    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXINFO, IFEDX
-    !
-    use mMalha,            only : nsd, numel,numelReserv, nen
-    use mMalha,            only : numnp
-    use mMalha,            only : numLadosReserv, numLadosElem
-    use mMalha,            only : x
-    use mMalha,            only : conecNodaisElem, conecLadaisElem
-    !
-    use mPropGeoFisica,    only : phi
-    use mPropGeoFisica,    only : permkx, phi0
-    use mPropGeoFisica,    only : lerPropriedadesFisicas
-    use mPropGeoFisica,    only : PORE, PORE0, PHIEULER
-    use mPropGeoFisica,    only : YOUNG, MASCN0, MASCN
-    !
-    use mTransporte,       only : transport, calc_prod
-    use mTransporte,       only : satElem
-    use mTransporte,       only : satElemL, satElemL0, satElem0
-    !
-    use mGeomecanica,      only : SIGMAT, SIGMA0, GEOTIME
-    use mGeomecanica,      only : NROWB
-    use mGeomecanica,      only : DIS, DIS0, AVSTRS, PRINT_DX
-    use mGeomecanica,      only : DIVU0, DIVU, STRSS0, TMANDEL, GEOPRSR
-    use mGeomecanica,      only: geomechanic
-    !
-    use mHidrodinamicaRT,  only : hidroGeomecanicaRT,  pressaoElem
-    use mHidrodinamicaRT,  only : velocLadal, pressaoElemAnt, vc, velocNodal
-    use mHidroDinamicaRT,  only : NPRESPRODWELL, PRESMEDIAINICIAL, PRESPROD
-    !
-    IMPLICIT NONE
-    !
-    !.... solution driver program
-    !
-    LOGICAL       :: JUMPINDXK, JUMPINDXL
-    INTEGER       :: INDEXL, INDEXK
-    character(21) :: labelTransp
-    !
-    REAL(8)       :: ERRSZSIG, ERRSZVEL, ERRSIG0, ERRVEL0
-    REAL(8)       :: SIGNORM, VELNORM
-    REAL*8        :: TIMEINJ, TIMELOAD, AUX
-    REAL(8), external :: DESPRESSURIZAR
-    REAL(8), external :: DESPRESSURIZAR_INIT
-    REAL(8), DIMENSION(numelReserv)      :: SIGMAK
-    REAL(8), DIMENSION(1,numLadosReserv) :: VELOCITYL
-    !
-    !.... imprime condicoes iniciais
-    !
-    call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-        permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
-    !
-    IF(iflag_tipoPrint.EQ.3)THEN
-        IF (NUMDX.GT.0) THEN
-            IF (MOD(NNP,NUMDX).EQ.0) THEN
-                CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                    &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
-            ENDIF
-        ENDIF
-    END IF
-    !
-    !.... tempo de simulacao para cada bloco do transporte
-    !
-    dtBlocoTransp=tt/DFLOAT(nvel)
-    !
-    !.... INICIALIZACAO DO TEMPO DA GEOMECANICA
-    !
-    GEOTIME = TT/DFLOAT(NVEL)
-    !
-    IF (TypeProcess.EQ.'MANDEL') TMANDEL = 0.0D0
-    !
-    !-----------------------------------------------------------------------
-    !
-    !.... DIMINUICAO GRADUAL DA PRESSAO NO POCO
-    !
-    !-----------------------------------------------------------------------
-    AUX = DESPRESSURIZAR_INIT(PRESPROD,dtBlocoTransp,nvel)
-    !
-    !-----------------------------------------------------------------------
-    !-----------------------------------------------------------------------
-    !
-    !     SIMULACAO
-    !
-    !-----------------------------------------------------------------------
-    !
-    DO NNP=1,NVEL
-
-        ! DESPRESURIZACAO LENTA DO POCO DE PRODUCAO
-        PRESPROD = DESPRESSURIZAR(NPRESPRODWELL,NNP,PRESMEDIAINICIAL,AUX,PRESPROD)
-        !
-        write(*,1000) tTransporte,nnp,nvel
-        !...  ..SETUP SATURATION FOR ITERATIVE HIDRODINAMICS AND TRANSPORT
-        satElem0       = satElem
-        satElemL       = satElem
-        !...  ..UPDATE FOR MACROTIME EVOLUTION
-        pressaoElemAnt = pressaoElem(1,:)
-        SIGMA0         = SIGMAT
-        PORE0          = PORE
-        DIVU0          = DIVU
-        MASCN0         = MASCN
-        !
-        IF (TypeProcess.EQ.'MANDEL') THEN
-            TMANDEL = TMANDEL + GEOTIME
-            CALL GEOMECHANIC('MANDEL_DATA_EXAMPL')
-        ENDIF
-        !
-        !...  ..COMPUTE INJECTION GEOMECHANICAL TIME
-        TIMEINJ   = TIMELOAD(GEOTIME*DFLOAT(NNP))
-        !...  ..BEGIN LOOP FOR ITERATIVE HIDRODINAMICS AND TRANSPORT (INDEX L)
-        VELOCITYL = velocLadal
-        INDEXL    = 0
-        JUMPINDXL = .FALSE.
-100     CONTINUE
-        !INDEXL =  INDEXL+1
-        DO  INDEXL=1,NITHIDRO
-            !IF (INDEXL.EQ.NITHIDRO) JUMPINDXL = .TRUE.
-            !...  .. UPDATE ARRAY SATURATIONS FOR ITERATIVE HIDRO-TRANSPORT
-            satElemL0 = satElemL
-            satElemL  = satElem
-            satElem   = satElem0
-            !
-            IF (INDEXL.EQ.1) satElemL = satElemL0
-            !...  .. BEGIN LOOP FOR ITERATIVE HIDRODINAMICS AND GEOMECHANIC (INDEX K)
-            SIGMAK  = SIGMAT
-            INDEXK  = 0
-            do INDEXK = 1, NITGEO
-                IF (INDEXK.EQ.NITGEO) JUMPINDXK = .TRUE.
-                IF (INDEXK.EQ.1     ) SIGMAT= SIGMA0
-                WRITE(*,2000) INDEXL, INDEXK, NITGEO
-                PHI  = PORE
-                PHI0 = PHIEULER
-                call hidroGeomecanicaRT(satElemL,satElemL0,SIGMAT,SIGMA0,TIMEINJ)
-                !...  .. ...
-                CALL GEOMECHANIC('RIGHT_SIDE_2_SOLVE')
-                CALL UPDTINIT(DIS,DIS0,NDOFD,NUMNP,INITS3)
-                CALL GEOMECHANIC('ELAST_STRSS_SIGMAT')
-                CALL GEOMECHANIC('RESETS_FORCE_VECTR')
-                !.... ..
-                ERRSZSIG = SIGNORM(SIGMAT,SIGMAK,numelReserv)
-                IF (INDEXK.EQ.1) THEN
-                    ERRSIG0 = ERRSZSIG
-                ELSE
-                    ERRSIG0  = DMAX1(ERRSIG0,ERRSZSIG)
-                ENDIF
-                ERRSZSIG = ERRSZSIG/ERRSIG0
-                WRITE(*,3000) 'SIGMA',INDEXK, ERRSZSIG
-                IF (ERRSZSIG.LT.TOLSIGMA) exit
-            end do   !.... do INDEXK = 1, NITGEO
-            CALL GEOMECHANIC('UPDAT_MASS_CONTENT')
-            !          IF (NSD.EQ.2) THEN
-            call transport(velocLadal,GEOTIME)
-            ERRSZVEL = VELNORM(velocLadal,VELOCITYL,numLadosReserv)
-            IF (INDEXL.EQ.1) THEN
-                ERRVEL0 = ERRSZVEL
-            ELSE
-                ERRVEL0  = DMAX1(ERRVEL0,ERRSZVEL)
-            ENDIF
-            ERRSZVEL = ERRSZVEL/ERRVEL0
-            WRITE(*,3000) 'VELOC',indexl,ERRSZVEL
-            VELOCITYL = velocLadal
-            !...
-            IF ((ERRSZVEL.LT.TOLVELOC)) exit ! .AND.(.NOT.JUMPINDXL)) GOTO 100
-        end do  ! END LOOP FOR INDEX L: ITERATION HIDRODINAMICS AND TRANSPORT
-        !...
-        tTransporte=tTransporte+dtBlocoTransp
-        !
-        call calc_prod(ndofV,numLadosElem,numelReserv,&
-            &     nsd,nen, conecNodaisElem, conecLadaisElem,velocLadal, &
-            &     satElem,x,tTransporte)
-        !
-        if (iflag_sat==1) then
-            if (iflag_tipoPrint==1) then
-                call gerarLabel(labelTransp,tTransporte)
-                call escreverArqParaviewIntermed(isat, satElem, ndofV, &
-                    numel, trim(labelTransp), len(trim(labelTransp)))
-            endif
-        endif
-        !
-        !.... imprime solucao intermediaria no tempo
-        !
-        call imprimirSolucaoNoTempo(satElem,DIS,PORE,YOUNG,GEOPRSR,pressaoElem, velocLadal, velocNodal, &
-            &       VC, AVSTRS, MASCN, tTransporte, NDOFV,NDOFP, NDOFD, nrowb)
-        !
-        IF(iflag_tipoPrint.EQ.3)THEN
-            IF (NUMDX.GT.0) THEN
-                IF (MOD(NNP,NUMDX).EQ.0) THEN
-                    CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                        &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
-                ENDIF
-            ENDIF
-        END IF
-        !
-    END DO ! nnp=1,nvel
-    !
-    !.....CLOSE SERIES OF DATA AT NODAL POINTS
-    !
-    IF(iflag_tipoPrint.EQ.3)THEN
-        IF(NUMDX.GT.0) CALL PRINT_DXINFO('CLOSE_FEDX_FILE',IFEDX, &
-            &                                     NUMNP,NUMNP)
-    END IF
-
-    tempoTotalVelocidade=tempoMontagemVel+tempoSolverVel
-    tempoTotalGeomecanica=tempoMontagemGeo+tempoSolverGeo
-    !
-    write(*,*) " "
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total da velocidade     = ", tempoTotalVelocidade
-    write(*,*) "      Montagem velocidade  =", tempoMontagemVel
-    write(*,*) "      Solver velocidade    =", tempoSolverVel
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total da pressao        = ", tempoTotalPressao
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total do transporte  = ", tempoTotalTransporte
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total da geomecanica    = ", tempoTotalGeomecanica
-    write(*,*) "      Montagem geomecanica =", tempoMontagemGeo
-    write(*,*) "      Solver geomecanica   =", tempoSolverGeo
-    write(*,*) "**********************************************"
-    write(*,*) "SOMATORIO DOS TEMPOS =", tempoTotalVelocidade + &
-        tempoTotalPressao    + &
-        tempoTotalTransporte + &
-        tempoTotalGeomecanica,  " segundos "
-
-    return
-
-1000 FORMAT(/,'###########################################',/, &
-        '###########################################',/, &
-        'tempo inicial: ',1PE15.8,5x,'Passo: ',i5, 2x,'de ',i5,/, &
-        '###########################################',/)
-1010 format('###########',/,'Fim da realizacao:', &
-        & i5,/,'###########',/)
-2000 FORMAT('ITERATIVE L-INDEX = ',I2,2X,'ITERATIVE K-INDEX =',I2,' OF ',I2)
-2500 FORMAT('ITERATIVE WAY_S COUNTER = ',I2,' OF ',I2)
-3000 FORMAT(/'PROPORTIONAL ERROR OF ',A5,' ON ITERATION ',I2,X,'IS ',1PE15.8/)
-    !
-    END SUBROUTINE
-    !
     !**** new ******************************************************************
     !
     SUBROUTINE UPDTINIT(DIS,DIS0,NDOFD,NUMNP,LFLAG)
@@ -714,288 +380,6 @@
 4500 FORMAT(I8,X,40(1PE15.8,2X))
     !
     END SUBROUTINE
-    !
-    !**** new *******************************************************************
-    !
-    subroutine processamento_creep()
-    use mLeituraEscrita, only: iflag_tipoPrint
-
-    use mGlobaisEscalares
-    use mGeomecanica, only: ndofD
-    use mHidrodinamicaRT, only: ndofV, ndofP
-    !
-    use mLeituraEscritaSimHidroGeoMec,   only : imprimirCondicoesIniciais,imprimirSolucaoNoTempo
-    use mLeituraEscritaSimHidroGeoMec,   only : escreverArqParaviewIntermed
-    use mLeituraEscritaSimHidroGeoMec,   only : PRINT_DXINFO, IFEDX
-    use mLeituraEscritaSimHidroGeoMec,   only : isat, iflag_sat
-    !
-    use mMalha,            only : nsd, numel, numelReserv, nen
-    use mMalha,            only : numnp
-    use mMalha,            only : numLadosReserv, numLadosElem
-    use mMalha,            only : x
-    use mMalha,            only : conecNodaisElem, conecLadaisElem
-    !
-    use mPropGeoFisica,    only : phi, phi0
-    use mPropGeoFisica,    only : permkx
-    use mPropGeoFisica,    only : lerPropriedadesFisicas
-    use mPropGeoFisica,    only : DTCREEP, TOLCREEP
-    use mPropGeoFisica,    only : PORE, PORE0, PHIEULER
-    use mPropGeoFisica,    only : YOUNG, MASCN0, MASCN
-    !
-    use mTransporte,       only : transport, satElem, calc_prod
-    use mTransporte,       only : satElemL, satElemL0, satElem0
-    use mGeomecanica,      only : SIGMAT, SIGMA0, GEOTIME, RESMAX
-    use mGeomecanica,      only : NWTNITER, RESIDUAL
-    use mGeomecanica,      only : NROWB
-    use mGeomecanica,      only : GEOSETUP, DIS, DIS0, AVSTRS, PRINT_DX
-    use mGeomecanica,      only : DIVU0, DIVU, DTRL, STRSS0, GEOPRSR
-    use mGeomecanica,      only: geomechanic
-    !
-    use mHidrodinamicaRT,  only : hidroGeomecanicaRT, vc, velocLadal, velocNodal
-    use mHidrodinamicaRT,  only : pressaoElem, pressaoElemAnt
-    use mHidroDinamicaRT,  only : NPRESPRODWELL,PRESMEDIAINICIAL,PRESPROD
-    !
-    implicit none
-    !
-    !.... solution driver program
-    !
-    LOGICAL       :: JUMPINDXK, JUMPINDXL, LJUMP
-    INTEGER       :: INDEXL, INDEXK
-    character(21) :: labelTransp
-    !
-    REAL(8)       :: ERRSZSIG, ERRSZVEL, ERRSIG0, ERRVEL0
-    REAL(8)       :: ERRSIZE
-    REAL(8)       :: SIGNORM, VELNORM
-    REAL*8        :: TIMEINJ, TIMELOAD, AUX
-    REAL(8), external :: DESPRESSURIZAR
-    REAL(8), external :: DESPRESSURIZAR_INIT
-    REAL(8), DIMENSION(numelReserv)      :: SIGMAK
-    REAL(8), DIMENSION(1,numLadosReserv) :: VELOCITYL
-    !
-    LJUMP = .FALSE.
-    !
-
-    !.... imprime condicoes iniciais
-    !
-    call imprimirCondicoesIniciais(GEOPRSR, pressaoElem, velocLadal, velocNodal, vc, phi, &
-        permkx, satElem, YOUNG, DIS, STRSS0, MASCN, ndofV, ndofP, ndofD, nrowb)
-    !
-    IF(iflag_tipoPrint.EQ.3)THEN
-        IF (NUMDX.GT.0) THEN
-            IF (MOD(NNP,NUMDX).EQ.0) THEN
-                CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                    &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
-            ENDIF
-        ENDIF
-    END IF
-    !
-    !.... tempo de simulacao para cada bloco do transporte
-    !
-    dtBlocoTransp=tt/dfloat(nvel)
-    !
-    !.... INICIALIZACAO DAS VARIAVEIS DA GEOMECANICA
-    !
-    GEOTIME = TT/DFLOAT(NVEL)
-    DTCREEP = DFLOAT(NCREEP)*GEOTIME
-    !
-    !-----------------------------------------------------------------------
-    !
-    !.... DIMINUICAO GRADUAL DA PRESSAO NO POCO
-    !
-    AUX = DESPRESSURIZAR_INIT(PRESPROD,dtBlocoTransp,nvel)
-    !
-    !-----------------------------------------------------------------------
-    !-----------------------------------------------------------------------
-    !
-    !     SIMULACAO
-    !
-    !-----------------------------------------------------------------------
-    !
-    DO NNP=1,NVEL
-        !
-        ! DESPRESURIZACAO LENTA DO POCO DE PRODUCAO
-        PRESPROD = DESPRESSURIZAR(NPRESPRODWELL,NNP, &
-            &                              PRESMEDIAINICIAL,AUX,PRESPROD)
-        write(*,1000) tTransporte,nnp,nvel
-        !...  ..SETUP SATURATION FOR ITERATIVE HIDRODINAMICS AND TRANSPORT
-        satElem0       = satElem
-        satElemL       = satElem
-        !...  ..UPDATE FOR MACROTIME EVOLUTION
-        pressaoElemAnt = pressaoElem(1,:)
-        SIGMA0         = SIGMAT
-        PORE0          = PORE
-        DIVU0          = DIVU
-        MASCN0         = MASCN
-        !...  ..COMPUTE INJECTION GEOMECHANICAL TIME
-        TIMEINJ        = TIMELOAD(GEOTIME*DFLOAT(NNP))
-        !...  ..BEGIN LOOP FOR ITERATIVE HIDRODINAMICS AND TRANSPORT (INDEX L)
-        VELOCITYL = velocLadal
-        INDEXL    = 0
-        JUMPINDXL = .FALSE.
-100     CONTINUE
-        INDEXL =  INDEXL+1
-        !            DO 500 INDEXL=1,NITHIDRO
-        IF (INDEXL.EQ.NITHIDRO) JUMPINDXL = .TRUE.
-        !...  .. UPDATE ARRAY SATURATIONS FOR ITERATIVE HIDRO-TRANSPORT
-        satElemL0 = satElemL
-        satElemL  = satElem
-        satElem   = satElem0
-        !
-        IF (INDEXL.EQ.1) satElemL = satElemL0
-        !...  .. BEGIN LOOP FOR ITERATIVE HIDRODINAMICS AND GEOMECHANIC (INDEX K)
-        SIGMAK  = SIGMAT
-        INDEXK  = 0
-        JUMPINDXK = .FALSE.
-300     CONTINUE
-        do INDEXK = 1, NITGEO
-            !INDEXK = INDEXK+1
-            !               DO 400 INDEXK=1,NITGEO
-            IF (INDEXK.EQ.NITGEO) JUMPINDXK = .TRUE.
-            IF (INDEXK.EQ.1) SIGMAT = SIGMA0
-            RESMAX   = 1.0D0
-            NWTNITER = 0
-            WRITE(*,2000) INDEXL, INDEXK, NITGEO
-            PHI  = PORE
-            PHI0 = PHIEULER
-            call hidroGeomecanicaRT(satElemL,satElemL0,SIGMAT, &
-                &              SIGMA0,TIMEINJ)
-            !...  .. ...
-350         CONTINUE
-            !...  .. ...
-            NWTNITER = NWTNITER + 1
-            WRITE(*,2500) INDEXK,NITGEO,NWTNITER
-            !...  .. ...
-            IF (NWTNITER.GT.MAXITERC) LJUMP = .TRUE.
-            !
-            CALL GEOMECHANIC('GEOMECHANICS_CREEP')
-            ERRSIZE = residual/resmax
-            write(*,5000) ERRSIZE
-            !
-            !.... .. ... NEXT TEST RESIDUAL NORM WITH TOLERANCE CRITERIA 4 CREEP
-            !
-            IF ((ERRSIZE.GT.TOLCREEP).AND.(.NOT.LJUMP)) GOTO 350
-            !.... .. ...
-            !.... .. ...  UPDATE NON-LINEAR DISPLACEMENT
-            !.... .. ...
-            DIS = DTRL
-            !
-            !.... .. ...  CORRECTION WITH INITIAL DISPLACEMENTS
-            !
-            CALL UPDTINIT(DIS,DIS0,NDOFD,NUMNP,INITS3)
-            !.... .. ...
-            call GEOMECHANIC('CREEP_STRSS_SIGMAT')
-            !.... .. ...
-            ERRSZSIG = SIGNORM(SIGMAT,SIGMAK,numelReserv)
-            IF (INDEXK.EQ.1) THEN
-                ERRSIG0 = ERRSZSIG
-            ELSE
-                ERRSIG0  = DMAX1(ERRSIG0,ERRSZSIG)
-            ENDIF
-            ERRSZSIG = ERRSZSIG/ERRSIG0
-            WRITE(*,3000) 'SIGMA',INDEXK, ERRSZSIG
-            SIGMAK = SIGMAT
-            !ERRSZSIGPreviews=ERRSZSIG
-            IF (ERRSZSIG.LT.TOLSIGMA) exit
-            !IF ((ERRSZSIG.GT.TOLSIGMA).OR.(.NOT.JUMPINDXK)) GOTO 300
-        end do
-        !IF ((ERRSZSIG.GT.TOLSIGMA).AND.(.NOT.JUMPINDXK)) GOTO 300
-        ! 400       CONTINUE ! END LOOP FOR INDEX_K: ITERATION HIDRODINAMICS AND GEOMECHANIC
-        !.... .. ...
-        call GEOMECHANIC('UPDAT_MASS_CONTENT')
-
-        !...
-        call transport(velocLadal,GEOTIME)
-
-        ERRSZVEL = VELNORM(velocLadal,VELOCITYL,numLadosReserv)
-        IF (INDEXL.EQ.1) THEN
-            ERRVEL0 = ERRSZVEL
-        ELSE
-            ERRVEL0  = DMAX1(ERRVEL0,ERRSZVEL)
-        ENDIF
-        ERRSZVEL = ERRSZVEL/ERRVEL0
-        WRITE(*,3000) 'VELOC',indexl,ERRSZVEL
-        VELOCITYL = velocLadal
-        !...
-        IF ((ERRSZVEL.GT.TOLVELOC).AND.(.NOT.JUMPINDXL)) GOTO 100
-        !...
-        !500   CONTINUE   ! END LOOP FOR INDEX L: ITERATION HIDRODINAMICS AND TRANSPORT
-        !...
-        tTransporte=tTransporte+dtBlocoTransp
-        !
-        call calc_prod(ndofV,numLadosElem,numelReserv, &
-            &      nsd,nen, conecNodaisElem, conecLadaisElem,velocLadal, &
-            &      satElem, x,tTransporte)
-        !
-        if (iflag_sat==1) then
-            if (iflag_tipoPrint==1) then
-                call gerarLabel(labelTransp,tTransporte)
-                call escreverArqParaviewIntermed(isat, satElem, ndofV, &
-                    numel, trim(labelTransp), len(trim(labelTransp)))
-            endif
-        endif
-
-        !
-        !.... imprime solucao intermediaria no tempo
-        !
-        call imprimirSolucaoNoTempo(satElem,DIS,PORE,YOUNG,GEOPRSR,pressaoElem, velocLadal, velocNodal, &
-            &       VC, AVSTRS, MASCN, tTransporte, NDOFV,NDOFP, NDOFD, nrowb)
-
-        !
-        IF(iflag_tipoPrint.EQ.3)THEN
-            IF (NUMDX.GT.0) THEN
-                IF (MOD(NNP,NUMDX).EQ.0) THEN
-                    CALL PRINT_DX(DIS,PORE,pressaoElem,satElem,MASCN, &
-                        &                       VC,AVSTRS,NDOFD,NUMEL,NROWB,NUMNP )
-                ENDIF
-            ENDIF
-        END IF
-        !
-    end do ! nnp=1,nvel
-    !
-    !.....CLOSE SERIES OF DATA AT NODAL POINTS
-    !
-    IF(iflag_tipoPrint.EQ.3)THEN
-        IF(NUMDX.GT.0) CALL PRINT_DXINFO('CLOSE_FEDX_FILE',IFEDX, &
-            &                                    NUMNP,NUMNP)
-    END IF
-
-
-    tempoTotalVelocidade=tempoMontagemVel+tempoSolverVel
-    tempoTotalGeomecanica=tempoMontagemGeo+tempoSolverGeo
-    !
-    write(*,*) " "
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total da velocidade=", tempoTotalVelocidade
-    write(*,*) "      Montagem velocidade=", tempoMontagemVel
-    write(*,*) "      Solver velocidade=", tempoSolverVel
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total da pressao   =", tempoTotalPressao
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total do transporte=", tempoTotalTransporte
-    write(*,*) "**********************************************"
-    write(*,*) "Tempo total da geomecanica=", tempoTotalGeomecanica
-    write(*,*) "      Montagem geomecanica=", tempoMontagemGeo
-    write(*,*) "      Solver geomecanica=", tempoSolverGeo
-    write(*,*) "**********************************************"
-    write(*,*) "TEMPO TOTAL DE EXECUCAO=", &
-        tempoTotalVelocidade+tempoTotalPressao+tempoTotalTransporte+tempoTotalGeomecanica
-
-    !
-1000 FORMAT(/,'###########################################',/, &
-        '###########################################',/, &
-        'tempo inicial: ',1PE15.8,5x,'Passo: ',i5, 2x,'de ',i5,/, &
-        '###########################################',/)
-1010 format('###########',/,'Fim da realizacao:', &
-        & i5,/,'###########',/)
-2000 FORMAT('ITERATIVE L-INDEX = ',I2,2X,'ITERATIVE K-INDEX =',I2,' OF ',I2)
-2500 FORMAT('ITERATIVE WAY_S COUNTER = ',I2,' OF ',I2,2X,&
-        &        '    NEWTON ITERATION COUNTER =',I5)
-3000 FORMAT(/'PROPORTIONAL ERROR OF ',A5,' ON ITERATION ',I2,X,'IS ',1PE15.8/)
-5000 FORMAT('     RESIDUAL/RMAX = ',1PE15.8//)
-
-
-    return
-    end subroutine processamento_creep
     !
     !**** NEW ******************************************************************
     !
@@ -1086,8 +470,6 @@
     use mPropGeoFisica,    only: GEOFORM, MASCN, MASCN0
     use mHidrodinamicaRT,  only: pressaoElem, pressaoElemAnt,PRESPRODWELL,NCONDP
     use mHidrodinamicaRT,  only: vc, ve, velocLadal, fVeloc, velocNodal
-    
-    use mGeomecanica, only: disInc, disPlast
 
     !
     implicit none
@@ -1178,7 +560,7 @@
     ALLOCATE(DIVU0 (NUMEL));              DIVU0   = 0.0D0
     !
     ALLOCATE(STRSS (NUMEL,NINTD,NROWB));  STRSS   = 0.0D0
-    ALLOCATE(HMTTG (NUMEL,NINTD,NROWB2)); HMTTG   = 0.0D0
+    ALLOCATE(HMTTG (nrowb2,NINTD,numel)); HMTTG   = 0.0D0
     ALLOCATE(ECREEP(NUMEL,NINTD,NROWB));  ECREEP  = 0.0D0
     !
     ALLOCATE(GEOPRSR(NUMEL));             GEOPRSR = 0.0D0
@@ -1198,8 +580,6 @@
     !
     !... allocate memory for plasticity
     allocate(EINELAS(NUMEL,NINTD,NROWB)); EINELAS = 0.0d0
-    allocate(disInc(ndofD, numnp)); disInc = 0.d0
-    allocate(disPlast(ndofD, numnp)); disPlast = 0.d0
     !
     !... END GEOMECANICA
     !
@@ -1514,13 +894,13 @@
     subroutine initGalerkinPressure(nnp)
     !variable imports
     use mHidrodinamicaGalerkin, only: hgNumPassosTempo, hgTempoTotal
-    use mHidrodinamicaGalerkin, only: hgInitialPressure, hgPrevPressure, hgPressure
+    use mHidrodinamicaGalerkin, only: hgInitialPressure
     use mHidrodinamicaGalerkin, only: hgNdof, hgNlvect, hgNeq
     use mHidrodinamicaGalerkin, only: hgF
     use mHidrodinamicaGalerkin, only: hgId
 
     use mLeituraEscrita, only:iecho
-    use mGlobaisEscalares, only: iprtin, betaCompressibility
+    use mGlobaisEscalares, only: iprtin
 
     !function imports
     use mInputReader,      only: leituraCodigosCondContornoDS, leituraValoresCondContornoDS
@@ -1543,9 +923,6 @@
     call readRealKeywordValue(keyword_name, hgTempoTotal, 0.0d0, ierr)
     hgTempoTotal = hgTempoTotal * 2592000.0 ! converts months to seconds
 
-    keyword_name = "hgCompressibilidade"
-    call readRealKeywordValue(keyword_name, betaCompressibility, 0.0d0, ierr)
-
     keyword_name = "hgNlvect"
     call readIntegerKeywordValue(keyword_name, hgNlvect, 0_4, ierr)
 
@@ -1554,10 +931,6 @@
 
 
     hgNdof = 1
-    allocate(hgPrevPressure(hgNdof, nnp))
-    hgPrevPressure = 0.0d0
-    allocate(hgPressure(hgNdof, nnp))
-    hgPressure=0.0d0
 
     allocate(hgId(hgNdof,nnp))
     hgId = 0
@@ -1576,79 +949,176 @@
     end subroutine initGalerkinPressure
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine processamentoGalerkinElastico()
+    subroutine processamento(way)
     !variable imports
     !flow
     use mHidrodinamicaGalerkin, only:hgNumPassosTempo, hgTempoTotal, hgInitialPressure
-    use mHidrodinamicaGalerkin, only:hgPrevPressure, hgPressure
     use mHidrodinamicaGalerkin, only:hgNdof
     use mMalha, only: numnp, numel, nen, nsd, conecNodaisElem
     use mMalha, only: x
-    use mLeituraEscritaSimHidroGeoMec, only:ihgPres, reservHGPres
+    use mLeituraEscritaSimHidroGeoMec, only:reservHGPres
     !mechanics
-    use mGeomecanica, only: disPlast
-    use mGeomecanica, only: ndofD
-    use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
-
+    use mGeomecanica, only: ndofD, nrowB, nintD
+    use mLeituraEscritaSimHidroGeoMec, only: reservDesloc
+    
     !function imports
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
-    use mHidrodinamicaGalerkin, only:montarSistemaEquacoesPressao
-    use mHidrodinamicaGalerkin, only:solveGalerkinPressao
-    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview, escreverArqParaviewIntermed
-    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewVector
-    use mGeomecanica, only: inicializacaoGeo, incrementMechanicPlasticSolution
-
-    !variables
+    use mHidrodinamicaGalerkin, only: incrementFlowPressureSolutionOneWay, incrementFlowPressureSolutionTwoWay
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview, escreverArqParaviewIntermed, escreverArqParaviewOpening
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewVector, escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoTensorialElemento
+    use mGeomecanica, only: incrementMechanicPlasticSolution, montarEstruturasDadosDeslocamentoSkyline
+    use mPropGeoFisica, only: lerPropriedadesFisicas
+    
+    !variables input
     implicit none
-    integer :: curTimeStep, i, j
+    integer :: way
+    
+    !variables
+    integer :: curTimeStep
     real*8 :: t, deltaT
-    character(21) :: labelTempo, num
+    integer :: unitNumber
+    character(8) :: filename
+    
+    integer :: k
+    
+    real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:)
+    real*8, allocatable :: p(:,:), prevP(:,:)
+    real*8, allocatable :: stress(:,:,:)
+    real*8, allocatable :: stressS(:,:), prevStressS(:,:)
+    real*8, allocatable :: strainP(:,:,:)
+    
+    real*8 :: prevPIt(hgNdof, numnp), prevUDifIt(ndofD, numnp)
+    
+    real*8 :: uNorm, pNorm
+    logical :: converged
+    real*8, external :: matrixNorm
 
     !------------------------------------------------------------------------------------------------------------------------------------
-    if(hgNumPassosTempo > 1) then
-        ! inicializar a solução no passo anterior
-        hgPrevPressure = hgInitialPressure
-    endif
-
-    ! print initial state
-    call escreverArqParaview(ihgPres, hgPrevPressure, hgNdof, numnp, nen, conecNodaisElem, 2, 't=0.0', len('t=0.0'), reservHGPres)
+    !allocate memory
+    allocate(u(ndofD, numnp))
+    allocate(uInit(ndofD, numnp))
+    allocate(uDif(ndofD, numnp))
+    allocate(p(hgNdof,numnp))
+    allocate(prevP(hgNdof,numnp))
+    allocate(stress(nrowb,nintD, numel))
+    allocate(stressS(nintD, numel))
+    allocate(prevStressS(nintD, numel))
+    allocate(strainP(nrowb,nintD,numel))
     
-    !init geomechanic variables
-    call InicializacaoGEO()
     
-    disPlast = 0
-    call escreverArqParaviewVector('dis', disPlast, nDofD, numnp, nen, conecNodaisElem, 2, 'u(0)', len('u(0)'), reservDesloc, iDis)
-    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, disPlast)
+    !read physical properties
+    call lerPropriedadesFisicas()
     
     ! mount data structure
     call montarEstruturasDadosPressaoSkyline(conecNodaisElem, nen, numel)
+    call montarEstruturasDadosDeslocamentoSkyline(conecNodaisElem, nen, numel)
+    
+    !init pressure
+    if(hgNumPassosTempo > 1) then
+        p = hgInitialPressure
+        prevP = p
+    endif
+    
+    !init stress and strain
+    u = 0.d0
+    strainP = 0.d0
+    stress = 0.d0
+    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, p, 3)
+    uInit = u
+    uDif = 0.d0
 
+    ! print initial state
+    unitNumber = 13579
+    filename = "solution"
+    call escreverArqParaviewOpening(filename, p, hgNdof, numnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, 0, unitNumber)
+    call escreverArqParaviewIntermed_CampoVetorial('dis', uDif, ndofD, numnp, 'u', len('u'), 2, reservDesloc, unitNumber)
+    call escreverArqParaviewIntermed_CampoTensorialElemento(stress, nrowb, nintD, numel, 'stress', len('stress'), unitNumber)
+    close(unitNumber)
+    
     !time loop
     t = 0
     deltaT = hgTempoTotal / hgNumPassosTempo
     do curTimeStep = 1, hgNumPassosTempo
         t = t + deltaT
         write(*,*) "tempo", t, "passo de tempo", curTimeStep
+        
+        prevStressS = stressS
+        ! begin split loop
+        converged = .false.
+        do k = 1, 15
+            if (way == 1 .or. k == 1) then
+                call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, curTimeStep, deltaT, p, prevP)
+            else
+                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS)
+            end if
 
-        ! mount equation system
-        call montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, numel, numnp, nsd, x)
-
-        !solve
-        call solveGalerkinPressao(curTimeStep, numnp)
-
-        !print current solution
-        write(num,'(f12.5)') t / 2592000
-        labelTempo="t="//ADJUSTL(num)
-        call escreverArqParaviewIntermed(ihgPres, hgPressure, hgNdof, numnp, trim(labelTempo), len(trim(labelTempo)))
-
-        ! copy solution to previous array
-        do j = 1, numnp
-            do i = 1, hgNdof
-                hgPrevPressure(i,j) = hgPressure(i,j)
-            end do
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, p, 1)
+            uDif = u - uInit
+            
+            if (way == 1) then
+                exit
+            end if
+            
+            
+            if (k > 1) then
+                prevPIt = prevPIt - p
+                pNorm = matrixNorm(prevPIt, hgNdof, numnp)
+                
+                prevUDifIt = prevUDifIt - uDif
+                uNorm = matrixNorm(prevUDifIt, ndofD, numnp)
+                
+                if (pNorm < 1.0d-6 .and. uNorm < 1.0d-6) then
+                    converged = .true.
+                    exit
+                end if
+            end if
+            
+            prevPIt = p
+            prevUDifIt = uDif
         end do
+        
+        if ((way == 2) .and.(converged.eqv..false.)) then
+            write(*,*) "fixed stress split didn't converged."
+            exit
+        end if
+        
+        !update time
+        prevP = p
+        
+        !print current solution
+        call escreverArqParaviewOpening(filename, p, hgNdof, numnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
+        call escreverArqParaviewIntermed_CampoVetorial('dis', uDif, ndofD, numnp, 'u', len('u'), 2, reservDesloc, unitNumber)
+        call escreverArqParaviewIntermed_CampoTensorialElemento(stress, nrowb, nintD, numel, 'stress', len('stress'), unitNumber)
+        close(unitNumber)
     end do
-
-    end subroutine processamentoGalerkinElastico
+    
+    deallocate(u)
+    deallocate(uInit)
+    deallocate(uDif)
+    deallocate(p)
+    deallocate(prevP)
+    deallocate(stress)
+    deallocate(stressS)
+    deallocate(prevStressS)
+    deallocate(strainP)
+    
+    end subroutine processamento
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine processamentoOneWay()
+    
+    implicit none
+    !------------------------------------------------------------------------------------------------------------------------------------
+    call processamento(1)
+    end subroutine processamentoOneWay
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine processamentoTwoWay()
+    
+    implicit none
+    !------------------------------------------------------------------------------------------------------------------------------------
+    call processamento(2)
+    
+    end subroutine processamentoTwoWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************

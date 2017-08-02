@@ -61,11 +61,6 @@
     REAL*8  :: RESMAX, RESIDUAL
     !
     !plasticity
-    !todo: inicializar tolYield, toleplas
-    real*8, allocatable :: disInc(:,:), disPlast(:,:)
-    
-    real*8 :: tolYield, toleplas
-    !
     real*8,  allocatable :: fDesloc(:,:)
     !
     CHARACTER(len=128) :: YNG_IN
@@ -73,365 +68,6 @@
     real(8) :: rho,rhophi  ! coeficiente da variancia (strenght)
     !
     contains
-    !**** new *******************************************************************
-    !
-    subroutine GEOMECHANIC(fase)
-
-    use mGlobaisEscalares,   only: tempoMontagemGeo, tempoSolverGeo
-
-    use mMalha,              only: x, nsd, numel, numnp
-    use mMalha,              only: numelReserv
-    use mMalha,              only: conecNodaisElem
-
-    use mPropGeoFisica,      only: PORE0, PORE, PHI, PHI0, PHIEULER
-    use mPropGeoFisica,      only: YOUNG
-    use mPropGeoFisica,      only: MASCN0, MASCN
-    use mPropGeoFisica,      only: XTERLOAD
-
-    use mHidrodinamicaRT,    only: pressaoElemAnt, pressaoElem
-    use mTransporte,         only: satElem
-
-    use mSolverGaussSkyline, only: solverGaussSkyline
-    !
-    implicit none
-
-    real*8, external :: coldot
-
-    integer, save       :: cont=1
-    character (LEN=100) :: nomeArq
-    character (LEN=10)  :: numSufix, zeros
-    logical :: plastified
-    
-    !
-    CHARACTER(LEN=18) :: FASE
-    !
-    real*8  :: t1,t2
-    integer :: i, j
-    real*8  :: tol
-    !
-    CHARACTER*18, DIMENSION(10) :: REFTASK
-    !      real*8, external :: coldot
-    !
-    DATA REFTASK(1)     ,     REFTASK(2)     ,     REFTASK(3)     /&
-        &'INIT_GEOMECH_ARRAY','ELASTIC_BBAR_MATRX','RIGHT_SIDE_2_SOLVE'/&
-        &     REFTASK(4)     ,     REFTASK(5)     ,     REFTASK(6)     /&
-        &'GEOMECHANICS_CREEP','ELAST_STRSS_SIGMAT','CREEP_STRSS_SIGMAT'/&
-        &     REFTASK(7)     ,     REFTASK(8)     ,     REFTASK(9)     /&
-        &'RESETS_FORCE_VECTR','UPDAT_MASS_CONTENT','MANDEL_DATA_EXAMPL'/&
-        &	  REFTASK(10)    /'GEOMECHANIC_PLAST'/
-    !
-    logical :: escreverSistD = .true., escreverSolD = .true.
-    escreverSistD = .true.; escreverSolD = .true.
-    escreverSistD = .false.; escreverSolD = .false.
-
-    WRITE(*,*) ' ==> GEOMECHANIC TASK == ', FASE
-    tol = 1.0e-12
-
-    DO 10 I=1,9
-        IF (FASE.EQ.REFTASK(I)) J=I
-10  CONTINUE
-    !
-    GOTO(100,200,300,400,500,600,700,800,900,1000), J
-    !
-100 CONTINUE     !.....  fase=='INIT_GEOMECH_ARRAY'
-    CALL InicializacaoGEO()
-    RETURN
-    !
-200 CONTINUE     !....   fase=='ELASTIC_BBAR_MATRX'
-    if(optSolverD=='hypre') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-
-    call timing(t1)
-    call montarSistEqAlgGEO('bbarmatrix_elast',satElem)
-    call timing(t2)
-    tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
-    write(*,'(a)', ADVANCE='NO') 'solucao do sistema de eq, GEOMECHANICS, '
-    call timing(t1)
-    call solverGeo200()
-    call timing(t2)
-    tempoSolverGeo=tempoSolverGeo+(t2-t1)
-    RETURN
-    !
-300 CONTINUE     !....  fase=='RIGHT_SIDE_2_SOLVE'
-    call timing(t1)
-    CALL montarSistEqAlgGEO('right_hand_elast',satElem)
-    call timing(t2)
-    tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
-
-    if(cont<1000)  zeros="00"
-    if(cont<100)   zeros="000"
-    if(cont<10)    zeros="0000"
-    write(numSufix,'(a,i0)') trim(zeros),  cont !; cont=cont+1
-    nomeArq = "coefSistEqAlgEsparsoD_"//trim(numSufix)//".mtx";! write(*,*) nomeArq
-    !if(cont<=2) then
-    ! cont = cont+1
-    !else
-    ! escreverSistD = .false.; escreverSolD = .false.
-    ! stop
-    !end if
-    if(escreverSistD) call escreverSistema_MTX(optSolverD,nomeArq)
-    write(*,'(a)', ADVANCE='NO') 'solucao do sistema de eq, GEOMECHANICS, '
-    call timing(t1)
-    call solverGeo300()
-    call timing(t2)
-    nomeArq = "coefSistEqAlgEsparsoD_"//trim(numSufix)//".sol";! write(*,*) nomeArq
-    if(escreverSolD)  call  escreverBRHS (brhsD, neqD, nomeArq)
-    !.... UPDATE DISPLACEMENT
-    CALL BTOD(idDesloc,DIS,BRHSD,NDOFD,NUMNP)
-    tempoSolverGeo=tempoSolverGeo+(t2-t1)
-    write(*,'(a)') 'em gemochanic, 300';
-    RETURN
-    !
-400 CONTINUE     !.... fase=='GEOMECHANICS_CREEP'
-    call timing(t1)
-    call montarSistEqAlgGEO('bbarmatrix_creep',satElem)
-    call timing(t2)
-    tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
-    !.... COMPUTE RESIDUAL EUCLIDEAN NORM
-    RESIDUAL = sqrt(DOT_PRODUCT (BRHSD,BRHSD))
-    !     IF ((NWTNITER.EQ.1)) RESMAX = MAX(RESIDUAL,RESMAX)
-    RESMAX = MAX1(RESIDUAL,RESMAX)
-    WRITE(*,4000) RESIDUAL,resmax
-    write(*,'(a)', ADVANCE='NO') 'solucao do sistema de eq, GEOMECHANICS, '
-    call timing(t1)
-    call solverGeo400()
-    call timing(t2)
-    tempoSolverGeo=tempoSolverGeo+(t2-t1)
-    !.... UPDATE TRIAL DISPLACEMENT WITH INCREMENT
-    CALL UPDATEINCR(idDesloc,BRHSD,NDOFD,NUMNP)
-    !.... NEXT LINE VISCO-ELASTIC EVOLUTION AND TANGENT MATRIX UPDATE
-    CALL POS4CREEP(x, conecNodaisElem)
-    RETURN
-    !
-500 CONTINUE     !.... fase='ELAST_STRSS_SIGMAT'
-    !.... POST-PROCESS STRESS FIELD
-    IF (NSD.EQ.2) CALL POS4ITER(X, conecNodaisElem, AVSTRS, DIVU)
-    IF (NSD.EQ.3) CALL POS4ITER_3D(X, conecNodaisElem, AVSTRS, DIVU)
-    !... UPDATE STRESS FIELD WITH INITIAL STRESS
-    CALL UPDTSTRS(AVSTRS,STRSS0,NROWB,NUMEL)
-    !... COMPUTE TRACE OF TOTAL STRESS'S (SIGMAT)
-    CALL COMPTRACE(pressaoElem,AVSTRS,SIGMAT,NROWB,&
-        &               NUMEL,numelReserv)
-    RETURN
-    !
-600 CONTINUE     !.... fase=='CREEP_STRSS_SIGMAT'
-    VDP   = 0.0D0
-    !.... POST-PROCESS STRESS FIELD
-    CALL POS4STRS(x, conecNodaisElem, AVSTRS, DIVU)
-    !.... COMPUTE TRACE OF TOTAL STRESS'S (SIGMAT)
-    CALL COMPTRACE(pressaoElem,AVSTRS,SIGMAT,NROWB,NUMEL,numelReserv)
-    RETURN
-    !
-700 CONTINUE     !....  fase=='RESETS_FORCE_VECTR'
-    call timing(t1)
-    CALL montarSistEqAlgGEO('right_hand_reset',satElem)
-    call timing(t2)
-
-    tempoMontagemGeo=tempoMontagemGeo+(t2-t1)
-    RETURN
-    !
-800 CONTINUE     !.... fase=='UPDAT_MASS_CONTENT'
-    !
-    CALL POS4_MASSCNT(DIVU,DIVU0, pressaoElem, pressaoElemAnt, &
-        &         PORE,PORE0,YOUNG,MASCN,MASCN0,PHIEULER,NUMEL,NUMELRESERV)
-    !
-    PHI  = MASCN
-    PHI0 = MASCN0
-    RETURN
-    !
-900 CONTINUE   !.... fase=='MANDEL_DATA_EXAMPL'
-    CALL FTODMANDL(FDesloc,NDOFD,NUMNP,NLVECTD,XTERLOAD,TMANDEL)
-    RETURN
-    !
-1000 continue  !.... fase=='GEOMECHANIC_PLAST'
-    call montarSistEqAlgGEO('bbarmatrix_plast',satElem)
-    !
-    !.... COMPUTE RESIDUAL EUCLIDEAN NORM
-    !
-    RESIDUAL = dsqrt(COLDOT(BRHSD,BRHSD,NEQD))
-    !      IF ((NWTNITER.EQ.1)) RESMAX = MAX(RESIDUAL,RESMAX)
-    RESMAX = DMAX1(RESIDUAL,RESMAX)
-    !
-    WRITE(*,4000) RESIDUAL,resmax
-    if (optSolverD=='skyline') then
-        write(*,'(2a)') ' direto ', optSolverD
-        call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
-    else
-        write(*,*) ' não implementado '
-        stop 9
-    end if
-    !
-    !.... UPDATE TRIAL DISPLACEMENT WITH INCREMENT
-    !
-    CALL UPDATEINCR(idDesloc,BRHSD,NDOFD,NUMNP)
-    !
-    !.... NEXT LINE PLASTIC DEFORMATION AND TANGENT MATRIX UPDATE
-    !
-    CALL POS4PLAST(x, conecNodaisElem, DTRL, eInelas, strss, hmttg, plastified)
-    !
-    !.... NEXT LINE UPDATE STRESS FOR PLASTIC DEFORMATION
-    !
-    CALL STRSS4PLAST(x, conecNodaisElem)
-    !
-    RETURN
-    !
-4000 FORMAT(3X,'RESIDUAL = ',1PE15.8,2X,'RMAX =',1PE15.8)
-4500 FORMAT(3X,'|====> solver direto ',A7,', GEOMECHANICS')
-9002 FORMAT( "Tempo de montagem da matriz e/ou vetor força = ",f12.5)
-9003 FORMAT( "Tempo do solver da geomecanica = ",f12.5)
-    !
-    contains
-
-    subroutine solverGeo200()
-    real*8 :: solutionNorm
-
-    if (optSolverD=='skyline') then
-        write(*,'(2a)') ' direto ', optSolverD
-        call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'fact')
-    end if
-    !
-    if (optSolverD=='pardiso') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-    !
-    if(optSolverD=='hypre') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-
-    solutionNorm = 0.0
-    do i = 1, neqD
-        solutionNorm = solutionNorm + brhsD(i)**2
-    end do
-    solutionNorm = sqrt(solutionNorm)
-
-    write(*,*) " 200 continue, valores nos extremos do vetor solucao geo,  "
-    write(*,'(6e16.8)') brhsD(1    :6)
-    write(*,'(6e16.8)') brhsD(neqD-5: neqD)
-    write(*,'(a,1e16.8)') "Euclid norms of computed desloc solution: ", solutionNorm
-    !
-    end subroutine solverGeo200
-    !
-    subroutine solverGeo300()
-    real*8 :: solutionNorm
-
-    if (optSolverD=='skyline') then
-        write(*,'(2a)') ' direto ', optSolverD
-        call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'back')
-    end if
-
-    solutionNorm = 0.0
-    do i = 1, neqD
-        solutionNorm = solutionNorm + brhsD(i)**2
-    end do
-    solutionNorm = sqrt(solutionNorm)
-    write(*,*) " 300 continue, valores nos extremos do vetor RHS     geo,  "
-    write(*,'(6e16.8)') brhsD(1    :6)
-    write(*,'(6e16.8)') brhsD(neqD-5: neqD)
-    write(*,'(a,1e16.8)') "Euclid norms of computed desloc RHS     : ", solutionNorm
-    !
-    IF (optSolverD=='pardiso') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-
-    if(optSolverD=='hypre') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-
-    solutionNorm = 0.0
-    do i = 1, neqD
-        solutionNorm = solutionNorm + brhsD(i)**2
-    end do
-    solutionNorm = sqrt(solutionNorm)
-
-    write(*,*) " 300 continue, valores nos extremos do vetor solucao geo,  "
-    write(*,'(6e16.8)') brhsD(1    :6)
-    write(*,'(6e16.8)') brhsD(neqD-5: neqD)
-    write(*,'(a,1e16.8)') "Euclid norms of computed desloc solution: ", solutionNorm
-    end subroutine solverGeo300
-
-    subroutine solverGeo400
-    real*8 :: solutionNorm
-
-    if (optSolverD=='skyline') then
-        write(*,'(2a)') ' direto ', optSolverD
-        call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
-    end if
-
-    if (optSolverD=='pardiso') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-
-    if(optSolverD=='hypre') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-    solutionNorm = 0.0
-    do i = 1, neqD
-        solutionNorm = solutionNorm + brhsD(i)**2
-    end do
-    solutionNorm = sqrt(solutionNorm)
-
-    write(*,*) " 400 continue, valores nos extremos do vetor solucao geo,  "
-    write(*,'(6e16.8)') brhsD(1    :6)
-    write(*,'(6e16.8)') brhsD(neqD-5: neqD)
-    write(*,'(a,1e16.8)') "Euclid norms of computed desloc solution: ", solutionNorm
-    end subroutine solverGeo400
-
-    subroutine escreverSistema_MTX(optSolver_, nomeArq_)
-
-    use mMalha,              only: numnp, numel, nen, conecNodaisElem
-    use mSolverGaussSkyline, only: escreverSistemaSkylineEmMTX
-
-    character(len=*), intent(in) :: optSolver_, nomeArq_
-    integer*4 :: nee
-
-    print*, "subroutine escreverSistema_MTX(optSolver_, ", trim(nomeArq_)
-    print*, "optSolver_:", optSolver_
-
-    nee = ndofD * nen
-
-    if (optSolver_=='GaussSkyline') then
-        call escreverSistemaSkylineEmMTX (alhsD, brhsD, idiagD, neqD,nomeArq_)
-    end if
-
-    if (optSolver_=='pardiso') then
-        write(*,*) ' não implementado '
-        stop 9
-    end if
-    end subroutine escreverSistema_MTX
-
-    !**** new **********************************************************************
-    !
-    subroutine escreverSolSistema_MTX(nomeArq_)
-    character(len=*) :: nomeArq_
-
-    call escreverBRHS (brhsD, neqD, nomeArq_)
-
-    end subroutine escreverSolSistema_MTX
-
-    subroutine escreverBRHS (brhs_, neq_, nomeArq_)
-    real*8   :: brhs_(:)
-    integer           :: neq_
-    character (LEN=*) :: nomeArq_
-
-    integer :: i
-
-    open (unit=1111, file=trim(nomeArq_))
-    write(1111, *) 1, neq_
-    do i = 1, neq_
-        write(1111, *) i, brhs_(i)
-    end do
-    close(1111)
-    end subroutine
-
-    END subroutine geomechanic
     !
     subroutine InicializacaoGEO()
     !
@@ -460,6 +96,9 @@
     MASCN0   = PORE0
     PHIEULER = PORE
     strss0   = 0.0D0
+    
+    !plasticity
+    einelas = 0.0d0
     !
     if(.not.allocated(ALHSD)) allocate(ALHSD(NALHSD))
     if(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
@@ -470,147 +109,7 @@
     BRHSD = 0.0D0
     !
     END SUBROUTINE
-    !**** new *******************************************************************
     !
-    SUBROUTINE STRESS_INIT()
-    !
-    use mGlobaisEscalares
-    use mLeituraEscritaSimHidroGeoMec, only : SOLIDONLY
-    use mMalha,            only : nsd, numel
-    use mMalha,            only : numelReserv
-    use mMalha,            only : x, conecNodaisElem
-    use mPropGeoFisica,    only : lerPropriedadesFisicas
-    use mHidrodinamicaRT,  only : pressaoElem
-    !
-    implicit none
-    !
-    NNP = 0
-    !
-    !.... READ STOCHASTIC FIELDS
-    !
-    CALL lerPropriedadesFisicas()
-    !
-    IF (SALTCREEP) THEN
-        CALL GEOSETUP(NUMEL,NROWB,NINTD,IOPT)
-    ENDIF
-    !
-    !.... SETUP INITIAL HIDROSTATIC PORE-PRESSURE
-    !
-
-    IF (INITS3) THEN
-        CALL GEOMECHANIC('INIT_GEOMECH_ARRAY')
-
-        !.... ..MOUNT STIFFNESS MATRIX OF GEOMECHANIC
-        CALL GEOMECHANIC('ELASTIC_BBAR_MATRX')
-        !.... ..ASSEMBLE RIGHT HAND VECTOR FORCE ARRAY AND SOLVE
-        CALL GEOMECHANIC('RIGHT_SIDE_2_SOLVE')
-        !.... ..COMPUTE INITIAL STRESS AND VOLUMETRIC DEFORMATION
-        IF (NSD.EQ.2) CALL POS4ITER(X, conecNodaisElem, STRSS0, DIVU)
-        IF (NSD.EQ.3) CALL POS4ITER_3D(X, conecNodaisElem, STRSS0, DIVU)
-
-        CALL GEOMECHANIC('RESETS_FORCE_VECTR')
-    ENDIF
-    !
-    !.... SETUP PRESSURE ON RESERVOIR AND FOR TERZAGHI AND MANDEL EXAMPLES
-    !
-    if(nsd==2) CALL PRSRINIT  (GEOPRSR,pressaoElem,NUMEL,numelReserv,INITS3)
-    if(nsd==3) CALL PRSRINIT3D(GEOPRSR,pressaoElem,NUMEL,numelReserv,INITS3)
-    !
-    LDRAINED = .TRUE.
-
-    CALL GEOMECHANIC('INIT_GEOMECH_ARRAY')
-    !
-    !.... MOUNT STIFFNESS MATRIX OF GEOMECHANIC
-    !
-    CALL GEOMECHANIC('ELASTIC_BBAR_MATRX')
-    !
-    !.... ASSEMBLE RIGHT HAND VECTOR FORCE ARRAY AND SOLVE
-    !
-    IF (INITS3.OR.SOLIDONLY) CALL GEOMECHANIC('RIGHT_SIDE_2_SOLVE')
-    IF (INITS3.OR.SOLIDONLY) THEN
-        IF (NSD.EQ.2) CALL POS4ITER(X, conecNodaisElem, STRSS0, DIVU)
-        IF (NSD.EQ.3) CALL POS4ITER_3D(X, conecNodaisElem, STRSS0, DIVU)
-    ENDIF
-    !
-    !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
-    !
-    DIS0 = DIS
-    !
-    !.... COMPUTE TRACE OF TOTAL STRESS'S (SIGMAT)
-    !
-    CALL COMPTRACE(pressaoElem,STRSS0,SIGMAT,NROWB,NUMEL,numelReserv)
-    !
-    !.... CLEAR GEOMECHANICAL VECTOR FORCE ARRAY
-    !
-    IF (TypeProcess.NE.'MANDEL') THEN
-        CALL GEOMECHANIC('RESETS_FORCE_VECTR')
-    ENDIF
-
-    !
-    DIS  = 0.0D0
-    DIVU = 0.0D0
-    !
-    WRITE(*,*) "  "
-    WRITE(*,*) "*** ************* ************* ************* ***"
-    WRITE(*,*) "***                                           ***"
-    WRITE(*,*) "*** INITIAL DISPLACEMENTS AND STRESS COMPUTED ***"
-    WRITE(*,*) "***                                           ***"
-    WRITE(*,*) "*** ************* ************* ************* ***"
-    WRITE(*,*) "  "
-    !
-    RETURN
-    !
-4500 FORMAT(I8,X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
-    !
-    !
-    SUBROUTINE PLAST_EXAMPLE()
-    !
-    use mGlobaisEscalares
-    !
-    use mMalha,            only : x, conecNodaisElem
-    !
-    implicit none
-    !
-    REAL(8)  :: ERRSIZE, TOLCREEP
-    !
-    TOLCREEP = 1
-    !
-    !.... MOUNT STIFFNESS MATRIX OF GEOMECHANIC
-    !
-    nwtnIter = 1
-    !.... ..TEST RESIDUAL NORM WITH TOLERANCE CRITERIA 4 CREEP
-    do while ((nwtnIter <= MAXITERC) .AND. (errSize > TOLCREEP))
-        nwtnIter = nwtnIter + 1
-        WRITE(*,2500) nwtnIter
-
-        call GEOMECHANIC('GEOMECHANICS_PLAST')
-        errSize = residual/resMax
-        write(*,5000) errSize
-    End do
-    !
-    !.... UPDATE DISPLACEMENT
-    !
-    dis = dtrl
-    !
-    !.... POST-PROCESS STRESS FIELD
-    !
-    CALL POS4STRS(x, conecNodaisElem, strss0, divU)
-    !
-    !.... MOVE COMPUTED DISPLACEMENTS (DIS) TO INITIAL DISPLACEMENTS (DIS0)
-    !
-    dis0 = dis
-    !
-    dis  = 0.0D0
-    divU = 0.0D0
-    !
-    return
-    !
-2500 FORMAT('    NEWTON ITERATION COUNTER =',I5)
-5000 FORMAT('    RESIDUAL/RMAX = ',1PE15.8)
-    !
-    END SUBROUTINE
     !
     !**** new *********************************************************************
     !
@@ -730,7 +229,7 @@
         !
         !.... MOUNT LEFT AND RIGHT SIDE AT ELEMENT LEVEL
         !
-        CALL BBARMTRX_PLAST(X,conecNodaisElem, dis, alhsd,brhsd,idiagD,lmD, hmttg)
+        CALL BBARMTRX_PLAST(X,conecNodaisElem, dis, alhsd,brhsd,idiagD,lmD, hmTTG, pressaoElem)
     ENDIF
     !
     END SUBROUTINE
@@ -850,7 +349,7 @@
             !
             !... ... SETUP TANGENT MATRIX QIXI: ORDER 4X4 FOR MULTIPLICATION
             !
-            CALL TANG2QX(HMTTG(NEL,L,1:16),QIXI)
+            CALL TANG2QX(HMTTG(1:16,L,nel),QIXI)
             !
             !...... SETUP ELEMENT DETERMINANT AND GAUSS WEIGHTS
             !
@@ -955,7 +454,7 @@
     !
     !
     !
-    subroutine bbarmtrx_plast(x,conecnodaiselem,disDirichlet,alhsd,brhsd,idiagd,lmd,tangentMatrix)
+    subroutine bbarmtrx_plast(x, conecnodaiselem, disDirichlet, alhsd, brhsd, idiagd, lmd, tangentMatrix, pressure)
     !
     !.... program to calculate stifness matrix and force array for the
     !        stoke's displacement  element and
@@ -963,28 +462,33 @@
     !        and right-hand side vector
     !
     !function imports
-    use msolvergaussskyline, only: addrhs, addlhs
+    use mSolverGaussSkyline, only: addrhs, addlhs
     use mfuncoesdeforma, only: shgq, shlq
     use mmalha, only: local
+    use mPropGeoFisica, only: rhoCell, calcBiotCoefficient
     
     !variables import
     use mglobaisescalares, only: nrowsh
     use mglobaisescalares, only: ibbar
     use mMalha, only: numnp, nsd, numel, nen
+    use mGlobaisArranjos, only:grav
     
     implicit none
     !variables input
-    real*8,  intent(in)    :: x(nsd,numnp)
-    integer, intent(in)    :: conecnodaiselem(nen,numel)
+    real*8 :: x(nsd,numnp)
+    integer :: conecnodaiselem(nen,numel)
     real*8 :: disDirichlet(ndofD, numnp)
-    real(8), intent(inout) :: alhsd(nalhsd), brhsd(neqd)
-    integer, intent(in)    :: idiagd(neqD)
-    integer, intent(in)    :: lmd(ned2,nen,numel)
-    real*8 :: tangentMatrix(numel,nintD, nrowb2)
+    real*8 :: alhsd(nalhsd), brhsd(neqd)
+    integer :: idiagd(neqD)
+    integer :: lmd(ned2,nen,numel)
+    real*8 :: tangentMatrix(nrowb2,nintD, numel)
+    real*8 :: pressure(1,numnp)
     
     !variables
-    real(8) :: xl(nesd,nen), disl(ned2,nen)
+    real(8) :: xl(nesd,nen), disL(ned2,nen), pL(1,nen)
+    real*8 :: pLInt, densTotal
     real(8) :: elresfd(nee2), eleffmd(nee2,nee2)
+    real*8 :: biotCoef
     !
     real(8), external :: rowdot, coldot
     
@@ -1021,19 +525,18 @@
         elresfd = 0.0d0
         
         !.... localize coordinates and dirichlet b.c.
-        call local(conecnodaiselem(1,nel),x,xl,nen,nsd,nesd)
-        call local(conecnodaiselem(1,nel),disDirichlet,disl,nen,ndofd,ned2)
+        call local(conecNodaisElem(1,nel),x,xl,nen,nsd,nesd)
+        call local(conecNodaisElem(1,nel),disDirichlet,disl,nen,ndofd,ned2)
+        call local(conecNodaisElem(1,nel),pressure,pL,nen,1,1)
+        
         quad = .true.
         if (conecnodaiselem(3,nel).eq.conecnodaiselem(4,nel)) quad = .false.
         call shgq(xl,detd,shld,shgd,nintd,nel,quad,nen)
         
-        !.... setup for axisymmetric option
-        if (iopt.eq.2) then
-            do l=1,nintd
-                r(l)    = rowdot(shgd(nrowsh,1,l),xl,nrowsh,nesd,nen)
-                detd(l) = detd(l)*r(l)
-            end do
-        endif
+        !calculate total density and biot parameters
+        densTotal = rhoCell(nel)
+        biotCoef = calcBiotCoefficient(nel)
+        
         !
         !.... calculate mean values of shape function global derivatives
         !.... for mean-dilatational b-bar formulation
@@ -1046,9 +549,13 @@
             !
             !... ... setup tangent matrix qixi: order 4x4 for multiplication
             !
-            call tang2qx(tangentMatrix(nel,l,1:16),qixi)
+            call tang2qx(tangentMatrix(1:16,l,nel),qixi)
             !
             c1=detd(l)*wd(l)
+            
+            !calculate the pressure at the integration point
+            pLInt = dot_product(shgD(nrowsh,1:nen,l), pL(1,1:nen))
+            
             !
             !.... ...upload b-bar matrix at node j
             !
@@ -1074,6 +581,15 @@
                     eleffmd(ned2*i,ned2*j-1) = eleffmd(ned2*i,ned2*j-1) + coldot(bbari(1:4,2),qixibbar(1:4,1),4)*c1
                     eleffmd(ned2*i,ned2*j) = eleffmd(ned2*i,ned2*j) + coldot(bbari(1:4,2),qixibbar(1:4,2),4)*c1
                 end do
+                
+                ! calc pressure contribution
+                
+                elresfd(ned2*j-1) = elresfd(ned2*j-1) &
+                    &                  + biotCoef * pLInt * shgD(1,j,l) * c1 & ! calc pressure contribution
+                    &                  + densTotal * grav(1) * shgD(nrowsh,j,l) * c1   ! calc gravity contribution
+                elresfd(ned2*j) = elresfd(ned2*j) &
+                    &                  + biotCoef * pLInt * shgD(2,j,l) * c1 & ! calc pressure contribution
+                    &                  + densTotal * grav(2) * shgD(nrowsh,j,l) * c1     ! calc gravity contribution
             end do
         end do
         !
@@ -2434,7 +1950,7 @@
             !..
             !.... .... TRANSFER 4X4-ORDER MATRIX TO GLOBAL TANGENT ARRAY
             !..
-            CALL QX2TANG(QIXI,HMTTG(NEL,L,1:16))
+            CALL QX2TANG(QIXI,hmTTG(1:16,l,nel))
             !
 400     CONTINUE
         !
@@ -2453,29 +1969,32 @@
     END SUBROUTINE
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, tangentMatrix, isPlast)
+    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, tangentMatrix, elementIsPlast, pressure)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
     !function import
     use mMalha, only: local
     use mFuncoesDeForma,   only: shgq, shlq
+    use mPropGeoFisica, only: calcBiotCoefficient
     
     !variables import
     use mMalha,            only: nsd, numnp, numel, nen
     use mGlobaisEscalares, only: nrowsh
-    use mPropGeoFisica,    only: geoform, geoindic, fncmeclaw
-    use mGlobaisEscalares, only: ibbar
+    use mPropGeoFisica,    only: geoform, geoindic
+    use mGlobaisEscalares, only: ibbar, tolYield, tolePlas
     
     implicit none
     !variables input
     real(8), intent(in)    :: x(nsd,numnp)
     integer, intent(in)    :: conecnodaiselem(nen,numel)
     real*8 :: u(ndofD, numnp)
-    real*8 :: plasticStrain(numel, nintD, nrowb)
+    real*8 :: plasticStrain(nrowb, nintD, numel)
     real*8 :: curStress(nrowB, nintD, numel)
-    real*8 :: tangentMatrix(numel,nintD, nrowb2)
-    logical :: isPlast
+    real*8 :: curStressS(nintD, numel)
+    real*8 :: tangentMatrix(nrowb2,nintD, numel)
+    real*8 :: elementIsPlast(numel)
+    real*8 :: pressure(1,numnp)
     
     !variables
     logical quad
@@ -2499,6 +2018,7 @@
 
     real(8) :: young, poisson, fyield, taub, sigmab, hgamma, hnorma
     real*8 :: misesYield
+    real*8 :: pressureL(1,nen), pressureIntPoint
     logical :: converged
 
     real*8, external :: rowdot, coldot
@@ -2518,7 +2038,6 @@
     !.... generation of local shape functions and weight values
     !
     !------------------------------------------------------------------------
-    isPlast = .false.
     qixigrad = 0.0d0
     !      qixip    = 0.0d0
     !
@@ -2540,6 +2059,7 @@
         !..... ..localize coordinates and dirichlet b.c.
         call local(conecnodaiselem(1,nel),x,xl,nen,nsd,nesd)
         call local(conecnodaiselem(1,nel),u,uL,nen,ndofd,ned2)
+        call local(conecnodaiselem(1,nel),pressure,pressureL,nen,1,1)
         !
         quad = .true.
         if (conecnodaiselem(3,nel).eq.conecnodaiselem(4,nel)) quad = .false.
@@ -2572,18 +2092,18 @@
                 
                 !.... ..... compute strains within intrinsic b-bar formulation
                 do k=1,nrowb
-                    strainL(k) = strainL(k) + coldot(bbarj(k,1:2),uL(1:2,j),2)
+                    strainL(k) = strainL(k) + dot_product(bbarj(k,1:2),uL(1:2,j))
                 end do
             end do
             
             !material iteration
             !initialize plastic strains
             do k=1,nrowb
-                ePTrial(k) = plasticStrain(nel,l,k)
-                ePInit(k)  = plasticStrain(nel,l,k)
+                ePTrial(k) = plasticStrain(k,l,nel)
+                ePInit(k)  = plasticStrain(k,l,nel)
             end do
             
-            call tang2qx(tangentMatrix(nel,l,1:16),qixi)
+            call tang2qx(tangentMatrix(1:16,l,nel),qixi)
             
             !.... part 1 from box 4.1 simo-hughes compute predictors
             
@@ -2599,7 +2119,7 @@
             call yield(fyield,sigmab,taub,stressL,poisson, misesYield)
             
             if (fyield.ge.tolyield) then
-                isPlast = .true.
+                elementIsPlast(nel) = 1.d0
                 converged = .false.
                 
                 hgamma = 0.0d0
@@ -2649,13 +2169,17 @@
             
             !.... ... update plastic deformation, etc.
             do k=1,nrowb
-                plasticStrain(nel,l,k) = eptrial(k)
+                plasticStrain(k,l,nel) = eptrial(k)
                 curStress(k,l,nel) = stressL(k)
             end do
+            
+            pressureIntPoint = dot_product(shgD(nrowsh,1:nen,l), pressureL(1,1:nen))
+            curStressS(l,nel) = (stressL(1) + stressL(2) + stressL(4))/3 - calcBiotCoefficient(nel)*pressureIntPoint
+            
             !
             !.... ... update tangent moduli
             !.... .... transfer 4x4-order matrix to global tangent array
-            call qx2tang(qixi,tangentMatrix(nel,l,1:16))
+            call qx2tang(qixi,tangentMatrix(1:16,l,nel))
         end do
     end do
     
@@ -2700,7 +2224,7 @@
         !.... SETUP INITIAL TANGENT MATRIX AT ELEMENT GAUSS POINT
         !
         do l=1,nintd
-            call qx2tang(cbbar,hmttg(nel,l,1:16))
+            call qx2tang(cbbar,hmTTG(1:16,l,nel))
         end do
     end do
     !
@@ -3909,6 +3433,8 @@
     !
     !**** NEW FOR 3D GEOMECHANICAL COUPLING *************************************
     !
+    
+    
     SUBROUTINE DENSLOC(RHOMAT,PRESSURE,GEOP,P,SATURAT,&
         &                   ELEMNT,LDRAINED)
     !
@@ -5453,7 +4979,7 @@
     subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
-    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoTensorialElemento
+    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial
     
     !variables import
     use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
@@ -5520,7 +5046,7 @@
         call splitBoundaryCondition(idDesloc,fExtT,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
 
         !initialize residual
-        call matsub(fExtNeumann, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+        r = fExtNeumann - fIntJ
         
         converged = .false.
         do j = 1, 15
@@ -5544,11 +5070,11 @@
             if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'uJ1', len('uJ1'), 2, reservDesloc, iDis)
 
             ! add correction da to the incremental displacement vector
-            call matadd(DeltaDis, dDis, DeltaDis, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            DeltaDis = dDis + DeltaDis
 
             !computes the strain and stress
             call pos4inc(x, conecNodaisElem, DeltaDis, strainInc, stressInc)
-            call mataddrank3(curStress, stressInc, nrowB, nintD, nel)
+            curStress = curStress + stressInc
             
             !computes the internal force
             call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, curStress, fIntJ)
@@ -5558,7 +5084,8 @@
             !updates the residual and check the stop condition
             call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
             
-            call matsub(fExtNeumann, fIntAllElse, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            r = fExtNeumann - fIntAllElse
+            
             error = dsqrt(coldot(r,r,nee))
             if (error < tolNewton) then
                 converged = .true.
@@ -5568,26 +5095,39 @@
         if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
         
         ! load the displacement into the answer
-        call matadd(u, DeltaDis, u, ndofD, ndofD, ndofD, ndofD, nnp, 1)
-        
+        u = u + DeltaDis
     end do
+    
+    deallocate(fExtT)
+    deallocate(fExtNeumann)
+    deallocate(fExtDirichlet)
+    deallocate(fIntJ)
+    deallocate(fIntDirichlet)
+    deallocate(fIntAllElse)
+    deallocate(r)
+    deallocate(DeltaDis)
+    deallocate(dDis)
+    deallocate(strainInc)
+    deallocate(stressInc)
+    deallocate(curStress)
 
     end subroutine incrementMechanicElasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, p, nLoadSteps)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
-    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoTensorialElemento
+    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
     
-    !variables import
-    use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
     
     implicit none
 
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
-    real*8 :: x(nsd, nnp), u(ndofD,nnp)
+    real*8 :: x(nsd, nnp), u(ndofD,nnp), epsP(nrowb, nintD, nel)
+    real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel)
+    real*8 :: p(1,nnp)
+    integer :: nLoadSteps
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
@@ -5595,23 +5135,19 @@
     real*8, allocatable :: fIntDirichlet(:,:), fIntAllElse(:,:) !fint with zeros on dirichlet/ everythin else nodes
     real*8, allocatable :: r(:,:) !r - residual
     real*8, allocatable :: dDis(:,:)
-    real*8 :: curStress(nrowB,nintD,nel)
-    logical :: isPlast
     real*8 :: error
     
     real*8, external :: coldot
 
-    integer :: nLoadSteps
     integer :: j, k
     
     real*8 :: tolNewton
     logical :: converged
     
-    character*21 :: propName
+    real*8 :: elementIsPlast(nel)
 
     !------------------------------------------------------------------------------------------------------------------------------------
-    ! for now, total increment is always 10
-    nLoadSteps = 5
+    
 
     ! allocate the required matrices
     if(.not.allocated(fExtT)) allocate(fExtT(ndofD, nnp))
@@ -5627,32 +5163,31 @@
 
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     
-    curStress = 0.d0
-    
-    tolNewton = 1.0e-8
+    tolNewton = 1.0e-6
     
     ! hmTTG = current tangent matrix
-    ! eInelas = plastic strain
-    
-    u = 0.d0
     do k = 1, nLoadSteps
         call geoSetup(nel,nrowb,nintd,iopt)
 
         !compute the new external force vector, and split into two, a dirichlet and a neumann one
         call updateIncrementMechanic(fExtT, k, nLoadSteps, nnp)
         call splitBoundaryCondition(idDesloc,fExtT,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
+        
+        !computes the internal force
+        call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
 
         !initialize residual
-        call matsub(fExtNeumann, fIntJ, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+        r = fExtNeumann - fIntJ
         
         converged = .false.
-        do j = 1, 15
+        elementIsPlast = 0.d0
+        do j = 1, 50
             alhsD = 0.d0
             brhsD = 0.d0
             dDis = 0.d0
 
             ! compute the tangential stiffness matrix, and fill brhsd with the dirichlet node info
-            call bbarmtrx_plast(x, conecNodaisElem, fExtDirichlet, alhsD, brhsD, idiagD, lmD, hmTTG)
+            call bbarmtrx_plast(x, conecNodaisElem, fExtDirichlet, alhsD, brhsD, idiagD, lmD, hmTTG, p)
 
             ! load force vector in the right side
             if (nlvectD.gt.0) then
@@ -5665,21 +5200,19 @@
             call btod(idDesloc, dDis, brhsD, ndofD, nnp)
 
             ! add correction da to the incremental displacement vector
-            call matadd(u, dDis, u, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            u = u + dDis
 
             !updates the plastic strain, and the stress at each gauss point
-            call pos4plast(x, conecNodaisElem, u, eInelas, curStress, hmTTG, isPlast)
+            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, hmTTG, elementIsPlast, p)
             
             !computes the internal force
-            call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, curStress, fIntJ)
-            
-            write(propName, 1500) k, j
-            call escreverArqParaviewIntermed_CampoVetorial('dis',u, ndofD, nnp, trim(propName), len(trim(propName)), 2, reservDesloc, iDis)
+            call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
             
             !updates the residual and check the stop condition
             call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
             
-            call matsub(fExtNeumann, fIntAllElse, r, ndofD, ndofD, ndofD, ndofD, nnp, 1)
+            r = fExtNeumann - fIntAllElse
+            
             error = dsqrt(coldot(r,r,nee))
             if (error < tolNewton) then
                 converged = .true.
@@ -5690,7 +5223,11 @@
         
     end do
 
-1500    format("u(", I1,",",I1,")")
+1100 format ("u(", I1,",",I1")")
+1200 format ("u(", I1,",",I2")")
+1300 format ("u(", I2,",",I1")")
+1400 format ("u(", I2,",",I2,")")
+
     end subroutine incrementMechanicPlasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -5795,6 +5332,33 @@
     end do
     
     end subroutine calcInternalForce
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine montarEstruturasDadosDeslocamentoSkyline(conecNodaisElem, nen, nel)
+    !function imports
+    use mMalha, only:formlm
+    
+    ! variable input
+    integer :: nen, nel, conecNodaisElem(nen, nel)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    !generation of lm array
+    call formlm(idDesloc,conecNodaisElem,lmD,ndofD,ned2,nen,nel)
+    
+    !compute column heights in global left-hand-side matrix
+    idiagD = 0.d0
+    call colht(idiagD,lmD,ned2,nen,nel,neqD)
+    
+    !compute diagonal addresses of left-hand-side matrix
+    call diag(idiagD, neqD, nalhsD)
+    
+    if(.not.allocated(alhsD)) allocate(alhsd(nalhsD))
+    if(.not.allocated(brhsD)) allocate(brhsd(neqD))
+    
+    alhsD = 0.d0
+    brhsD = 0.d0
+    
+    end subroutine montarEstruturasDadosDeslocamentoSkyline
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     end module mGeomecanica

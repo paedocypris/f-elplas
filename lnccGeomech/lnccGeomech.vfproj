@@ -4,7 +4,7 @@
 		<Platform Name="Win32"/></Platforms>
 	<Configurations>
 		<Configuration Name="Debug|Win32">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarningsAsErrors="true" Diagnostics="diagnosticsShowAll" WarnInterfaces="true" Traceback="true" RuntimeChecks="rtChecksNone" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarningsAsErrors="true" Diagnostics="diagnosticsShowAll" WarnInterfaces="true" Traceback="true" NullPointerCheck="true" BoundsCheck="true" UninitializedVariablesCheck="true" DescriptorDataTypeCheck="true" DescriptorDataSizeCheck="true" ArgTempCreatedCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
 				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
@@ -30,7 +30,6 @@
 		<File RelativePath=".\data\barra1D\condContornoGeom.inc"/>
 		<File RelativePath=".\data\barra1D\condContornoHidro.inc"/>
 		<File RelativePath=".\data\barra1D\data.inc"/>
-		<File RelativePath=".\data\barra1D\dome_reference_layer.in"/>
 		<File RelativePath=".\data\barra1D\elmnt_geoformation.inc"/>
 		<File RelativePath=".\data\barra1D\geomechLayers.inc"/>
 		<File RelativePath=".\data\barra1D\inputDS.dat"/>
@@ -56,7 +55,6 @@
 		<File RelativePath=".\data\cookMembrane\condContornoGeom.inc"/>
 		<File RelativePath=".\data\cookMembrane\condContornoHidro.inc"/>
 		<File RelativePath=".\data\cookMembrane\data.inc"/>
-		<File RelativePath=".\data\cookMembrane\dome_reference_layer.in"/>
 		<File RelativePath=".\data\cookMembrane\elmnt_geoformation.inc"/>
 		<File RelativePath=".\data\cookMembrane\geomechLayers.inc"/>
 		<File RelativePath=".\data\cookMembrane\hidroGalerkin.inc"/>
@@ -76,7 +74,20 @@
 		<File RelativePath=".\data\exTuane\layer_reference.inc"/>
 		<File RelativePath=".\data\exTuane\malha.inc"/>
 		<File RelativePath=".\data\exTuane\NumericParam.inc"/>
-		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter></Filter>
+		<File RelativePath=".\data\exTuane\SimulatorParam.inc"/></Filter>
+		<Filter Name="slab">
+		<File RelativePath=".\data\slab\condContornoGeom.inc"/>
+		<File RelativePath=".\data\slab\condContornoHidro.inc"/>
+		<File RelativePath=".\data\slab\data.inc"/>
+		<File RelativePath=".\data\slab\echo.dat"/>
+		<File RelativePath=".\data\slab\elmnt_geoformation.inc"/>
+		<File RelativePath=".\data\slab\geomechLayers.inc"/>
+		<File RelativePath=".\data\slab\inputDS.dat"/>
+		<File RelativePath=".\data\slab\layer_reference.inc"/>
+		<File RelativePath=".\data\slab\malha.inc"/>
+		<File RelativePath=".\data\slab\mesh_rsrv_outsburden.inc"/>
+		<File RelativePath=".\data\slab\NumericParam.inc"/>
+		<File RelativePath=".\data\slab\SimulatorParam.inc"/></Filter></Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\fonte\driverGeocreep.F90"/>
 		<File RelativePath=".\fonte\funcoesDeForma.F90"/>

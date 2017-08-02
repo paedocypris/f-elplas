@@ -4,9 +4,6 @@
 *tempoTotal{
       12.0
 }
-*hgCompressibilidade{
-     1.d-7
-}
 
 *pressao_inicial_fluxo{
      5.0d7

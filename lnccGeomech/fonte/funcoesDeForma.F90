@@ -770,7 +770,6 @@
         !
         do 300 j=1,2
             do 200 i=1,2
-                !       xs(i,j) = dot_product(shg(i,1:4,l),xl(j,1:4))
                 xs(i,j) = rowdot(shg(i,1,l),xl(j,1),3,2,nen)
 
 200         continue

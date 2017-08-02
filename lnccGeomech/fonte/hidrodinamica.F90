@@ -1098,7 +1098,8 @@
     module mHidrodinamicaGalerkin
 
     implicit none
-    public montarEstruturasDadosPressaoSkyline, montarSistemaEquacoesPressao, solveGalerkinPressao
+    public montarEstruturasDadosPressaoSkyline, montarSistemaEquacoesPressao, &
+        & solveGalerkinPressao, incrementFlowPressureSolution
 
     !module variables
     integer :: hgNumPassosTempo
@@ -1113,7 +1114,6 @@
 
     !flow variables
     real*8 :: hgInitialPressure
-    real*8, allocatable :: hgPrevPressure(:,:), hgPressure(:,:)
 
     !data processing arrays
     integer, allocatable :: hgId(:,:), hgLm(:,:,:)
@@ -1160,40 +1160,49 @@
     end subroutine montarEstruturasDadosPressaoSkyline
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x)
+    subroutine montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
 
     !variable input
     integer :: curTimeStep, conecNodaisElem(nen,nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp)
+    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
+    real*8 :: stressS(:, :), prevStressS(:, :)
+    integer :: way
 
     !------------------------------------------------------------------------------------------------------------------------------------
     hgBrhs = 0.0
     if (curTimeStep == 1) then
         if (hgNlvect >= 1) then
             call load(hgId, hgF, hgBrhs, hgNdof, nnp, hgNlvect)
-            call ftod(hgId, hgPressure, hgF, hgNdof, nnp, hgNlvect)
+            call ftod(hgId, p, hgF, hgNdof, nnp, hgNlvect)
         endif
     endif 
 
-    call calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x)
+    call calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
 
     end subroutine montarSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x)
+    subroutine calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
     !variable imports
-    use mGlobaisEscalares, only: nrowsh, npint, betaCompressibility
-    use mGlobaisArranjos,  only: mat, c, grav
+    use mGlobaisEscalares, only: nrowsh, npint
+    use mGlobaisArranjos,  only: mat, c
+    use mPropGeoFisica, only:geoindic, geoform
 
     !function imports
     use mFuncoesDeForma, only: shlt, shlq, shlq3d
     use mFuncoesDeForma, only: shgq, shg3d
     use mSolverGaussSkyline, only: addlhs, addrhs
     use mMalha, only: local
+    use mPropGeoFisica, only: totalCompressibility, calcMatrixBulk, calcBiotCoefficient
 
     !variable input
     integer :: curTimeStep, conecNodaisElem(nen,nel), nen, nel, nnp, nsd
     real*8 :: x(nsd, nnp)
+    real*8 :: deltaT
+    real*8 :: p(hgNdof, nnp), prevP(hgNdof, nnp)
+    real*8 :: stressS(npint, nel), prevStressS(npint, nel)
+    integer :: way
 
     !variables
     integer :: nee ! number of element equations
@@ -1207,16 +1216,17 @@
     real*8 :: kX, kY !x component of permeability, y component of permeability
 
     integer :: ni, nj !node position considering multiple degrees of freedom
-    real*8 :: pss
-    real*8 :: uup
+    real*8 :: prevPLInt
     real*8 :: djx, djy, djn, dix, diy, din
 
     integer :: curElement, l, i, j ! iterators
-    real*8 :: temp1, gf1, gf2 !temporary variables
+    real*8 :: cl !temporary variables
 
     logical :: quad, zerodl !is diagonal, is degenerated triange, is zero
-
-    real*8 :: deltaT
+    
+    real*8 :: initialPorosityL, curPorosityL
+    real*8 :: betaTotalCompressibility
+    real*8 :: psi
 
     !------------------------------------------------------------------------------------------------------------------------------------
     if (nsd > 2) then
@@ -1225,7 +1235,6 @@
 
     ! set some constants
     nee = hgNdof * nen
-    deltaT = hgTempoTotal / hgNumPassosTempo
 
     w = 0.0
     shL = 0.0
@@ -1239,12 +1248,20 @@
         !clear stiffness matrix and force array
         elementK=0.0
         elementF=0.0
-
-        call local(conecNodaisElem(1,curElement), x, xL, nen, nsd, nsd) !localize coordinates
-        call local(conecNodaisElem(1,curElement), hgPressure, pressureL, nen, hgNdof, hgNdof) !localize dirichlet b.c.
-        if (hgNumPassosTempo > 1) then
-            call local(conecNodaisElem(1,curElement), hgPrevPressure, prevPressureL, nen, hgNdof, hgNdof) !localize dirichlet b.c.
+        
+        !get mechanical parameters
+        initialPorosityL = geoindic('POROSTY',geoform(curElement))
+        if (way == 1) then
+            curPorosityL = initialPorosityL
+        else
+            curPorosityL = initialPorosityL
         end if
+        betaTotalCompressibility = totalCompressibility(curElement, initialPorosityL, curPorosityL)
+        psi = calcBiotCoefficient(curElement)/calcMatrixBulk(curElement)
+        
+        call local(conecNodaisElem(1,curElement), x, xL, nen, nsd, nsd)
+        call local(conecNodaisElem(1,curElement), p, pressureL, nen, hgNdof, hgNdof)
+        call local(conecNodaisElem(1,curElement), prevP, prevPressureL, nen, hgNdof, hgNdof)
 
         ! check if element has any coalesced nodes
         quad = .true.
@@ -1263,26 +1280,7 @@
         kY = c(2,m)
 
         do l = 1, npint ! foreach integration point
-            temp1 = w(l)*det(l)
-
-            gf1 = grav(1)
-            gf2 = grav(2)
-
-            pss = 0.0
-            if (hgNumPassosTempo > 1) then
-                uup = 0.0
-                do j = 1, nen ! foreach node on element
-                    uup = uup + shg(3, j, l) * prevPressureL(1, j)
-                end do
-
-                do j = 1, nen !foreach node on element
-                    nj = hgNdof * j
-                    djn = shg(nrowsh,j,l)
-
-                    ! source terms
-                    elementF(nj) = elementF(nj) + (betaCompressibility * djn * uup) * temp1 !B \csi^(n-1)
-                end do
-            end if
+            cl = w(l)*det(l)
 
             do i = 1, nen
                 do j = 1, nen !for each pair of nodes in the element
@@ -1294,17 +1292,25 @@
                     ni = hgNdof * i
                     dix = shg(1, i, l)
                     diy = shg(2, i, l)
-                    din = shg(3, i, l)
+                    din = shg(nrowsh, i, l)
 
-                    if(hgNumPassosTempo > 1) then
-                        elementK(nj, ni) = elementK(nj, ni) + deltaT * Kx * dix * djx * temp1 !kn A
-                        elementK(nj, ni) = elementK(nj, ni) + deltaT * Ky * diy * djy * temp1 !kn A
-                        elementK(nj, ni) = elementK(nj, ni) + betaCompressibility * din * djn * temp1 !B
-                    else
-                        elementK(nj, ni) = elementK(nj, ni) + Kx * dix * djx * temp1
-                        elementK(nj, ni) = elementK(nj, ni) + Ky * diy * djy * temp1
-                    endif
+                    elementK(nj, ni) = elementK(nj, ni) + deltaT * Kx * dix * djx * cl !kn A
+                    elementK(nj, ni) = elementK(nj, ni) + deltaT * Ky * diy * djy * cl !kn A
+                    elementK(nj, ni) = elementK(nj, ni) + betaTotalCompressibility * din * djn * cl !B
                 end do
+            end do
+            
+            prevPLInt = dot_product(shg(nrowsh, 1:nen, l),prevPressureL(1,1:nen))
+            
+            do j = 1, nen !foreach node on element
+                nj = hgNdof * j
+                djn = shg(nrowsh,j,l)
+
+                ! source terms
+                elementF(nj) = elementF(nj) + (betaTotalCompressibility * djn * prevPLInt) * cl !B \csi^(n-1)
+                if (way == 2) then
+                    elementF(nj) = elementF(nj) - psi * (stressS(l,curElement) - prevStressS(l,curElement)) * djn * cl
+                end if
             end do
         end do
 
@@ -1322,11 +1328,12 @@
     end subroutine calcCoeficientesSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine solveGalerkinPressao(curTimeStep, nnp)
+    subroutine solveGalerkinPressao(curTimeStep, nnp, p)
     !function imports
     use mSolverGaussSkyline, only: factor, back
     !variables input
     integer :: curTimeStep, nnp
+    real*8 :: p(hgNdof, nnp)
 
     !------------------------------------------------------------------------------------------------------------------------------------
     !solve by LU decomposition
@@ -1334,9 +1341,57 @@
     call back(hgAlhs, hgBrhs, hgIdiag, hgNeq)
 
     !store the result
-    call btod(hgId, hgPressure, hgBrhs, hgNdof, nnp)
+    call btod(hgId, p, hgBrhs, hgNdof, nnp)
 
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS, way)
+    implicit none
+    ! variables input
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd, curTimeStep
+    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
+    real*8 :: stressS(:,:), prevStressS(:,:)
+    integer :: way
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    ! mount equation system
+    call montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
+    
+    !solve
+    call solveGalerkinPressao(curTimeStep, nnp, p)
+    
+    end subroutine incrementFlowPressureSolution
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP)
+    ! variables input
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd, curTimeStep
+    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
+    
+    !variables
+    real*8 :: stressS(1,1), prevStressS(1,1)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS, 1)
+    
+    end subroutine incrementFlowPressureSolutionOneWay
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS)
+    ! variables input
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd, curTimeStep
+    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
+    real*8 :: stressS(:,:), prevStressS(:,:)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS, 2)
+    
+    end subroutine incrementFlowPressureSolutionTwoWay
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    
     end module mHidrodinamicaGalerkin

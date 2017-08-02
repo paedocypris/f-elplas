@@ -114,6 +114,7 @@
     public :: atribuirPermBloco, atribuirPhiBloco, readphi
     public :: estatistica,  xkkc, xlt, xlw,  xlo, xkrw, xkro
     public :: GEOINDIC, GEOYLOC, GEOYLOC3D, FNCMECLAW
+    public :: rhoCell
     !
     contains
     !
@@ -1715,23 +1716,23 @@
     !
     !*** NEW ***** FUNCTION TO COMPUTE ROCK BULK MODULUS  *******************
     !
-    FUNCTION BULK(YOUNG,POISSON,S3DIM)
+    function bulk(young,poisson,s3dim)
     !
-    !... COMPUTE BULK MODULUS OF ROCK BULK MODULUS
+    !... compute bulk modulus of rock bulk modulus
     !
-    IMPLICIT NONE
+    implicit none
     !
-    REAL(8) :: AMU2, ALAM, YOUNG, POISSON, BULK, S3DIM
+    real(8) :: amu2, alam, young, poisson, bulk, s3dim
     !
-    !... STRESS DIMENSION:  S3DIM = 1.0D0 OR 3.0D0
+    !... stress dimension:  s3dim = 1.0d0 or 3.0d0
     !
-    AMU2  = YOUNG/(1.0D0 + POISSON)
+    amu2  = young/(1.0d0 + poisson)
     !
-    ALAM  = AMU2*POISSON/(1.0D0-2.0D0*POISSON)
+    alam  = amu2*poisson/(1.0d0-2.0d0*poisson)
     !
-    BULK  = ALAM + AMU2/S3DIM
+    bulk  = alam + amu2/s3dim
     !
-    END FUNCTION
+    end function
     !
     !**** NEW ***** FOR SISMIC REPRESENTATION ******************************
     !
@@ -1743,7 +1744,6 @@
     !....         geological formation
     !
     implicit none
-    !... vectors: poisvect, yungvect, rhodvect, are defined on "lerdatain"
     integer      :: i, lastregion
     character*7  :: task
     character*12 :: geof
@@ -1822,6 +1822,14 @@
         do i=1,lastregion
             if (refgeo(i).eq.geof) then
                 geoloc = meanbulk(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('BLKWATR')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = meanblkw(i)
                 exit
             end if
         end do
@@ -2586,5 +2594,119 @@
     return
     !
     END SUBROUTINE KOZENYCARMAN
-    !
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function getRegionIndex(curElement)
+    
+    !variables import
+    use mMalha, only: nsd
+    
+    implicit none
+    
+    !variables input
+    integer :: curElement
+    
+    !variables
+    integer :: getRegionIndex
+    integer :: lastRegion
+    character*12, dimension(9) :: refgeo
+    integer :: i
+    
+    
+    data refgeo(1)     ,     refgeo(2),     refgeo(3)/ &
+        &     'RESERVATORIO','RIFT_CAPROCK','RIGHT_RESERV'/ &
+        &     refgeo(4)     ,     refgeo(5),     refgeo(6)/ &
+        &     'SALT_CAPROCK','LEFT__RESERV','POS_SAL_OVER'/ &
+        &     refgeo(7)     ,     refgeo(8),     refgeo(9)/ &
+        &     'FRONT_RESERV','BASE_CAPROCK','BACK__RESERV'/
+    !------------------------------------------------------------------------------------------------------------------------------------
+    lastRegion = 3*nsd
+    do i=1,lastRegion
+        if (refgeo(i).eq.geoform(curElement)) then
+            getRegionIndex = i
+            exit
+        end if
+    end do
+    
+    end function
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function totalCompressibility(curElement, initialPorosityL, curPorosityL)
+    
+    implicit none
+    
+    !variables input
+    integer :: curElement
+    real*8 :: initialPorosityL, curPorosityL
+    
+    ! Variables
+    integer :: geoFormIndx
+    real*8 :: nInv, mInv, biotCoefficient, matrixBulk, grainBulk
+    real*8 :: totalCompressibility
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
+    matrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
+    grainBulk = GRAINBLK(geoFormIndx)
+    biotCoefficient = 1 - matrixBulk/grainBulk
+
+    nInv = (biotCoefficient - initialPorosityL)/GRAINBLK(geoFormIndx)
+    mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
+    totalCompressibility = mInv + biotCoefficient*biotCoefficient/matrixBulk
+    
+    end function totalCompressibility
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function rhoCell(curElement)
+    ! variable input
+    integer :: curElement
+    
+    ! variables
+    real*8 rhoCell
+    integer :: geoFormIndx
+    real*8 :: poroL, fluidDensity, grainDensity
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    poroL = PORELAGR(geoFormIndx)
+    fluidDensity = MEANRHOW(geoFormIndx)
+    grainDensity = RHODVECT(geoFormIndx)
+    
+    rhoCell = poroL * fluidDensity + (1.0d0-poroL) * grainDensity
+    end function rhoCell
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcBiotCoefficient(curElement)
+    implicit none
+    !variables input
+    integer :: curElement
+    
+    !variables
+    real*8 :: calcBiotCoefficient
+    integer :: geoFormIndx
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
+    calcBiotCoefficient = 1 - bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)/GRAINBLK(geoFormIndx)
+    end function calcBiotCoefficient
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcMatrixBulk(curElement)
+    implicit none
+    !variables input
+    integer :: curElement
+    
+    !variables
+    real*8 :: calcMatrixBulk
+    integer :: geoFormIndx
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    calcMatrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
+    
+    end function calcMatrixBulk
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     end module

@@ -70,8 +70,7 @@
     INTEGER           :: NITHIDRO, MAXITERC, IBBAR
     LOGICAL           :: INITS3, SALTCREEP, LDRAINED
     REAL(8)           :: TOLSIGMA, TOLVELOC
-    
-    real*8 :: betaCompressibility
+    real*8 :: tolYield, toleplas
 
     !
     end module mGlobaisEscalares

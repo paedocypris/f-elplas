@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <VisualStudioUserFile ProjectCreator="Intel Fortran" Keyword="Console Application" Version="11.0" ProjectIdGuid="{8F521528-418A-4F8B-8A00-1DF28A3801F5}">
 	<Configurations>
-		<Configuration Name="Debug|Win32" WorkingDirectory="C:\Users\rafae\Documents\Visual Studio 2015\Projects\lnccGeomech\lnccGeomech\data\cilindroJesus"/>
+		<Configuration Name="Debug|Win32" WorkingDirectory="C:\Users\rafae\Documents\Visual Studio 2015\Projects\lnccGeomech\lnccGeomech\data\slab"/>
 		<Configuration Name="Release|Win32"/></Configurations></VisualStudioUserFile>
