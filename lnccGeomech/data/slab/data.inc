@@ -131,13 +131,13 @@ dominioCompleto
 dominioCompleto  
 }
 *impressao_dos_deslocamentos{  
-1
+0
 ./out/
 100
 reservatorio  
 }
 *impressao_das_tensoes{  
-1
+0
 ./out/
 100
 dominioCompleto  

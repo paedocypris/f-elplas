@@ -31,7 +31,7 @@
 
 #impressao dos dados
 *impressao_da_pressaoGalerkin{   
-1
+0
 ./out/
 1
 reservatorio  

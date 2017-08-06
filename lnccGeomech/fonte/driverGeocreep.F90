@@ -46,6 +46,7 @@
 
     !processa o escoamento
     call processamentoOneWay()
+    call processamentoTwoWay()
 
     !
     call fecharArquivosBase()
@@ -956,16 +957,13 @@
     use mHidrodinamicaGalerkin, only:hgNdof
     use mMalha, only: numnp, numel, nen, nsd, conecNodaisElem
     use mMalha, only: x
-    use mLeituraEscritaSimHidroGeoMec, only:reservHGPres
+    
     !mechanics
     use mGeomecanica, only: ndofD, nrowB, nintD
-    use mLeituraEscritaSimHidroGeoMec, only: reservDesloc
     
     !function imports
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
     use mHidrodinamicaGalerkin, only: incrementFlowPressureSolutionOneWay, incrementFlowPressureSolutionTwoWay
-    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaview, escreverArqParaviewIntermed, escreverArqParaviewOpening
-    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewVector, escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoTensorialElemento
     use mGeomecanica, only: incrementMechanicPlasticSolution, montarEstruturasDadosDeslocamentoSkyline
     use mPropGeoFisica, only: lerPropriedadesFisicas
     
@@ -976,18 +974,16 @@
     !variables
     integer :: curTimeStep
     real*8 :: t, deltaT
-    integer :: unitNumber
-    character(8) :: filename
+    character(20) :: filename
     
     integer :: k
     
-    real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:)
-    real*8, allocatable :: p(:,:), prevP(:,:)
+    real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:)
+    real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:)
+    real*8, allocatable :: vDarcy(:,:)
     real*8, allocatable :: stress(:,:,:)
-    real*8, allocatable :: stressS(:,:), prevStressS(:,:)
+    real*8, allocatable :: stressS(:,:), prevStressS(:,:), stressTotal(:,:,:)
     real*8, allocatable :: strainP(:,:,:)
-    
-    real*8 :: prevPIt(hgNdof, numnp), prevUDifIt(ndofD, numnp)
     
     real*8 :: uNorm, pNorm
     logical :: converged
@@ -998,10 +994,14 @@
     allocate(u(ndofD, numnp))
     allocate(uInit(ndofD, numnp))
     allocate(uDif(ndofD, numnp))
+    allocate(prevUDifIt(ndofD, numnp))
     allocate(p(hgNdof,numnp))
     allocate(prevP(hgNdof,numnp))
+    allocate(prevPIt(hgNdof, numnp))
+    allocate(vDarcy(nsd,numel))
     allocate(stress(nrowb,nintD, numel))
     allocate(stressS(nintD, numel))
+    allocate(stressTotal(nrowb,nintD,numel))
     allocate(prevStressS(nintD, numel))
     allocate(strainP(nrowb,nintD,numel))
     
@@ -1023,17 +1023,14 @@
     u = 0.d0
     strainP = 0.d0
     stress = 0.d0
-    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, p, 3)
+    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, stressTotal, p, 3)
     uInit = u
     uDif = 0.d0
 
     ! print initial state
-    unitNumber = 13579
-    filename = "solution"
-    call escreverArqParaviewOpening(filename, p, hgNdof, numnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, 0, unitNumber)
-    call escreverArqParaviewIntermed_CampoVetorial('dis', uDif, ndofD, numnp, 'u', len('u'), 2, reservDesloc, unitNumber)
-    call escreverArqParaviewIntermed_CampoTensorialElemento(stress, nrowb, nintD, numel, 'stress', len('stress'), unitNumber)
-    close(unitNumber)
+    if (way==1) filename = "solution1way"
+    if (way==2) filename = "solution2way"
+    call writeCurrentSolution(filename,0, p, uDif, stress, stressTotal, stressS, vDarcy, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
     t = 0
@@ -1045,14 +1042,14 @@
         prevStressS = stressS
         ! begin split loop
         converged = .false.
-        do k = 1, 15
+        do k = 1, 50
             if (way == 1 .or. k == 1) then
-                call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, curTimeStep, deltaT, p, prevP)
+                call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy)
             else
-                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS)
+                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy)
             end if
 
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, p, 1)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, stressTotal, p, 1)
             uDif = u - uInit
             
             if (way == 1) then
@@ -1086,21 +1083,23 @@
         prevP = p
         
         !print current solution
-        call escreverArqParaviewOpening(filename, p, hgNdof, numnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
-        call escreverArqParaviewIntermed_CampoVetorial('dis', uDif, ndofD, numnp, 'u', len('u'), 2, reservDesloc, unitNumber)
-        call escreverArqParaviewIntermed_CampoTensorialElemento(stress, nrowb, nintD, numel, 'stress', len('stress'), unitNumber)
-        close(unitNumber)
+        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, vDarcy, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     end do
     
     deallocate(u)
     deallocate(uInit)
     deallocate(uDif)
+    deallocate(prevUDifIt)
     deallocate(p)
     deallocate(prevP)
+    deallocate(prevPIt)
+    deallocate(vDarcy)
     deallocate(stress)
     deallocate(stressS)
+    deallocate(stressTotal)
     deallocate(prevStressS)
     deallocate(strainP)
+    
     
     end subroutine processamento
     !************************************************************************************************************************************
@@ -1120,5 +1119,66 @@
     call processamento(2)
     
     end subroutine processamentoTwoWay
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine convertStressStoPrintable(stressS, stressSPrint, npint, nel)
+    
+    implicit none
+    !variables input
+    real*8 :: stressS(npint,nel)
+    real*8 :: stressSPrint(nel)
+    integer :: npint, nel
+    
+    !variables
+    integer :: i,j
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do j = 1, nel
+        stressSPrint(j) = 0.
+        do i = 1, npint
+            stressSPrint(j) = stressSPrint(j) + stressS(i,j)
+        end do
+        stressSPrint(j) = stressSPrint(j)/npInt
+    end do
+    
+    end subroutine convertStressStoPrintable
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, vDarcy, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
+    !function imports
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoVetorial
+    use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoTensorialElemento
+    
+    !variables import
+    use mLeituraEscritaSimHidroGeoMec, only:reservHGPres
+    
+    implicit none
+    !variables input
+    character(len=*) :: filename
+    integer :: curTimeStep
+    real*8 :: p(1,nnp), u(nsd,nnp), stressEf(nrowb,nintD,nel), stressTot(nrowb,nintD,nel)
+    real*8 :: stressS(nintD,nel), vDarcy(nsd,nel)
+    integer :: conecNodaisElem(nen,nel)
+    integer :: nnp, nel, nen, nsd, nrowb, nintD
+    
+    !variables
+    integer :: unitNumber
+    real*8 :: stressSPrint(nel)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    unitNumber = 13587
+    
+    call convertStressStoPrintable(stressS, stressSPrint, nintD, nel)
+    call escreverArqParaviewOpening(filename, p, 1, nnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
+    call escreverArqParaviewIntermed_CampoVetorial(u, nsd, nnp, 'u', len('u'), 2, unitNumber)
+    call escreverArqParaviewIntermed_CampoVetorial(vDarcy, nsd, nel, 'vDarcy', len('vDarcy'), 1, unitNumber)
+    call escreverarqparaviewintermed_campotensorialelemento(stressef, nrowb, nintd, nel, 'stressef', len('stressef'), unitnumber)
+    call escreverarqparaviewintermed_campotensorialelemento(stresstot, nrowb, nintd, nel, 'stresstot', len('stresstot'), unitnumber)
+    call escreverarqparaviewintermed_campoescalar(unitnumber, stresssprint, 1, nel, 'stresss', len('stresss'), 1)
+    close(unitNumber)
+    
+    end subroutine writeCurrentSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************

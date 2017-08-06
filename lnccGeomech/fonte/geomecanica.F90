@@ -1969,7 +1969,7 @@
     END SUBROUTINE
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, tangentMatrix, elementIsPlast, pressure)
+    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curStressTotal, tangentMatrix, elementIsPlast, pressure)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
@@ -1991,6 +1991,7 @@
     real*8 :: u(ndofD, numnp)
     real*8 :: plasticStrain(nrowb, nintD, numel)
     real*8 :: curStress(nrowB, nintD, numel)
+    real*8 :: curStressTotal(nrowB, nintD, numel)
     real*8 :: curStressS(nintD, numel)
     real*8 :: tangentMatrix(nrowb2,nintD, numel)
     real*8 :: elementIsPlast(numel)
@@ -2019,7 +2020,9 @@
     real(8) :: young, poisson, fyield, taub, sigmab, hgamma, hnorma
     real*8 :: misesYield
     real*8 :: pressureL(1,nen), pressureIntPoint
+    real*8 :: biotCoef
     logical :: converged
+    real*8 :: identI(nrowb)
 
     real*8, external :: rowdot, coldot
     !
@@ -2039,6 +2042,7 @@
     !
     !------------------------------------------------------------------------
     qixigrad = 0.0d0
+    identI = (/ 1., 1., 0., 1. /)
     !      qixip    = 0.0d0
     !
     call shlq(shld,wd,nintd,nen)
@@ -2168,14 +2172,15 @@
             endif
             
             !.... ... update plastic deformation, etc.
+            biotCoef = calcBiotCoefficient(nel)
+            
+            pressureIntPoint = dot_product(shgD(nrowsh,1:nen,l), pressureL(1,1:nen))
             do k=1,nrowb
                 plasticStrain(k,l,nel) = eptrial(k)
                 curStress(k,l,nel) = stressL(k)
+                curStressTotal(k,l,nel) = stressL(k) - biotCoef*pressureIntPoint*IdentI(k)
             end do
-            
-            pressureIntPoint = dot_product(shgD(nrowsh,1:nen,l), pressureL(1,1:nen))
-            curStressS(l,nel) = (stressL(1) + stressL(2) + stressL(4))/3 - calcBiotCoefficient(nel)*pressureIntPoint
-            
+            curStressS(l,nel) = (curStressTotal(1,l,nel) + curStressTotal(2,l,nel) + curStressTotal(4,l,nel)) / 3
             !
             !.... ... update tangent moduli
             !.... .... transfer 4x4-order matrix to global tangent array
@@ -4979,10 +4984,8 @@
     subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
-    use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial
     
     !variables import
-    use mLeituraEscritaSimHidroGeoMec, only:iDis, reservDesloc
     
     implicit none
 
@@ -5066,8 +5069,6 @@
             ! solve using LDU decomposition, and store the result in the right array
             call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
             call btod(idDesloc, dDis, brhsD, ndofD, nnp)
-            
-            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis',dDis, ndofD, nnp, 'uJ1', len('uJ1'), 2, reservDesloc, iDis)
 
             ! add correction da to the incremental displacement vector
             DeltaDis = dDis + DeltaDis
@@ -5078,8 +5079,6 @@
             
             !computes the internal force
             call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, curStress, fIntJ)
-            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis', fIntJ, ndofD, nnp, 'fIntJ1', len('fIntJ1'), 2, reservDesloc, iDis)
-            if (j == 1) call escreverArqParaviewIntermed_CampoVetorial('dis', fExtNeumann, ndofD, nnp, 'fExtJ1', len('fExtJ1'), 2, reservDesloc, iDis)
             
             !updates the residual and check the stop condition
             call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
@@ -5114,18 +5113,16 @@
     end subroutine incrementMechanicElasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, p, nLoadSteps)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, stressTotal, p, nLoadSteps)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
     
-    
     implicit none
-
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
     real*8 :: x(nsd, nnp), u(ndofD,nnp), epsP(nrowb, nintD, nel)
-    real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel)
+    real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), stressTotal(nrowB, nintD,nel)
     real*8 :: p(1,nnp)
     integer :: nLoadSteps
 
@@ -5203,7 +5200,7 @@
             u = u + dDis
 
             !updates the plastic strain, and the stress at each gauss point
-            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, hmTTG, elementIsPlast, p)
+            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, stressTotal, hmTTG, elementIsPlast, p)
             
             !computes the internal force
             call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)

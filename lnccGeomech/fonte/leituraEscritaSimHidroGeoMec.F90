@@ -1465,7 +1465,7 @@
                 npcontsat=npcontsat+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(isat, sat, ndofV, numelReserv, trim(labelTransp), &
-                    len(trim(labelTransp)), 1, reservSat)
+                    len(trim(labelTransp)), 1)
             end if
         endif
         if(iflag_tipoPrint==2) then
@@ -1490,7 +1490,7 @@
                 npcontpres=npcontpres+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(ipres, pressaoElem, ndofP, numelReserv, trim(labelTransp), &
-                    len(trim(labelTransp)), 1, reservPres)
+                    len(trim(labelTransp)), 1)
             endif
         end if
         if(iflag_tipoPrint==2) then
@@ -1520,8 +1520,8 @@
                 tprt_vel=tprt_vel+dtprt_vel
                 npcontvel=npcontvel+1
                 call gerarLabel(labelTransp,tempo)
-                call escreverArqParaviewIntermed_CampoVetorial('vel',velocNodal, nsd, numnpReserv,  &
-                    trim(labelTransp), len(trim(labelTransp)), 2, reservVel, ivel)
+                call escreverArqParaviewIntermed_CampoVetorial(velocNodal, nsd, numnpReserv,  &
+                    trim(labelTransp), len(trim(labelTransp)), 2, ivel)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1546,8 +1546,8 @@
                 tprt_velc=tprt_velc+dtprt_velc
                 npcontvelc=npcontvelc+1
                 call gerarLabel(labelTransp,tempo)
-                call escreverArqParaviewIntermed_CampoVetorial('vel', velocCentral, nsd, numelReserv,  &
-                    trim(labelTransp), len(trim(labelTransp)), 1, reservVelc, ivelc)
+                call escreverArqParaviewIntermed_CampoVetorial(velocCentral, nsd, numelReserv,  &
+                    trim(labelTransp), len(trim(labelTransp)), 1, ivelc)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1571,8 +1571,8 @@
                 tprt_dis=tprt_dis+dtprt_dis
                 npcontdis=npcontdis+1
                 call gerarLabel(labelTransp,tempo)
-                call escreverArqParaviewIntermed_CampoVetorial('des',DIS, NDOFD, NUMNP,  &
-                    trim(labelTransp), len(trim(labelTransp)), 2, reservDesloc, idis)
+                call escreverArqParaviewIntermed_CampoVetorial(DIS, NDOFD, NUMNP,  &
+                    trim(labelTransp), len(trim(labelTransp)), 2, idis)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1596,8 +1596,8 @@
                 tprt_ten=tprt_ten+dtprt_ten
                 npcontten=npcontten+1
                 call gerarLabel(labelTransp,tempo)
-                call escreverArqParaviewIntermed_CampoVetorial('ten',AVSTRS, NROWB, NUMEL,  &
-                    trim(labelTransp), len(trim(labelTransp)), 1, reservTensao, iten)
+                call escreverArqParaviewIntermed_CampoVetorial(AVSTRS, NROWB, NUMEL,  &
+                    trim(labelTransp), len(trim(labelTransp)), 1, iten)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1621,7 +1621,7 @@
                 npcontphi=npcontphi+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(iphi, PORE, ndofP, numelReserv, &
-                    & trim(labelTransp), len(trim(labelTransp)), 1, reservPhi)
+                    & trim(labelTransp), len(trim(labelTransp)), 1)
             endif
         end if
         if(iflag_tipoPrint==2) then
@@ -1647,7 +1647,7 @@
                 npcontmasc=npcontmasc+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(imasc, MASCN, ndofV, numelReserv, trim(labelTransp), &
-                    len(trim(labelTransp)), 1, reservMasc)
+                    len(trim(labelTransp)), 1)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1673,7 +1673,7 @@
                 npcontyoung=npcontyoung+1
                 call gerarLabel(labelTransp,tempo)
                 call escreverArqParaviewIntermed_CampoEscalar(iyng, YOUNG, ndofV, numel, trim(labelTransp), &
-                    len(trim(labelTransp)), 1, reservYoung)
+                    len(trim(labelTransp)), 1)
             endif
         endif
         if(iflag_tipoPrint==2) then
@@ -1985,7 +1985,7 @@
     write(iparaview,'(a)')'vtk output'
     write(iparaview,'(a)')'ASCII'
     write(iparaview,'(a)')'DATASET UNSTRUCTURED_GRID'
-    write(iparaview,'(a,i10,a)')'POINTS', numPontos,' float '
+    write(iparaview,'(a,i10,a)')'POINTS', numPontos,' double '
 
     call escreverPontosNodais  (x, numPontos, nsd,iparaview)
     !
@@ -2000,13 +2000,13 @@
     if(tipo==2) write(iparaview,'(a,i10)')'POINT_DATA',  numPontos
 
     if(label=='ten') then
-        write(iparaview,'(3a,i5)')'SCALARS ', trim(rotulo), ' float ', dim1
+        write(iparaview,'(3a,i5)')'SCALARS ', trim(rotulo), ' double ', dim1
         write(iparaview,'(a)')'LOOKUP_TABLE default'
     else
-        write(iparaview,'(3a,i5)')'VECTORS ', trim(rotulo), ' float '
+        write(iparaview,'(3a,i5)')'VECTORS ', trim(rotulo), ' double '
     endif
 
-    call escreverVetoresNodais(label, campo, dim1, dim2, tipo,reserv,iparaview)
+    call escreverVetoresNodais(campo, dim1, dim2, iparaview)
 
     end subroutine escreverArqParaviewVector
     !
@@ -2085,7 +2085,7 @@
         write(arquivo,'(a)')'vtk output'
         write(arquivo,'(a)')'ASCII'
         write(arquivo,'(a)')'DATASET UNSTRUCTURED_GRID'
-        write(arquivo,'(a,i10,a)')'POINTS', numNos,' float '
+        write(arquivo,'(a,i10,a)')'POINTS', numNos,' double '
         !    write(arquivo,'(a,i10,a)')'POINTS', numnpReserv,' float '
         !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2142,9 +2142,9 @@
     TEMP=ADJUSTL(TRIM(TEMP))
     WRITE(*,*)'TEMPO da IMPRESSAO:',TEMP
     IF(VARIOSARQ.EQ.1)THEN
-        write(arquivo,'(3a,i10)')'SCALARS ', LABEL, ' float ',dim
+        write(arquivo,'(3a,i10)')'SCALARS ', LABEL, ' double ',dim
     ELSE
-        write(arquivo,'(3a,i10)')'SCALARS ', 't='//TRIM(TEMP)//'' , ' float ',dim
+        write(arquivo,'(3a,i10)')'SCALARS ', 't='//TRIM(TEMP)//'' , ' double ',dim
     END IF
     write(arquivo,'(2a)')'LOOKUP_TABLE ','default'
     !
@@ -2243,7 +2243,7 @@
         write(arquivo,'(a)')'vtk output'
         write(arquivo,'(a)')'ASCII'
         write(arquivo,'(a)')'DATASET UNSTRUCTURED_GRID'
-        write(arquivo,'(a,i10,a)')'POINTS', NUMNPLOCAL,' float '
+        write(arquivo,'(a,i10,a)')'POINTS', NUMNPLOCAL,' double '
         !    write(arquivo,'(a,i10,a)')'POINTS', numnpReserv,' float '
         !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2300,9 +2300,9 @@
     TEMPO=ADJUSTL(TRIM(TEMPO))
     WRITE(*,*)'TEMPO da IMPRESSAO:',TEMPO
     IF(VARIOSARQ.EQ.1)THEN
-        write(arquivo,'(3a)')'SCALARS ', ' '//TRIM(LABEL)//'' , ' float '
+        write(arquivo,'(3a)')'SCALARS ', ' '//TRIM(LABEL)//'' , ' double '
     ELSE
-        write(arquivo,'(3a)')'SCALARS ', 't='//TRIM(TEMPO)//'' , ' float '
+        write(arquivo,'(3a)')'SCALARS ', 't='//TRIM(TEMPO)//'' , ' double '
     ENDIF
     write(arquivo,'(2a)')'LOOKUP_TABLE ','default'
     !
@@ -3612,7 +3612,7 @@
     write(arquivo,'(a)')'vtk output'
     write(arquivo,'(a)')'ASCII'
     write(arquivo,'(a)')'DATASET UNSTRUCTURED_GRID'
-    write(arquivo,'(a,i10,a)')'POINTS', numPontos,' float '
+    write(arquivo,'(a,i10,a)')'POINTS', numPontos,' double '
 
     call escreverPontosNodais  (x, numPontos, nsd, arquivo)
     !
@@ -3627,10 +3627,10 @@
 
     if(tipo==2) write(arquivo,'(a,i10)')'POINT_DATA',  numPontos
 
-    write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' float '
+    write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' double '
     write(arquivo,'(a)')'LOOKUP_TABLE default'
 
-    if (tipo == 1) call escreverEscalares(campo, dim1, dim2, rotulo, tamRot, reserv, arquivo)
+    if (tipo == 1) call escreverEscalares(campo, dim1, dim2, arquivo)
     if (tipo == 2) call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
     
     tipoLeitura = tipo
@@ -3759,7 +3759,7 @@
             write(eixo,'(i0)') i
             if(rotulo.ne.'potencial') then
                 rotuloN=trim(rotulo)//'Dir'//trim(eixo)
-                write(arquivo,'(3a)')'SCALARS ', trim(rotuloN), ' float '
+                write(arquivo,'(3a)')'SCALARS ', trim(rotuloN), ' double '
                 write(arquivo,'(a)')'LOOKUP_TABLE default'
             endif
         endif
@@ -3773,11 +3773,10 @@
     end subroutine escreverEscalaresNodais
     !
     !**** new *******************************************************************
-    subroutine escreverArqParaviewIntermed_CampoEscalar(arquivo, campo, dim1, dim2, rotulo, tamRot, tipo, reserv)
+    subroutine escreverArqParaviewIntermed_CampoEscalar(arquivo, campo, dim1, dim2, rotulo, tamRot, tipo)
 
     implicit none
     integer, intent(in) :: arquivo,dim1, dim2
-    character(len=*) :: reserv
     double precision, intent(in) :: campo(dim1, dim2)
     integer :: tipo
 
@@ -3789,40 +3788,32 @@
         if(tipo==2) write(arquivo,'(a,i10)')'POINT_DATA ', dim2
         tipoLeitura = tipo
     end if
-    write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' float '
+    write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' double '
     write(arquivo,'(a)')'LOOKUP_TABLE default'
 
-    call escreverEscalares(campo, dim1, dim2, rotulo, tamRot, reserv,  arquivo)
+    call escreverEscalares(campo, dim1, dim2, arquivo)
 
     end subroutine escreverArqParaviewIntermed_CampoEscalar
     !
     !**** new *******************************************************************
     !
-    subroutine escreverArqParaviewIntermed_CampoVetorial(label,campo, dim1, dim2, rotulo, tamRot, tipo, &
-        reserv, arquivo)
+    subroutine escreverArqParaviewIntermed_CampoVetorial(campo, dim1, dim2, rotulo, tamRot, tipo, arquivo)
 
     implicit none
     integer, intent(in) :: arquivo,dim1, dim2, tipo
-    character(len=*) :: reserv
     double precision, intent(in) :: campo(dim1, dim2)
-    character(len=3) :: label
 
     integer :: tamRot
     character(len=tamRot) :: rotulo
 
-    if(label=='ten') then
-        write(arquivo,'(3a,i5)')'SCALARS ', trim(rotulo), ' float ', dim1
-        write(arquivo,'(a)')'LOOKUP_TABLE default'
-    else
-        if (tipo /= tipoLeitura) then
-            if(tipo==1) write(arquivo,'(a,i10)')'CELL_DATA ', dim2
-            if(tipo==2) write(arquivo,'(a,i10)')'POINT_DATA ', dim2
-            tipoLeitura = tipo
-        end if
-        write(arquivo,'(3a,i5)')'VECTORS ', trim(rotulo), ' float '
-    endif
+    if (tipo /= tipoLeitura) then
+        if(tipo==1) write(arquivo,'(a,i10)')'CELL_DATA ', dim2
+        if(tipo==2) write(arquivo,'(a,i10)')'POINT_DATA ', dim2
+        tipoLeitura = tipo
+    end if
+    write(arquivo,'(3a,i5)')'VECTORS ', trim(rotulo), ' double '
 
-    call escreverVetoresNodais(label, campo, dim1, dim2, tipo, reserv, arquivo)
+    call escreverVetoresNodais(campo, dim1, dim2, arquivo)
 
     end subroutine escreverArqParaviewIntermed_CampoVetorial
     !********************************************************************************************************************
@@ -3840,75 +3831,29 @@
         write(arquivo,'(a,i10)') 'CELL_DATA ', dim3
     end if
     
-    write(arquivo,'(3a,i5)')'TENSORS ', trim(rotulo), ' float '
+    write(arquivo,'(3a,i5)')'TENSORS ', trim(rotulo), ' double '
     call escreverTensores(campo, dim1, dim2, dim3, arquivo)
     
     end subroutine escreverArqParaviewIntermed_CampoTensorialElemento
     !********************************************************************************************************************
     !********************************************************************************************************************
-    subroutine escreverVetoresNodais(label, campo, tam1, tam2, tipo, reserv, arquivo)
-
-    use mMalha, only: nsd, numnp, numnpReserv, numel, numelReserv
-
+    subroutine escreverVetoresNodais(campo, dim1, dim2, arquivo)
+    
     implicit none
     !
-    character(len=3)      :: label
-    integer,   intent(in) :: tam1,tam2
-    real*8, intent(in)    :: campo(tam1,tam2)
-    integer               :: arquivo, tipo
-    character(len=*)      :: reserv
+    integer,   intent(in) :: dim1,dim2
+    real*8    :: campo(dim1,dim2)
+    integer               :: arquivo
     !
     integer   :: j
-    real*8    :: limite,zero
-    integer   :: numPontosReserv, numPontosTotal
-    real*8    :: minimo(tam1)
 
-    limite=1.e-15
-    minimo=0.0d0
-    zero  =0.0d0
-    
-    if(tipo==1) then
-        numPontosReserv=numelReserv
-        numPontosTotal=numel
-    elseif(tipo==2) then
-        numPontosReserv=numnpReserv
-        numPontosTotal=numnp
-    endif
-
-    if(trim(reserv)=='reservatorio') then
-        if(label=='ten') then
-            do j=1, numPontosReserv
-                write(arquivo,1000) campo(1:tam1,j)
-            enddo
-        else
-            do j=1, numPontosReserv
-                if(nsd==2) write(arquivo,1000) campo(1:tam1,j), zero
-                if(nsd==3) write(arquivo,1000) campo(1:tam1,j)
-            end do
-        endif
-    else
-        if(label=='ten') then
-            do j=1, numPontosTotal
-                write(arquivo,1000) campo(1:tam1,j)
-            enddo
-        elseif (label=='dis') then
-            do j=1, numPontosTotal
-                if(nsd==2)write(arquivo,1000) campo(1:tam1,j),zero
-                if(nsd==3)write(arquivo,1000) campo(1:tam1,j)
-            enddo
-        else
-            do j=1, numPontosReserv
-                if(nsd==2)write(arquivo,1000) campo(1:tam1,j),zero
-                if(nsd==3)write(arquivo,1000) campo(1:tam1,j)
-            end do
-            do j=numPontosReserv+1, numPontosTotal
-                if(nsd==2)write(arquivo,1000) minimo(1:tam1), zero
-                if(nsd==3)write(arquivo,1000) minimo(1:tam1)
-            end do
-        endif
-    endif
+    do j=1,dim2
+        if (abs(campo(1,j)) < 1.0d-99) campo(1,j) = 0.d0
+        if (abs(campo(2,j)) < 1.0d-99) campo(2,j) = 0.d0
+        write (arquivo,1000) campo(1,j), campo(2,j), 0.d0
+    end do
     !
-1000 format(6(E15.7E3,5x))
+1000 format(6(e15.5,5x))
 
     end subroutine escreverVetoresNodais
     !********************************************************************************************************************
@@ -3930,11 +3875,13 @@
     !--------------------------------------------------------------------------------------------------------------------
     do k=1, dim3
         do i = 1, dim1
-            campoElemento(i) = 0
+            campoElemento(i) = 0.
             do j=1, dim2
                 campoElemento(i) = campoElemento(i) + campo(i,j,k)
             end do
             campoElemento(i) = campoElemento(i)/dim2
+            
+            if (abs(campoElemento(i)) < 1.0d-99) campoElemento(i) = 0.d0
         end do
         
         write(arquivo,1000) campoElemento(1), campoElemento(3), 0.d0
@@ -3943,7 +3890,7 @@
         write(arquivo,*) ''
     end do
     
-1000 format(6(e15.7,5x))
+1000 format(6(e15.5,5x))
 
     end subroutine escreverTensores
     !********************************************************************************************************************
@@ -3957,7 +3904,7 @@
     integer :: tamRot
     character(len=tamRot) :: rotulo
 
-    write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' float '
+    write(arquivo,'(3a)')'SCALARS ', trim(rotulo), ' double '
     write(arquivo,'(a)')'LOOKUP_TABLE default'
 
     call escreverEscalaresNodais(campo, dim1, dim2, rotulo, tamRot, arquivo)
@@ -3965,59 +3912,19 @@
     end subroutine escreverArqParaviewIntermed
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine escreverEscalares(campo, tam1, tam2, rotulo, tamRot, reserv, arquivo)
-    !
-    use mMalha, only: numelReserv, numel
+    subroutine escreverEscalares(campo, dim1, dim2, arquivo)
     !
     implicit none
-    integer, intent(in)  :: arquivo,tam1,tam2
-    real*8, intent(in)   :: campo(tam1,tam2)
-    integer :: tamRot
-    character(len=*) :: reserv
-    character(len=tamRot) :: rotulo
+    integer, intent(in)  :: arquivo,dim1,dim2
+    real*8   :: campo(dim1,dim2)
     !
-    character(len=tamRot+5) ::  rotuloN
     integer :: i,j
-    character(len=5):: eixo
-    real*8 :: limite,zero
-    !
-    limite=1.e-15
-    zero=0.0d0
-
-    do i=1,tam1
-
-        if(i>1) then
-            write(eixo,'(i0)') i
-            rotuloN=trim(rotulo)//trim(eixo)
-            write(arquivo,'(3a)')'SCALARS ', trim(rotuloN), ' float '
-            write(arquivo,'(a)')'LOOKUP_TABLE default'
-        endif
-        !
-        if(trim(reserv)=='reservatorio')  then
-            do j=1, numelReserv
-                if(campo(i,j).lt.limite) then
-                    write(arquivo,*) zero
-                else
-                    write(arquivo,*) campo(i,j)
-                end if
-            end do
-            !
-        else
-
-            do j=1, numel
-                if(j>tam2) then
-                    write(arquivo,*) zero
-                else
-                    if(campo(i,j).lt.limite) then
-                        write(arquivo,*) zero
-                    else
-                        write(arquivo,*) campo(i,j)
-                    end if
-                end if
-            end do
-
-        endif
-        !
+    
+    do i=1,dim1
+        do j=1, dim2
+            if (abs(campo(i,j)) < 1.0d-99) campo(i,j) = 0.d0
+            write(arquivo,*) campo(i,j)
+        end do
     end do
     !
     end subroutine escreverEscalares

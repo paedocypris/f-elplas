@@ -817,23 +817,23 @@
 
     !     cria o vetor de permeabilidades
     npperm = numel*100
-    allocate(perm(npperm));           perm   = 0.d0
-    allocate(permkx(numelReserv));    permkx = 0.d0
-    allocate(permky(numelReserv));    permky = 0.d0
+    if(.not.allocated(perm)) allocate(perm(npperm));           perm   = 0.d0
+    if(.not.allocated(permkx)) allocate(permkx(numelReserv));    permkx = 0.d0
+    if(.not.allocated(permky)) allocate(permky(numelReserv));    permky = 0.d0
     if(nsd==3) then
-        allocate(permkz(numelReserv)); permkz = 0.d0
+        if(.not.allocated(permkz)) allocate(permkz(numelReserv)); permkz = 0.d0
     end if
-    allocate(phi(numelReserv)); phi=0.d0
-    allocate(phi0(numelReserv)); phi0=0.d0
+    if(.not.allocated(phi)) allocate(phi(numelReserv)); phi=0.d0
+    if(.not.allocated(phi0)) allocate(phi0(numelReserv)); phi0=0.d0
     !
-    allocate(PORE(numelReserv));     PORE     = 0.0D0
-    allocate(PORE0(numelReserv));    PORE0    = 0.0D0
-    allocate(YOUNG(NUMEL));          YOUNG    = 0.0D0
-    allocate(PHIEULER(numelReserv)); PHIEULER = 0.0D0
+    if(.not.allocated(PORE)) allocate(PORE(numelReserv));     PORE     = 0.0D0
+    if(.not.allocated(PORE0)) allocate(PORE0(numelReserv));    PORE0    = 0.0D0
+    if(.not.allocated(YOUNG)) allocate(YOUNG(NUMEL));          YOUNG    = 0.0D0
+    if(.not.allocated(PHIEULER)) allocate(PHIEULER(numelReserv)); PHIEULER = 0.0D0
     IF (NSD.EQ.2) then
-        ALLOCATE(PWELL(nelYReserv)); PWELL    = 0.0D0
+        if(.not.allocated(PWELL)) ALLOCATE(PWELL(nelYReserv)); PWELL    = 0.0D0
     ELSE
-        ALLOCATE(PWELL(nelZReserv)); PWELL    = 0.0D0
+        if(.not.allocated(PWELL)) ALLOCATE(PWELL(nelZReserv)); PWELL    = 0.0D0
     ENDIF
     !
     nelem=nelxReserv*nelyReserv

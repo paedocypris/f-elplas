@@ -1138,12 +1138,12 @@
 
     !------------------------------------------------------------------------------------------------------------------------------------
     !generation of lm array
-    allocate(hgLm(hgNdof, nen, nel))
+    if(.not.allocated(hgLm)) allocate(hgLm(hgNdof, nen, nel))
     hgLm = 0.0
     call formlm(hgId, conecNodaisElem, hgLm, hgNdof, hgNdof ,nen, nel)
 
     !compute column heights in global left-hand-side matrix
-    allocate(hgIdiag(hgNeq))
+    if(.not.allocated(hgIdiag)) allocate(hgIdiag(hgNeq))
     hgIdiag = 0.0
     call colht(hgIdiag, hgLm, hgNdof, nen, nel, hgNeq)
 
@@ -1151,39 +1151,37 @@
     call diag(hgIdiag, hgNeq, hgNalhs)
 
     !initialize alhs
-    allocate(hgAlhs(hgNalhs))
-    hgAlhs = 0.0
+    if(.not.allocated(hgAlhs)) allocate(hgAlhs(hgNalhs))
 
     !initialize brhs
-    allocate(hgBrhs(hgNeq))
+    if(.not.allocated(hgBrhs)) allocate(hgBrhs(hgNeq))
 
     end subroutine montarEstruturasDadosPressaoSkyline
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
+    subroutine montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
 
     !variable input
-    integer :: curTimeStep, conecNodaisElem(nen,nel), nen, nel, nnp, nsd
+    integer ::  conecNodaisElem(nen,nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:, :), prevStressS(:, :)
     integer :: way
 
     !------------------------------------------------------------------------------------------------------------------------------------
+    hgAlhs = 0.0
     hgBrhs = 0.0
-    if (curTimeStep == 1) then
-        if (hgNlvect >= 1) then
-            call load(hgId, hgF, hgBrhs, hgNdof, nnp, hgNlvect)
-            call ftod(hgId, p, hgF, hgNdof, nnp, hgNlvect)
-        endif
-    endif 
+    if (hgNlvect >= 1) then
+        call load(hgId, hgF, hgBrhs, hgNdof, nnp, hgNlvect)
+        call ftod(hgId, p, hgF, hgNdof, nnp, hgNlvect)
+    endif
 
-    call calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
+    call calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
 
     end subroutine montarSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine calcCoeficientesSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
+    subroutine calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
     !variable imports
     use mGlobaisEscalares, only: nrowsh, npint
     use mGlobaisArranjos,  only: mat, c
@@ -1197,7 +1195,7 @@
     use mPropGeoFisica, only: totalCompressibility, calcMatrixBulk, calcBiotCoefficient
 
     !variable input
-    integer :: curTimeStep, conecNodaisElem(nen,nel), nen, nel, nnp, nsd
+    integer :: conecNodaisElem(nen,nel), nen, nel, nnp, nsd
     real*8 :: x(nsd, nnp)
     real*8 :: deltaT
     real*8 :: p(hgNdof, nnp), prevP(hgNdof, nnp)
@@ -1212,7 +1210,7 @@
     real*8 :: shG(nrowsh,nen,npint), shL(nrowsh,nen,npint) !global shape function with derivative, local shape function with derivative
     real*8 :: det(npint), w(npint) ! jacobian determinant, gauss integration weight
 
-    real*8 :: xL(nsd, nnp), pressureL(1, nen), prevPressureL(1, nen) !local position, local pressure, previous local pressure
+    real*8 :: xL(nsd, nen), pressureL(1, nen), prevPressureL(1, nen) !local position, local pressure, previous local pressure
     real*8 :: kX, kY !x component of permeability, y component of permeability
 
     integer :: ni, nj !node position considering multiple degrees of freedom
@@ -1321,23 +1319,23 @@
         endif
 
         ! assemble element stifness matrix and force array into the global matrixes
-        if(curTimeStep == 1) call addlhs (hgAlhs, elementK, hgLm(1,1,curElement), hgIdiag, nee, .false., .true.)
+        call addlhs (hgAlhs, elementK, hgLm(1,1,curElement), hgIdiag, nee, .false., .true.)
         call addrhs(hgBrhs, elementF, hgLm(1,1,curElement), nee)
     end do
 
     end subroutine calcCoeficientesSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine solveGalerkinPressao(curTimeStep, nnp, p)
+    subroutine solveGalerkinPressao(nnp, p)
     !function imports
     use mSolverGaussSkyline, only: factor, back
     !variables input
-    integer :: curTimeStep, nnp
+    integer :: nnp
     real*8 :: p(hgNdof, nnp)
 
     !------------------------------------------------------------------------------------------------------------------------------------
     !solve by LU decomposition
-    if (curTimeStep == 1) call factor(hgAlhs, hgIdiag, hgNeq)
+    call factor(hgAlhs, hgIdiag, hgNeq)
     call back(hgAlhs, hgBrhs, hgIdiag, hgNeq)
 
     !store the result
@@ -1346,52 +1344,127 @@
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS, way)
+    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, way)
     implicit none
     ! variables input
-    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd, curTimeStep
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:,:), prevStressS(:,:)
+    real*8 :: vDarcy(:,:)
     integer :: way
     
     !------------------------------------------------------------------------------------------------------------------------------------
     ! mount equation system
-    call montarSistemaEquacoesPressao(curTimeStep, conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
+    call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, way)
     
     !solve
-    call solveGalerkinPressao(curTimeStep, nnp, p)
+    call solveGalerkinPressao(nnp, p)
+    
+    !process darcy velocity
+    call calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy)
     
     end subroutine incrementFlowPressureSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP)
+    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, vDarcy)
     ! variables input
-    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd, curTimeStep
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
+    real*8 :: vDarcy(:,:)
     
     !variables
     real*8 :: stressS(1,1), prevStressS(1,1)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS, 1)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, 1)
     
     end subroutine incrementFlowPressureSolutionOneWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS)
+    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy)
     ! variables input
-    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd, curTimeStep
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:,:), prevStressS(:,:)
+    real*8 :: vDarcy(:,:)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curTimeStep, deltaT, p, prevP, stressS, prevStressS, 2)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, 2)
     
     end subroutine incrementFlowPressureSolutionTwoWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    subroutine calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy)
+    !function imports
+    use mFuncoesDeForma, only: shlt, shlq, shlq3d
+    use mFuncoesDeForma, only: shgq, shg3d
+    use mMalha, only: local
     
+    !variables import
+    use mGlobaisEscalares, only: nrowsh, npint
+    use mGlobaisArranjos,  only: mat, c
+    use mMalha, only: x
+    
+    implicit none
+    !variables input
+    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
+    real*8 :: p(hgNdof,nnp), vDarcy(nsd,nel)
+    
+    !variables
+    real*8 :: det(nen), w(npint)
+    real*8 :: shL(nrowsh,nen,npint), shG(nrowsh,nen,npint)
+    integer :: m !material index
+    
+    real*8 :: xL(nsd,nen), pressureL(hgNdof,nen)
+    real*8 :: velL(nsd)
+    
+    logical :: quad
+    
+    real*8 :: gradP(nsd)
+    
+    integer :: curElement, l, dir
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    vDarcy = 0.
+    
+    ! construct shape functions and calculates quadrature weights
+    if(nen==3) call shlt(shL,w,npint,nen)
+    if(nen==4) call shlq(shL,w,npint,nen)
+    if(nen==8) call shlq3d(shL,w,npint,nen)
+    
+    !loop over elements
+    do curElement = 1, nel
+        !localize variables
+        call local(conecNodaisElem(1,curElement), x, xL, nen, nsd, nsd)
+        call local(conecNodaisElem(1,curElement), p, pressureL, nen, hgNdof, hgNdof)
+        
+        ! check if element has any coalesced nodes
+        quad = .true.
+        if (nen.eq.4.and.conecNodaisElem(3,curElement).eq.conecNodaisElem(4,curElement)) quad = .false.
+
+        ! calculates global derivatives of shape functions and jacobian determinants
+        if(nen==3) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
+        if(nen==4) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
+        if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
+
+        ! set material index
+        m = mat(curElement)
+        
+        do dir=1,nsd
+            do l=1,npint
+                gradP(dir) = dot_product(shG(dir,1:nen,l), pressureL(1,1:nen))
+                velL(dir) = -c(dir,m) * gradP(dir)
+
+                vDarcy(dir,curElement) = vDarcy(dir,curElement) + velL(dir)
+            end do
+            vDarcy(dir,curElement) = vDarcy(dir,curElement)/npint
+        end do
+    end do
+
+    end subroutine calcDarcyVelocity
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     end module mHidrodinamicaGalerkin
