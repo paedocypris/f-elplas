@@ -1344,14 +1344,14 @@
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, way)
+    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, vDarcyNodal, way)
     implicit none
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:,:), prevStressS(:,:)
-    real*8 :: vDarcy(:,:)
+    real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     integer :: way
     
     !------------------------------------------------------------------------------------------------------------------------------------
@@ -1362,45 +1362,46 @@
     call solveGalerkinPressao(nnp, p)
     
     !process darcy velocity
-    call calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy)
+    call calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy, vDarcyNodal)
     
     end subroutine incrementFlowPressureSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, vDarcy)
+    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
-    real*8 :: vDarcy(:,:)
+    real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     
     !variables
     real*8 :: stressS(1,1), prevStressS(1,1)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, 1)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, vDarcyNodal, 1)
     
     end subroutine incrementFlowPressureSolutionOneWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy)
+    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, vDarcyNodal)
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:,:), prevStressS(:,:)
-    real*8 :: vDarcy(:,:)
+    real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, 2)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, vDarcyNodal, 2)
     
     end subroutine incrementFlowPressureSolutionTwoWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy)
+    subroutine calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy, vDarcyNodal)
     !function imports
     use mFuncoesDeForma, only: shlt, shlq, shlq3d
     use mFuncoesDeForma, only: shgq, shg3d
+    use mFuncoesDeForma, only: shlqen
     use mMalha, only: local
     
     !variables import
@@ -1411,28 +1412,35 @@
     implicit none
     !variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
-    real*8 :: p(hgNdof,nnp), vDarcy(nsd,nel)
+    real*8 :: p(hgNdof,nnp), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
     
     !variables
     real*8 :: det(nen), w(npint)
     real*8 :: shL(nrowsh,nen,npint), shG(nrowsh,nen,npint)
+    real*8 :: shLen(nrowsh,nen,nen), shGen(nrowsh,nen,nen)
     integer :: m !material index
     
     real*8 :: xL(nsd,nen), pressureL(hgNdof,nen)
     real*8 :: velL(nsd)
     
+    real*8 :: vDarcyNodalAccum(nsd,nnp)
+    integer :: globalNodeIndex, numNodalContributions(nsd,nnp)
+    
     logical :: quad
-    
     real*8 :: gradP(nsd)
-    
-    integer :: curElement, l, dir
+    integer :: curElement, l, dir, i
     
     !------------------------------------------------------------------------------------------------------------------------------------
     vDarcy = 0.
+    vDarcyNodalAccum = 0.
+    numNodalContributions = 0
     
     ! construct shape functions and calculates quadrature weights
     if(nen==3) call shlt(shL,w,npint,nen)
-    if(nen==4) call shlq(shL,w,npint,nen)
+    if(nen==4) then
+        call shlq(shL,w,npint,nen)
+        call shlqen(shLen, nen)
+    end if
     if(nen==8) call shlq3d(shL,w,npint,nen)
     
     !loop over elements
@@ -1447,7 +1455,10 @@
 
         ! calculates global derivatives of shape functions and jacobian determinants
         if(nen==3) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
-        if(nen==4) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
+        if(nen==4) then 
+            call shgq(xl,det,shL,shG,npint,nel,quad,nen)
+            call shgq(xL,det,shLen,shGen,nen,nel,quad,nen)
+        end if
         if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
 
         ! set material index
@@ -1461,6 +1472,22 @@
                 vDarcy(dir,curElement) = vDarcy(dir,curElement) + velL(dir)
             end do
             vDarcy(dir,curElement) = vDarcy(dir,curElement)/npint
+            
+            do i = 1, nen
+                globalNodeIndex = conecNodaisElem(i,curElement)
+                
+                gradP(dir) = dot_product(shGen(dir,1:nen,i), pressureL(1,1:nen))
+                velL(dir) = -c(dir,m) * gradP(dir)
+                
+                vDarcyNodalAccum(dir,globalNodeIndex) = vDarcyNodalAccum(dir,globalNodeIndex) + velL(dir)
+                numNodalContributions(dir,globalNodeIndex) = numNodalContributions(dir,globalNodeIndex) + 1
+            end do
+        end do
+    end do
+    
+    do i = 1, nnp
+        do dir = 1,nsd
+            vDarcyNodal(dir,i) = vDarcyNodalAccum(dir,i)/numNodalContributions(dir,i)
         end do
     end do
 

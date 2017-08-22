@@ -980,7 +980,7 @@
     
     real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:)
     real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:)
-    real*8, allocatable :: vDarcy(:,:)
+    real*8, allocatable :: vDarcy(:,:), vDarcyNodal(:,:)
     real*8, allocatable :: stress(:,:,:)
     real*8, allocatable :: stressS(:,:), prevStressS(:,:), stressTotal(:,:,:)
     real*8, allocatable :: strainP(:,:,:)
@@ -999,6 +999,7 @@
     allocate(prevP(hgNdof,numnp))
     allocate(prevPIt(hgNdof, numnp))
     allocate(vDarcy(nsd,numel))
+    allocate(vDarcyNodal(nsd,numnp))
     allocate(stress(nrowb,nintD, numel))
     allocate(stressS(nintD, numel))
     allocate(stressTotal(nrowb,nintD,numel))
@@ -1030,7 +1031,7 @@
     ! print initial state
     if (way==1) filename = "solution1way"
     if (way==2) filename = "solution2way"
-    call writeCurrentSolution(filename,0, p, uDif, stress, stressTotal, stressS, vDarcy, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+    call writeCurrentSolution(filename,0, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
     t = 0
@@ -1044,9 +1045,9 @@
         converged = .false.
         do k = 1, 50
             if (way == 1 .or. k == 1) then
-                call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy)
+                call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
             else
-                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy)
+                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, vDarcyNodal)
             end if
 
             call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, stressTotal, p, 1)
@@ -1083,7 +1084,7 @@
         prevP = p
         
         !print current solution
-        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, vDarcy, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     end do
     
     deallocate(u)
@@ -1094,6 +1095,7 @@
     deallocate(prevP)
     deallocate(prevPIt)
     deallocate(vDarcy)
+    deallocate(vDarcyNodal)
     deallocate(stress)
     deallocate(stressS)
     deallocate(stressTotal)
@@ -1144,7 +1146,7 @@
     end subroutine convertStressStoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, vDarcy, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, vDarcy, vDarcyNodal, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
     !function imports
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
@@ -1159,7 +1161,7 @@
     character(len=*) :: filename
     integer :: curTimeStep
     real*8 :: p(1,nnp), u(nsd,nnp), stressEf(nrowb,nintD,nel), stressTot(nrowb,nintD,nel)
-    real*8 :: stressS(nintD,nel), vDarcy(nsd,nel)
+    real*8 :: stressS(nintD,nel), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
     integer :: conecNodaisElem(nen,nel)
     integer :: nnp, nel, nen, nsd, nrowb, nintD
     
@@ -1174,6 +1176,7 @@
     call escreverArqParaviewOpening(filename, p, 1, nnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(u, nsd, nnp, 'u', len('u'), 2, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(vDarcy, nsd, nel, 'vDarcy', len('vDarcy'), 1, unitNumber)
+    call escreverArqParaviewIntermed_CampoVetorial(vDarcyNodal, nsd, nnp, 'vDarcyNodal', len('vDarcyNodal'), 2, unitNumber)
     call escreverarqparaviewintermed_campotensorialelemento(stressef, nrowb, nintd, nel, 'stressef', len('stressef'), unitnumber)
     call escreverarqparaviewintermed_campotensorialelemento(stresstot, nrowb, nintd, nel, 'stresstot', len('stresstot'), unitnumber)
     call escreverarqparaviewintermed_campoescalar(unitnumber, stresssprint, 1, nel, 'stresss', len('stresss'), 1)

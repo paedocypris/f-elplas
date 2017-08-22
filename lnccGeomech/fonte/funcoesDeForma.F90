@@ -1,4 +1,4 @@
-    !=================================================================================
+﻿    !=================================================================================
     !         programa de elementos finitos
     !         baseado em: The Finite Element Method, Hughes, T. J. R., (2003)
     !
@@ -17,6 +17,7 @@
     use mGlobaisEscalares,only: zero,one,two,three,four,five,six,pt1667,pt25,pt5
 
     public :: newshl,  newshg, shap2m, shlqrt, shgqrt, shlt, shgq, shg3d, shlq, shg2q, shl2q, shlq3d
+    public :: shlqen
 
     contains
 
@@ -1277,6 +1278,66 @@
     !
     return
     end subroutine
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine shlqen(shlen, nen) !alterei esta rotina... corrigi a numeração
+
+    !  Calcula funcoes de interpolacao e suas derivadas locais para
+    !     elementos quadrangulares nos nos do elemento
+    !
+    !  - ----------------------------------------------- - -------------------- -
+    !
+    !            s,t = local element coordinates ("xi", "eta", resp.)
+    !   shlen(1,i,l) = local ("xi") derivative of shape function i in node l
+    !   shlen(2,i,l) = local ("eta") derivative of shape function i in node l
+    !   shlen(3,i,l) = local shape function i in node l
+    !            nen = number of element nodes
+    !
+    implicit none
+
+    integer :: l, nen
+    real*8 :: onemr, onems, onepr, oneps
+    real*8 :: r, s
+    real*8 :: shlen(3, nen, nen), ra(nen), sa(nen)
+
+    if (nen == 4) then
+        ra(1) = -one
+        sa(1) = -one
+        ra(2) =  one
+        sa(2) = -one
+        ra(3) =  one
+        sa(3) =  one
+        ra(4) = -one
+        sa(4) =  one
+    end if
+
+    do l = 1, nen
+        r = ra(l)
+        s = sa(l)
+        onepr = one + r
+        onemr = one - r
+        oneps = one + s
+        onems = one - s
+
+        shlen(1, 1, l) = -onems * pt25
+        shlen(2, 1, l) = -onemr * pt25
+        shlen(3, 1, l) = onemr * onems * pt25
+
+        shlen(1, 2, l) = onems * pt25
+        shlen(2, 2, l) = -onepr * pt25
+        shlen(3, 2, l) = onepr * onems * pt25
+
+        shlen(1, 3, l) = oneps * pt25
+        shlen(2, 3, l) = onepr * pt25
+        shlen(3, 3, l) = onepr * oneps * pt25
+
+        shlen(1, 4, l) = -oneps * pt25
+        shlen(2, 4, l) = onemr * pt25
+        shlen(3, 4, l) = onemr * oneps * pt25
+    end do
+    end subroutine
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     !**** new **********************************************************************
     subroutine shg2q(xl,shl,shl2,shg2,npint,nel,neg,quad,nen)
     !
