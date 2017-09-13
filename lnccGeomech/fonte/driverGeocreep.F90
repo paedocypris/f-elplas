@@ -62,19 +62,17 @@
     subroutine preprocessador_DS()
     !
     use mLeituraEscritaSimHidroGeoMec, only : CYLINDER, SOLIDONLY
-    use mGlobaisArranjos,  only: title, listaSolverDisponivel
+    use mGlobaisArranjos,  only: listaSolverDisponivel
     use mGlobaisEscalares
     use mGeomecanica, only: ndofD, nlvectD
-    use mHidrodinamicaRT, only: ndofV, nlvectV, nlvectP, ndofP
     !
     use mGeomecanica,      only: idDesloc, idiagD, neqD, nalhsD
-    use mHidroDinamicaRT,  only: neqV, nalhsV, idiagV, idVeloc,simetriaVel
     !
     use mMalha,            only: nen, nsd
     use mMalha,            only: numLadosElem, numLadosReserv
-    use mMalha,            only: numnp, x, numelReserv, numnpReserv
+    use mMalha,            only: numnp, x, numnpReserv
 
-    use mMalha,            only: IrregMesh, Dirichlet, Neumann
+    use mMalha,            only: IrregMesh
     use mMalha,            only: I4SeaLoad
     use mMalha,            only: FNCPROCESS, FNCINIT, FNCSOLID
     !
@@ -86,15 +84,11 @@
     use mLeituraEscritaSimHidroGeoMec,   only: SETUPDX, abrirArquivosResultados, lerSimulatorParam_DS, lerRandfilesIn_DS
     use mLeituraEscritaSimHidroGeoMec,   only: readSetupPhaseDS
     !
-    use mPropGeoFisica,    only: nelx, nely, nelz
     use mPropGeoFisica,    only: nr
     use mPropGeoFisica,    only: nelxReserv, nelyReserv, nelzReserv
     use mPropGeoFisica,    only: XTERLOAD, GEOMECLAW
     !
-    use mHidrodinamicaRT,  only: fVeloc, leituraCoordenadasPoco
-    use mHidroDinamicaRT,  only: lerParametrosHidrodinamica_DS, optSolverV
-    use mGeomecanica,      only: fDesloc, InSeaLoad, optSolverD, simetriaGeo
-    use mTransporte,       only: satElem, satinit
+    use mGeomecanica,      only: fDesloc, InSeaLoad, optSolverD
     use mInputReader,      only: readInputFileDS, LEIturaGERacaoCOORdenadasDS
     use mInputReader,      only: leituraCodigosCondContornoDS,leituraValoresCondContornoDS
 
@@ -121,23 +115,16 @@
     SALTCREEP = .FALSE.
     SOLIDONLY = .FALSE.
     LDRAINED  = .FALSE.
-    optSolverV='skyline'
     optSolverD='skyline'
 
     open(unit=ifdata, file= 'inputDS.dat'  )
     call readInputFileDS(ifdata)
 
-    call readSetupPhaseDS(nlvectV, nlvectP, nlvectD, optSolverV, optSolverD)
+    call readSetupPhaseDS(nlvectD)
 
     call identificaSolversDisponiveis(listaSolverDisponivel)
-    call verificarSolver(optSolverV, listaSolverDisponivel)
     call verificarSolver(optSolverD, listaSolverDisponivel)
-    write(*,9001)  optSolverV, optSolverD
 
-    if(optSolverV=="pardiso") simetriaVel=.true.
-    if(optSolverD=="pardiso") simetriaGeo=.true.
-    if(optSolverV=="hypre")   simetriaVel=.false.
-    if(optSolverD=="hypre")   simetriaGeo=.false.
     !
     !.... STRESS DIMENSION PHISICS: S3DIM
     !
@@ -154,13 +141,6 @@
     !.... Logical novaMalha
     IF (IrregMesh.eq.1) novaMalha=.true.
     !
-    write(iecho,1000) title
-    write(iecho,3000) iprtin, nsd
-    write(iecho,4000) numnp, numLadosReserv, ndofP, ndofV, ndofD, &
-        nlvectP, nlvectV, nlvectD
-    WRITE(IECHO,5000) nelx,nely,nelz,numnp, &
-        nelxReserv,nelyReserv,nelzReserv,numnpReserv
-    WRITE(IECHO,6000) IrregMesh, Dirichlet, Neumann, I4SeaLoad
     !
     if (nsd==2) then
         numLadosReserv=(nelxReserv+1)*(nelyReserv+1)*2
@@ -183,7 +163,6 @@
     call lerNumericParam_DS
     call lerCreepParam_DS
     call lerSimulatorParam_DS
-    call lerParametrosHidrodinamica_DS
     !
     call abrirArquivosResultados
     call lerRandfilesIn_DS
@@ -196,9 +175,6 @@
     ENDIF
     !
     !.... initialization phase
-    !
-    ndofP = 1
-    ndofV = 1
     !
     numLadosElem = 2*NSD
     nen          = 2**NSD
@@ -222,30 +198,11 @@
     if(nsd==2) call leituraGeoformations_DS  (x, nsd, numnp)
     if(nsd==3) call leituraGeoformations3D_DS(x, nsd, numnp)
     !
-    !.... input boundary condition data and establish equation numbers
-    !
-    if (.not.SOLIDONLY) then
-        keyword_name = "codigos_cond_contorno_veloc"
-        call leituraCodigosCondContornoDS(keyword_name, idVeloc,ndofV,numLadosReserv,neqV,iecho,iprtin)
-        !
-        allocate(idiagV(neqV));  idiagV=0
-    end if
-    !
     !.... INPUT GEOMECHANIC DIRICHLET CONDITION DATA AND ESTABLISH EQUATION NUMBERS
     !
     keyword_name = "codigos_cond_contorno_desloc"
     call leituraCodigosCondContornoDS(keyword_name,idDesloc,ndofD,numnp,neqD,iecho,iprtin)
     allocate(idiagD(neqD));  idiagD=0
-    !
-    print*, "ndofV=", ndofV, "neqV=", neqV
-    print*, "ndofD=", ndofD, "neqD=", neqD
-    !
-    !.... input nodal force and prescribed kinematic boundary-value data
-    !
-    if (.not.solidonly) then
-        keyword_name = "valores_cond_contorno_veloc"
-        if (nlvectV.gt.0) call leituraValoresCondContornoDS(keyword_name,fVeloc,ndofV,numLadosReserv,1,nlvectV,iprtin, iecho)
-    end if
     !
     !.... INPUT GEOMECHANIC DIRICHLET CONDITION DATA AND ESTABLISH EQUATION NUMBERS
     !
@@ -260,20 +217,18 @@
     !
     !.... input element data
     !
-    call TOPologiaMALhaSistEQUAcoesDS(NALHSV, NEQV, NALHSD, NEQD)
+    call TOPologiaMALhaSistEQUAcoesDS(NALHSD, NEQD)
     !
     !.... inicializa os tempos de impressao
     !
     call inittime
     !
-    !.... estabelece a condicao inicial para a saturacao
-    !
-    call satinit(nsd,numelReserv,satElem)
-    !
     !    inicializa a pressão para o galerkin
     !
     call initGalerkinPressure(numnpReserv)
-    !
+    
+    !inicializa variáveis de drucker prager
+    call initDPProperties
     !
 1000 format(20a4)
 3000 format(//&
@@ -448,19 +403,15 @@
     !
     subroutine alocarMemoria()
     use mGlobaisArranjos,  only: uTempoN, mat, grav, beta
-    use mHidrodinamicaRT,  only: ndofV, nlvectV, ndofP
 
     !
-    use mMalha,            only: nsd, numel, numelReserv, numnp, numnpReserv
+    use mMalha,            only: nsd, numel, numelReserv, numnp
     use mMalha,            only: numLadosReserv, nen, numLadosElem
     use mMalha,            only: x, xc
     !
     use mMalha,            only: listaDosElemsPorNo
     use mMalha,            only: listaDosElemsPorFace
     use mMalha,            only: conecNodaisElem, conecLadaisElem
-    use mHidroDinamicaRT,  only: idVeloc, lmV
-    use mTransporte,       only: satElemAnt, satElem
-    use mTransporte,       only: satElemL, satElemL0, satElem0
     use mGeomecanica,      only: EINELAS
     use mGeomecanica,      only: nrowB, nintD, nrowB2
     use mGeomecanica,      only: idDesloc, lmD, ndofD, nlVectD, fDesloc
@@ -469,41 +420,9 @@
     use mGeomecanica,      only: geoPrsr, avStrs, avCrep, strs3D
     use mGeomecanica,      only: sigmaT, sigma0
     use mPropGeoFisica,    only: GEOFORM, MASCN, MASCN0
-    use mHidrodinamicaRT,  only: pressaoElem, pressaoElemAnt,PRESPRODWELL,NCONDP
-    use mHidrodinamicaRT,  only: vc, ve, velocLadal, fVeloc, velocNodal
 
     !
     implicit none
-    !
-    !campos
-    !
-    allocate(pressaoElem(ndofP,numelReserv))
-    pressaoElem = 0.0D0
-    allocate(pressaoElemAnt(numelReserv))
-    pressaoElemAnt = 0.0D0
-    allocate(velocLadal (ndofV,numLadosReserv))
-    velocLadal = 0.0D0
-    ALLOCATE(PRESPRODWELL(NCONDP))
-    PRESPRODWELL = 0.0D0
-    allocate(ve (nsd,nen,numelReserv))
-    ve = 0.0D0
-    allocate(vc (nsd,numelReserv))
-    vc = 0.0D0
-    allocate(velocNodal(nsd,numnpReserv))
-    velocNodal = 0.0D0
-    allocate(satElem(numelReserv))
-    satElem = 0.0D0
-    allocate(satElemAnt(numelReserv))
-    satElemAnt  = 0.0D0
-    !
-    ! NEXT 3 LINES NEW SATURATION ARRAY FOR ITERATIVE HIDRODINAMICS AND TRANSPORT
-    !
-    ALLOCATE(satElem0(numelReserv))
-    satElem0    = 0.0D0
-    ALLOCATE(satElemL(numelReserv))
-    satElemL    = 0.0D0
-    ALLOCATE(satElemL0(numelReserv))
-    satElemL0   = 0.0D0
     !
     !malha
     !
@@ -520,17 +439,6 @@
     allocate(listaDosElemsPorFace(numLadosElem,numLadosReserv))
     listaDosElemsPorFace = 0
     !
-    !contorno
-    !
-    allocate(idVeloc(ndofV,numLadosReserv))
-    idVeloc = 0
-    allocate(lmV(ndofV,numLadosElem,numelReserv))
-    lmV = 0
-    !
-    if (nlvectV.ne.0)  then
-        allocate(fVeloc(ndofV,numLadosReserv))
-        fVeloc = 0.0d0
-    endif
     !
     !material
     allocate(mat(numel)); mat=0.d0
@@ -591,16 +499,13 @@
     !
     !**** NEW **** MODIFIED 4 HIERARCH MESH  ************************************
     !
-    SUBroutine TOPologiaMALhaSistEQUAcoesDS(NALHSV,NEQV,NALHSD,NEQD)
+    SUBroutine TOPologiaMALhaSistEQUAcoesDS(NALHSD,NEQD)
     use mGlobaisEscalares
     use mGeomecanica, only: ndofD, optSolverD
-    use mHidrodinamicaRT, only: ndofV, optSolverV
     use mGlobaisArranjos
     use mLeituraEscrita, only: iecho, nprint, prntel
     use mLeituraEscritaSimHidroGeoMec, only: GEOREGION_DS
     !
-    use mHidroDinamicaRT, only: lmV, idVeloc, idiagV, nedV
-    use mHidroDinamicaRT, only: meanbwV
     use mGeomecanica,     only: LMD, IDIAGD, IDDESLOC
     use mGeomecanica,     only: AUXM,IOPT,NED,NED2,NEE,NEE2,NEESQ,NEESQ2,NESD,NSTR
     !
@@ -627,7 +532,7 @@
     !
     !.... program to set arrays storage
     !
-    integer :: NALHSV, NEQV, NALHSD, NEQD
+    integer :: NALHSD, NEQD
     integer :: i
     real*8, allocatable :: xl(:,:)
 
@@ -646,7 +551,6 @@
     !
     NROWSH = NSD + 1
     !
-    nedV   = ndofV
     nprint = 0
     !
     NED    = 1
@@ -670,14 +574,7 @@
     !
     !....... set memory pointers
     !
-    allocate(c(6,numat)); c=0.d0
-    !
     write(iecho,1000) ntype,numel,numat,nen,npint
-    !
-    !      read material properties
-    !
-    keyword_name = "material_properties"
-    call readMaterialPropertiesDS(keyword_name, iecho, ierr)
     !
     !     constant body forces
     !
@@ -702,24 +599,6 @@
     listaDosElemsPorFace=0
     call criarListaVizinhos(numladosElem,numLadosReserv, &
         &     numelReserv,conecLadaisElem,listaDosElemsPorFace)
-    !
-    !.... generation of velocity lm array
-    !
-    if (NEQV > 0) then
-        call formlm(idVeloc,conecLadaisElem,lmV,nedV,nedV,&
-            &     numLadosElem,numelReserv)
-        !
-        !.... modification of idiag array
-        !
-        call colht(idiagV,lmV,nedV,numLadosElem,numelReserv,neqV)
-        !
-        if(optSolverV=='skyline') then
-            call diag(idiagV,neqV,nalhsV)
-        endif
-        !
-        meanbwV = nalhsV/neqV
-        write(iecho,9000) neqV, nalhsV, meanbwV, 8.0*nalhsV/1000/1000
-    end if
 
     !     calculo de xc (centros dos elementos)
     allocate(xl(nsd,nen)); xl=0.0
@@ -757,25 +636,8 @@
     !.... SETUP GEO-MECHANICAL REGIONS
     !
     CALL GEOREGION_DS(XC,NSD,NUMEL)
-
-    if(optSolverV=='pardiso') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
     !
     if(optSolverD=='pardiso') then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-    !
-    print*, "NALHSV=", NALHSV, "NALHSD=", NALHSD
-
-    if(optSolverV=="hypre") then
-        write(*,*) ' não implementado '
-        stop 9
-    endif
-
-    if(optSolverD=="hypre") then
         write(*,*) ' não implementado '
         stop 9
     endif
@@ -843,52 +705,7 @@
     END IF
     DESPRESSURIZAR = BWP
     END FUNCTION DESPRESSURIZAR
-    !
-    !===========================================================================
-    !
-    FUNCTION DESPRESSURIZAR_INIT(BWP,DT,nvel)
-    !
-    use mHidroDinamicaRT,  only : pressaoElem
-    use mHidroDinamicaRT,  ONLY : TPRESPRODWELL,NPRESPRODWELL,PRESMEDIAINICIAL
-    use mHidroDinamicaRT,  ONLY : NCONDP,ELEM_CONDP
-    !
-    IMPLICIT NONE
-    !
-    REAL(8) :: BWP,DT,AUX
-    REAL(8) :: DESPRESSURIZAR_INIT
-    INTEGER :: NEL,NVEL
-    !
-    PRESMEDIAINICIAL = -1E30
-    DO NEL=1,NCONDP
-        IF(pressaoElem(1,ELEM_CONDP(NEL)).GE.PRESMEDIAINICIAL)THEN
-            PRESMEDIAINICIAL=pressaoElem(1,ELEM_CONDP(NEL))
-        end IF
-    END DO
-    WRITE(*,*)'#############################################################'
-    WRITE(*,*)'PRESSAO INICIAL NO FUNDO DO POCO DE PRODUCAO: ###############'
-    WRITE(*,*)PRESMEDIAINICIAL
-    WRITE(*,*)'#############################################################'
-    !
-    NPRESPRODWELL = NINT(TPRESPRODWELL/DT)
-    IF(TPRESPRODWELL.GT.REAL(NVEL)*DT)THEN
-        AUX = 0.0
-        NPRESPRODWELL=1
-    ELSE
-        IF(NPRESPRODWELL.EQ.0)THEN
-            AUX = 0.0
-        ELSE
-            AUX = (PRESMEDIAINICIAL-BWP)/REAL(NPRESPRODWELL)
-        END IF
-    END IF
-    !
-    WRITE(*,*)'#############################################################'
-    WRITE(*,*)'TEMPO TOTAL PARA CHEGAR A PRESSAO MINIMA NO POCO DE PRODUCAO:'
-    WRITE(*,*)TPRESPRODWELL
-    WRITE(*,*)'#############################################################'
-    !
-    DESPRESSURIZAR_INIT = AUX
-    !
-    END FUNCTION DESPRESSURIZAR_INIT
+    
 
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -950,6 +767,34 @@
     end subroutine initGalerkinPressure
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    subroutine initDPProperties()
+    !function imports
+    
+    !variables import
+    use mPropGeoFisica,    only: mcFriction, mcC, dpH, dpAlpha
+    
+    implicit none
+    !variables input
+    
+    !variables
+    integer :: i 
+    real*8, parameter :: piConst = 3.141592653589793
+    real*8 :: constPlaneStrain
+    real*8 :: phiRad
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do i = 1,9
+        phiRad = mcFriction(i) * piConst / 180
+        
+        constPlaneStrain = 3.0d0 / sqrt(9 + 12*(tan(phiRad)**2))
+        dpAlpha(i) = constPlaneStrain * tan(phiRad)
+        dpH(i) = mcC(i) / tan(phiRad)
+    end do
+    
+    
+    end subroutine initDPProperties
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     subroutine processamento(way)
     !variable imports
     !flow
@@ -982,8 +827,12 @@
     real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:)
     real*8, allocatable :: vDarcy(:,:), vDarcyNodal(:,:)
     real*8, allocatable :: stress(:,:,:)
-    real*8, allocatable :: stressS(:,:), prevStressS(:,:), stressTotal(:,:,:)
+    real*8, allocatable :: stressS(:,:), prevStressS(:,:)
+    real*8, allocatable :: trStrainP(:,:), prevTrStrainP(:,:)
+    real*8, allocatable :: stressTotal(:,:,:)
     real*8, allocatable :: strainP(:,:,:)
+    
+    real*8,allocatable :: elementIsPlast(:)
     
     real*8 :: uNorm, pNorm
     logical :: converged
@@ -1002,9 +851,12 @@
     allocate(vDarcyNodal(nsd,numnp))
     allocate(stress(nrowb,nintD, numel))
     allocate(stressS(nintD, numel))
-    allocate(stressTotal(nrowb,nintD,numel))
     allocate(prevStressS(nintD, numel))
+    allocate(trStrainP(nintD, numel))
+    allocate(prevTrStrainP(nintD, numel))
+    allocate(stressTotal(nrowb,nintD,numel))
     allocate(strainP(nrowb,nintD,numel))
+    allocate(elementIsPlast(numel))
     
     
     !read physical properties
@@ -1024,14 +876,16 @@
     u = 0.d0
     strainP = 0.d0
     stress = 0.d0
-    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, stressTotal, p, 3)
+    elementIsPlast = 0.d0
+    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 3)
     uInit = u
     uDif = 0.d0
+    prevTrStrainP = trStrainP
 
     ! print initial state
     if (way==1) filename = "solution1way"
     if (way==2) filename = "solution2way"
-    call writeCurrentSolution(filename,0, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+    call writeCurrentSolution(filename,0, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
     t = 0
@@ -1041,16 +895,19 @@
         write(*,*) "tempo", t, "passo de tempo", curTimeStep
         
         prevStressS = stressS
+        prevTrStrainP = trStrainP
+        
         ! begin split loop
         converged = .false.
-        do k = 1, 50
+        elementIsPlast = 0.d0
+        do k = 1, 500
             if (way == 1 .or. k == 1) then
                 call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
             else
-                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, vDarcy, vDarcyNodal)
+                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal)
             end if
 
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, stressTotal, p, 1)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 1)
             uDif = u - uInit
             
             if (way == 1) then
@@ -1084,7 +941,7 @@
         prevP = p
         
         !print current solution
-        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     end do
     
     deallocate(u)
@@ -1100,7 +957,10 @@
     deallocate(stressS)
     deallocate(stressTotal)
     deallocate(prevStressS)
+    deallocate(trStrainP)
+    deallocate(prevTrStrainP)
     deallocate(strainP)
+    deallocate(elementIsPlast)
     
     
     end subroutine processamento
@@ -1146,7 +1006,7 @@
     end subroutine convertStressStoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, vDarcy, vDarcyNodal, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
     !function imports
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
@@ -1162,6 +1022,7 @@
     integer :: curTimeStep
     real*8 :: p(1,nnp), u(nsd,nnp), stressEf(nrowb,nintD,nel), stressTot(nrowb,nintD,nel)
     real*8 :: stressS(nintD,nel), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
+    real*8 :: elementIsPlast(nel)
     integer :: conecNodaisElem(nen,nel)
     integer :: nnp, nel, nen, nsd, nrowb, nintD
     
@@ -1180,6 +1041,7 @@
     call escreverarqparaviewintermed_campotensorialelemento(stressef, nrowb, nintd, nel, 'stressef', len('stressef'), unitnumber)
     call escreverarqparaviewintermed_campotensorialelemento(stresstot, nrowb, nintd, nel, 'stresstot', len('stresstot'), unitnumber)
     call escreverarqparaviewintermed_campoescalar(unitnumber, stresssprint, 1, nel, 'stresss', len('stresss'), 1)
+    call escreverarqparaviewintermed_campoescalar(unitnumber, elementIsPlast, 1, nel, 'elementIsPlast', len('elementIsPlast'), 1)
     close(unitNumber)
     
     end subroutine writeCurrentSolution

@@ -69,390 +69,7 @@
     !
     contains
     !
-    subroutine InicializacaoGEO()
-    !
-    use mTransporte,       only: satElem, satElemAnt
-    use mPropGeoFisica,    only: phi, phi0
-    use mPropGeoFisica,    only: PORE, PORE0, MASCN, MASCN0
-    use mPropGeoFisica,    only: PHIEULER
-    use mPropGeoFisica, only: lerPropriedadesFisicas
-    !
-    !..NEW LINES 4 COMPRESSIBLE MODEL MASS CONTENT ARRAYS
-    !
-    IMPLICIT NONE
-    !-----------------------------------------------------------------------------------
-    call lerPropriedadesFisicas()
-
-    !.... SETUP SATURATION AT TIME ZERO
-    !
-    satElemAnt = satElem
-    !
-    !.... SETUP EULERIAN AND 'CLASSICAL' POROSITIES AT TIME ZERO
-    !
-    PHI0     = PHI
-    PORE     = PHI
-    PORE0    = PHI0
-    MASCN    = PORE
-    MASCN0   = PORE0
-    PHIEULER = PORE
-    strss0   = 0.0D0
-    
-    !plasticity
-    einelas = 0.0d0
-    !
-    if(.not.allocated(ALHSD)) allocate(ALHSD(NALHSD))
-    if(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
-    !
-    !.... CLEAR LEFT AND RIGHT HAND SIDE FOR THE ELASTIC  PROBLEM
-    !
-    ALHSD = 0.0D0
-    BRHSD = 0.0D0
-    !
-    END SUBROUTINE
-    !
-    !
-    !**** new *********************************************************************
-    !
-    subroutine montarSistEqAlgGeo(TASK,satElem)
-    !
-    use mMalha,            only: conecNodaisElem
-    use mMalha,            only: x, numnp, nsd, numelReserv
-    use mHidroDinamicaRT,  only: pressaoElem
-    !
-    implicit none
-    !
-    character(len=16) :: TASK
-    REAL(8), DIMENSION(numelReserv) :: satElem
-    !
-    !.... ALLOCATE MEMORY FOR GLOBAL EQUATION SYSTEM
-    !
-    print*, " *** TASK FOR MATRIX CONFIGURATION = ", TASK
-    !
-    IF (TASK.EQ.'right_hand_reset') THEN
-        !
-        IF(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
-        !
-        !.... CLEAR RIGHT HAND SIDE FOR THE ELASTIC  PROBLEM
-        !
-        BRHSD = 0.0D0
-        !
-        !.... ACCOUNT THE NODAL FORCES IN THE R.H.S.
-        !
-        IF (NLVECTD.GT.0) &
-            CALL LOAD(idDesloc,fDesloc,brhsd,NDOFD,NUMNP,NLVECTD)
-        !
-        IF (NLVECTD.GT.0) &
-            CALL FTOD(idDesloc,DIS,fDesloc,NDOFD,NUMNP,NLVECTD)
-        !
-        RETURN
-        !
-    ENDIF
-    !
-    IF (TASK.EQ.'bbarmatrix_elast') THEN
-        !
-        !.... MOUNT ONLY LEFT HAND SIDE AT ELEMENT LEVEL
-        !
-        IF (NSD.EQ.2) CALL BBARMTRX_ELAST(x, conecNodaisElem, alhsd, &
-            &                                  brhsd, idiagD, lmD)
-        !
-        IF (NSD.EQ.3) CALL BBARMTRX_ELAST_3D(X,conecNodaisElem,ALHSD, &
-            &                                     BRHSD,IDIAGD,LMD)
-
-        RETURN
-        !
-    ENDIF
-    !
-    IF (TASK.EQ.'bbarmatrix_creep') THEN
-
-        if(.not.allocated(ALHSD)) allocate(ALHSD(NALHSD))
-        if(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
-        !
-        !.... CLEAR LEFT AND RIGHT HAND SIDE FOR THE ELASTIC  PROBLEM
-        !
-        ALHSD = 0.0D00
-        BRHSD = 0.0D00
-        !
-        !.... ACCOUNT THE NODAL FORCES IN THE R.H.S.
-        !
-        IF (NLVECTD.GT.0) &
-            CALL LOAD(idDesloc,fDesloc,brhsd,NDOFD,NUMNP,NLVECTD)
-        !
-        IF (NLVECTD.GT.0) &
-            CALL FTOD(idDesloc,DIS,fDesloc,NDOFD,NUMNP,NLVECTD)
-        !
-        !.... MOUNT LEFT AND RIGHT SIDE AT ELEMENT LEVEL
-        !
-        CALL BBARMTRX_CREEP(X,pressaoElem,satElem,conecNodaisElem, &
-            alhsd,brhsd,idiagD,lmD)
-        !
-        RETURN
-        !
-    ENDIF
-    !
-    IF (TASK.EQ.'right_hand_elast') THEN
-        !
-        !.... MOUNT VECTOR SOURCE OF RIGHT HAND SIDE IN ELASTIC PROBLEM
-        !
-        IF (NSD.EQ.2) CALL VECTOR_SOURC(satElem, pressaoElem, &
-            &                                GEOPRSR, brhsd, lmD)
-        !
-
-        IF (NSD.EQ.3) CALL VECTOR_SOURC_3D(satElem, pressaoElem, &
-            &                                   GEOPRSR, brhsd, lmD)
-        !
-        RETURN
-        !
-    ENDIF
-    !
-    IF (TASK.EQ.'bbarmatrix_plast') THEN
-        !
-        IF (NSD.EQ.3) THEN
-            WRITE(*,*) 'PLAST FOR 3-D PROBLEM NOT IMPLEMENTED YET'
-            STOP
-        ENDIF
-        !
-        IF(.not.allocated(ALHSD)) allocate(ALHSD(NALHSD))
-        IF(.not.allocated(BRHSD)) allocate(BRHSD(NEQD))
-        !
-        !.... CLEAR LEFT AND RIGHT HAND SIDE FOR THE ELASTIC  PROBLEM
-        !
-        ALHSD = 0.0D00
-        BRHSD = 0.0D00
-        !
-        !.... ACCOUNT THE NODAL FORCES IN THE R.H.S.
-        !
-        IF (NLVECTD.GT.0) &
-            CALL LOAD(idDesloc,fDesloc,brhsd,NDOFD,NUMNP,NLVECTD)
-        !
-        IF (NLVECTD.GT.0) &
-            CALL FTOD(idDesloc,DIS,fDesloc,NDOFD,NUMNP,NLVECTD)
-        !
-        !.... MOUNT LEFT AND RIGHT SIDE AT ELEMENT LEVEL
-        !
-        CALL BBARMTRX_PLAST(X,conecNodaisElem, dis, alhsd,brhsd,idiagD,lmD, hmTTG, pressaoElem)
-    ENDIF
-    !
-    END SUBROUTINE
-    !
     !**** new ********************************************************************
-    !
-    SUBROUTINE BBARMTRX_CREEP(x,p,satElem,conecNodaisElem,alhsd,brhsd,idiagD,lmD)
-    !
-    !.... PROGRAM TO CALCULATE STIFNESS MATRIX AND FORCE ARRAY FOR THE
-    !        STOKE'S DISPLACEMENT  ELEMENT AND
-    !        ASSEMBLE INTO THE GLOBAL LEFT-HAND-SIDE MATRIX
-    !        AND RIGHT-HAND SIDE VECTOR
-    !
-    use mGlobaisEscalares, only: nrowsh,IBBAR,LDRAINED
-    use mGlobaisArranjos,  only: grav
-    use mPropGeoFisica,    only: GEOINDIC, BULK
-    !
-    use mSolverGaussSkyline, only: addrhs, addlhs
-    !
-    use mFuncoesDeForma,   only: shgq, shlq
-    use mMalha,            only: local, numnp, multab
-    use mMalha,            only: nsd, numel, numelReserv, nen
-    !
-    implicit none
-    !
-    real*8,  intent(in)    :: x(nsd,numnp), p(1,numelReserv)
-    real*8,  intent(in)    :: satelem(numelReserv)
-    integer, intent(in)    :: conecNodaisElem(nen,numel)
-    real(8), intent(inout) :: alhsd(nalhsD), brhsd(neqD)
-    integer, intent(in)    :: idiagD(*)
-    integer, intent(in)    :: lmD(ned2,nen,numel)
-    !
-    real(8) :: xl(nesd,nen), disl(ned2,nen)
-    real(8) :: ELRESFD(nee2), ELEFFMD(nee2,nee2)
-    !
-    !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
-    !
-    LOGICAL DIAG,QUAD,ZERODL,LSYM
-    !
-    !.... LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ, BBARI, QIXIBBAR
-    REAL(8), DIMENSION(NROWB,NROWB)   :: QIXI
-    REAL(8), DIMENSION(NROWB)         :: TENSAO, PRESSURE
-    !
-    REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
-    REAL(8) :: SHGBR(NROWSH,NEN)
-    REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
-    !
-    REAL(8) :: C1,RHOTOTAL
-    !
-    INTEGER :: NEL, I, J, L, K
-    !
-    integer :: tid, numThreads
-
-    real*8, external :: rowdot, coldot
-    !
-    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
-    !
-    CALL SHLQ(SHLD,WD,NINTD,NEN)
-    !
-    !      CONSISTENT MATRIX
-    !
-    DIAG       = .FALSE.
-    TENSAO     = 0.0D0
-    tid        = 1
-    numThreads = 1
-
-
-    DO 500 NEL=1,numel
-        !
-        BBARI    = 0.0D0
-        BBARJ    = 0.0D0
-        QIXIBBAR = 0.0D0
-        QIXI     = 0.0D0
-        R        = 0.0D0
-        !
-        !.... SETUP DENSITY ELEMENT
-        !
-
-        CALL DENSLOC(RHOTOTAL,PRESSURE,GEOPRSR(nel),&
-            &                P(1,nel),satElem(nel),NEL,LDRAINED)
-        !
-        !.... CLEAR STIFFNESS MATRIX AND FORCE ARRAY
-        !
-        ELEFFMD=0.0D0
-        ELRESFD=0.0D0
-        !
-        !.... LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        QUAD = .TRUE.
-        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
-        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
-        !
-        !.... SETUP FOR AXISYMMETRIC OPTION
-        !
-        IF (IOPT.EQ.2) THEN
-            DO 100 L=1,NINTD
-                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
-                DETD(L) = DETD(L)*R(L)
-100         CONTINUE
-        ENDIF
-        !
-        !.... MOUNT STIFFNESS MATRIX
-        !
-        !.... CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
-        !
-        !.... LOOP OVER INTEGRATIONN POINTS
-        !
-        DO 400 L=1,NINTD
-            !
-            !... ... SETUP TANGENT MATRIX QIXI: ORDER 4X4 FOR MULTIPLICATION
-            !
-            CALL TANG2QX(HMTTG(1:16,L,nel),QIXI)
-            !
-            !...... SETUP ELEMENT DETERMINANT AND GAUSS WEIGHTS
-            !
-            C1=DETD(L)*WD(L)
-            !
-            !.... ...UPLOAD B-BAR MATRIX AT NODE J
-            !
-            DO 200 J=1,NEN
-                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),  &
-                    &           SHGBR(1:NROWSH,J),R(L),NROWSH,NROWB,IOPT,IBBAR)
-                !
-                !.... .... MULTIPLY QIXI*BBARJ ===>QIXIBBAR
-                !
-                QIXIBBAR=matmul(QIXI,BBARJ)
-                !             CALL MULTAB(QIXI,BBARJ,QIXIBBAR,4,4,4,4,4,2,1)
-                !
-                !.... .... UPLOAD B-BAR MATRIX AT NODE I
-                !
-                DO 200 I=1,NEN
-                    CALL SETBB(BBARI,SHGD(1:NROWSH,I,L),  &
-                        &              SHGBR(1:NROWSH,I),R(L),NROWSH,NROWB,IOPT,IBBAR)
-                    !
-                    !.... .......  MOUNT ELEMNT STIFFNESS NODAL MATRIX:
-                    !.... .......  K^E_IJ= MULTIPLY BBAR^T_I*(QIXI*BBAR_J)
-                    !
-                    ELEFFMD(NED2*I-1,NED2*J-1)= ELEFFMD(NED2*I-1,NED2*J-1)  &
-                        &             +COLDOT(BBARI(1:4,1),QIXIBBAR(1:4,1),4)*C1
-                    !
-                    ELEFFMD(NED2*I-1,NED2*J)= ELEFFMD(NED2*I-1,NED2*J)      &
-                        &             +COLDOT(BBARI(1:4,1),QIXIBBAR(1:4,2),4)*C1
-                    !
-                    ELEFFMD(NED2*I,NED2*J-1)= ELEFFMD(NED2*I,NED2*J-1)      &
-                        &             +COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,1),4)*C1
-                    !
-                    ELEFFMD(NED2*I,NED2*J)= ELEFFMD(NED2*I,NED2*J)          &
-                        &             +COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,2),4)*C1
-200         CONTINUE
-
-
-            BBARI=0.0D0
-            !
-            DO 350 I=1,NEN
-                CALL SETBB(BBARI,SHGD(1:NROWSH,I,L), &
-                    &              SHGBR(1:NROWSH,I),R(L),NROWSH,NROWB,IOPT,IBBAR)
-                DO 340 K=1,NROWB
-                    TENSAO(K) = STRSS(NEL,L,K)-PRESSURE(K)
-340             CONTINUE
-
-                ELRESFD(NED2*I-1)= ELRESFD(NED2*I-1)  &
-                    &                      - COLDOT(BBARI(1:4,1),TENSAO,4)*C1 &
-                    &                      + RHOTOTAL*GRAV(1)*SHGD(3,I,L)*C1
-                !
-                ELRESFD(NED2*I)  = ELRESFD(NED2*I)    &
-                    &                      - COLDOT(BBARI(1:4,2),TENSAO,4)*C1 &
-                    &                      + RHOTOTAL*GRAV(2)*SHGD(3,I,L)*C1
-
-350         CONTINUE
-            !
-400     CONTINUE
-        !
-        !.... COMPUTATION OF DIRICHLET B.C. CONTRIBUTION
-        !
-        CALL ZTEST(DISL,NEE2,ZERODL)
-        !
-        IF(.NOT.ZERODL)CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
-        !
-        !.... ASSEMBLE ELEMENT STIFFNESS MATRIX AND FORCE ARRAY INTO GLOBAL
-        !....     LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
-        !
-
-        LSYM=.TRUE.
-
-        if (optSolverD=='skyline')   then
-            CALL ADDLHS(ALHSD,ELEFFMD,LMD(1,1,NEL),IDIAGD,NEE2,DIAG,LSYM)
-        endif
-
-        if (optSolverD=='pardiso')   then
-            write(*,*) ' não implementado '
-            stop 9
-        endif
-
-        if (optSolverD=='hypre')   then
-            write(*,*) ' não implementado '
-            stop 9
-        endif
-        !
-        CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
-
-500 CONTINUE
-
-    !
-    RETURN
-    !
-2000 FORMAT(5(1PE15.8,2X))
-2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X   &
-        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                    &
-        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                    &
-        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                    &
-        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
-    !
-    END SUBROUTINE
-    !
-    !
     !
     subroutine bbarmtrx_plast(x, conecnodaiselem, disDirichlet, alhsd, brhsd, idiagd, lmd, tangentMatrix, pressure)
     !
@@ -1969,7 +1586,7 @@
     END SUBROUTINE
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curStressTotal, tangentMatrix, elementIsPlast, pressure)
+    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, elementIsPlast, pressure)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
@@ -1993,6 +1610,7 @@
     real*8 :: curStress(nrowB, nintD, numel)
     real*8 :: curStressTotal(nrowB, nintD, numel)
     real*8 :: curStressS(nintD, numel)
+    real*8 :: curTrStrainP(nintD, numel)
     real*8 :: tangentMatrix(nrowb2,nintD, numel)
     real*8 :: elementIsPlast(numel)
     real*8 :: pressure(1,numnp)
@@ -2010,21 +1628,23 @@
     !
     real(8), dimension(nrowb,nesd)    :: bbarj
     real(8), dimension(nrowb,nrowb)   :: qixi, cbbar, cbbarm1
-    real(8), dimension(nrowb) :: stressL, strainL, grad, qixigrad
+    real(8), dimension(nrowb) :: stressLEff, strainL, qixigrad
     real(8), dimension(nrowb) :: elasticStrain, eptrial, epinit, residuo
     !
     real(8) :: shld(nrowsh,nen,nintd), shgd(nrowsh,nen,nintd)
     real(8) :: shgbr(nrowsh,nen)
     real(8) :: detd(nintd), r(nintd), wd(nintd)
 
-    real(8) :: young, poisson, fyield, taub, sigmab, hgamma, hnorma
-    real*8 :: misesYield
+    real(8) :: young, poisson, fyield, fYield1(nrowb), fYield2(nrowb,nrowb)
+    real*8 :: hgamma, hnorma
+    real*8 :: dpH, dpAlpha
     real*8 :: pressureL(1,nen), pressureIntPoint
     real*8 :: biotCoef
     logical :: converged
     real*8 :: identI(nrowb)
 
     real*8, external :: rowdot, coldot
+    real*8, external :: traceTensor
     !
     !.... etotal      :  deformacao total
     !.... eplas       :  deformacao plastica
@@ -2047,12 +1667,13 @@
     !
     call shlq(shld,wd,nintd,nen)
     !
-    stressL = 0.0d0
+    stressLEff = 0.0d0
     !
     do nel=1,numel
         poisson = geoindic('POISSON',geoform(nel))
         young = geoindic('YOUNGMD',geoform(nel))
-        misesYield = geoIndic('MISESYI',geoform(nel))
+        dpH = geoIndic('DPCOHES',geoform(nel))
+        dpAlpha = geoIndic('DPALPHA',geoform(nel))
         
         !.... setup stochastic elasticity tensor for bbar method
         call setupc(cbbar,young,poisson,nrowb,iopt)
@@ -2064,6 +1685,10 @@
         call local(conecnodaiselem(1,nel),x,xl,nen,nsd,nesd)
         call local(conecnodaiselem(1,nel),u,uL,nen,ndofd,ned2)
         call local(conecnodaiselem(1,nel),pressure,pressureL,nen,1,1)
+        
+        !.... ... calculates biot coefficient
+        biotCoef = calcBiotCoefficient(nel)
+        
         !
         quad = .true.
         if (conecnodaiselem(3,nel).eq.conecnodaiselem(4,nel)) quad = .false.
@@ -2085,6 +1710,8 @@
         
         !.... ...loop over integration points
         do l=1,nintd
+            ! get pressure value at integration point
+            pressureIntPoint = dot_product(shgD(nrowsh,1:nen,l), pressureL(1,1:nen))
             
             !..... ..clear initial strain
             strainL = 0.0d0
@@ -2117,10 +1744,10 @@
             end do
             
             !.... ..... compute trial stress
-            stressL = matmul(cbbar, elasticStrain)
+            stressLEff = matmul(cbbar, elasticStrain)
             
             !.... ... compute yield function (mohr-coulomb):
-            call yield(fyield,sigmab,taub,stressL,poisson, misesYield)
+            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpH, dpAlpha)
             
             if (fyield.ge.tolyield) then
                 elementIsPlast(nel) = 1.d0
@@ -2130,7 +1757,7 @@
                 !
                 !.... ************* closest point-projection ********************
                 !
-                do nItPlas = 1, 15
+                do nItPlas = 1, 10000000
                     !
                     !.... ...deform elast (trial): e_elast=e_total-e_plast
                     !
@@ -2141,21 +1768,21 @@
                     !.... part 2a de box 4.1 simo-hughes compute residuals
                     
                     !.... ... compute elastic predictor stress: stress = c*e_elastico
-                    stressL = matmul(cbbar, elasticStrain)
-
-                    !.... ... compute yield function (mohr-coulomb):
-                    call yield(fyield,sigmab,taub,stressL,poisson, misesYield)
+                    stressLEff = matmul(cbbar, elasticStrain)
                     
-                    !.... ... compute gradient and hessian of yield function
-                    call grads(grad,qixi,stressL,hgamma,cbbarm1,poisson,nrowb)
+                    !.... ... compute the yield function, its gradient and hessian (drucker-prager):
+                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpH, dpAlpha)
                     
                     !.... ... residual computation
                     do k=1,nrowb
-                        residuo(k)  = eptrial(k)-epinit(k)-hgamma*grad(k)
+                        residuo(k) = eptrial(k)-epInit(k)-hGamma*fYield1(k)
                     end do
-
+                    
                     !.... ... compute norm of residuo
-                    hnorma = dsqrt(coldot(residuo,residuo,nrowb))
+                    hNorma = dsqrt(dot_product(residuo,residuo))
+                    
+                    !... compute inverse definition of QIXI (simo pag.175. equation 4.3.15)
+                    call calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
                     
                     !.... part 2b de box 4.1 simo-hughes: convergence test:
                     !.... ... convergence test
@@ -2165,22 +1792,20 @@
                     end if
                     
                     !.... ... update trial plastic deformation, gamma and qixigrad values
-                    call trials(eptrial,hgamma,qixigrad,qixi, residuo,grad,fyield,cbbarm1,nrowb)
+                    call trials(eptrial,hgamma,qixigrad,qixi, residuo, fYield1, fyield,cbbarm1,nrowb)
                 end do
                 
                 if (converged.eqv..false.) write(*,*) 'Plastic newton iteration not converged'
             endif
             
-            !.... ... update plastic deformation, etc.
-            biotCoef = calcBiotCoefficient(nel)
-            
-            pressureIntPoint = dot_product(shgD(nrowsh,1:nen,l), pressureL(1,1:nen))
             do k=1,nrowb
                 plasticStrain(k,l,nel) = eptrial(k)
-                curStress(k,l,nel) = stressL(k)
-                curStressTotal(k,l,nel) = stressL(k) - biotCoef*pressureIntPoint*IdentI(k)
+                curStress(k,l,nel) = stressLEff(k)
+                curStressTotal(k,l,nel) = stressLEff(k) - biotCoef*pressureIntPoint*IdentI(k)
             end do
-            curStressS(l,nel) = (curStressTotal(1,l,nel) + curStressTotal(2,l,nel) + curStressTotal(4,l,nel)) / 3
+            curStressS(l,nel) = traceTensor(curStressTotal(:,l,nel),nrowb)/3
+            curTrStrainP(l,nel) = traceTensor(plasticStrain(:,l,nel),nrowb)
+            
             !
             !.... ... update tangent moduli
             !.... .... transfer 4x4-order matrix to global tangent array
@@ -2980,197 +2605,6 @@
     !
     !**** NEW **** FOR INITIAL STRESS *****************************************
     !
-    FUNCTION SUMPRSR(XC, YC, G, TASK,ELEMNT)
-    !
-    use mMalha,         only: LEFTLINE, RGHTLINE
-    use mPropGeoFisica, only: MEANDENS, MEANBULK
-    !
-    !.... PROGRAM TO COMPUTE HIDROSTATIC FLUID PRESSURE LOAD
-    !....    TASK = 'INCOMP'  ---> INCOMPRESSIBLE FLUID MODEL
-    !....    TASK = 'EXACTL'  ---> COMPRESSIBLE FLUID MODEL
-    !....    TASK = 'LINEAR'  ---> LINEAR APPROXIMATION MODEL
-    !....                          FOR COMPRESSIBLE FLUID
-    !
-    IMPLICIT NONE
-    !
-    INTEGER      :: ELEMNT
-    REAL(8)      :: XC, YC, SUMPRSR, DENSRSRV, BULKRSRV, G
-    CHARACTER(6) :: TASK
-    !
-    IF (XC.LT.LEFTLINE) THEN
-        DENSRSRV = MEANDENS(5)
-        BULKRSRV = MEANBULK(5)
-    ENDIF
-    !
-    IF ((XC.GE.LEFTLINE).AND.(XC.LE.RGHTLINE)) THEN
-        DENSRSRV = MEANDENS(1)
-        BULKRSRV = MEANBULK(1)
-    ENDIF
-    !
-    IF (XC.GT.RGHTLINE) THEN
-        DENSRSRV = MEANDENS(3)
-        BULKRSRV = MEANBULK(3)
-    ENDIF
-    !
-    SUMPRSR = DABS(ADDPRSR(XC,YC,DENSRSRV,BULKRSRV,G,TASK,ELEMNT))
-    !
-    RETURN
-    !
-    END FUNCTION
-    !
-    !**** NEW **** FOR INITIAL STRESS *****************************************
-    !
-    FUNCTION ADDPRSR(XC,YC,DENSRSRV,BULKRSRV,G,TASK,ELEMNT)
-    !
-    use mGlobaisEscalares, only: SALTCREEP, S3DIM
-    use mMalha,          only: POSTLINE, SALTLINE, RTOPLINE
-    use mMalha,          only: RBTTLINE, RIFTLINE, IDOME
-    use mPropGeoFisica,  only: SEADEPTH, GRAINBLK
-    use mPropGeoFisica,  only: DOMESURF, PORELAGR, YOUNG, POISVECT
-    use mPropGeoFisica,  only: MEANDENS, MEANBULK, RHODVECT, BULK
-    use mPropGeoFisica,  only: MEANRHOW, MEANBLKW
-    !
-    use mHidroDinamicaRT, only: PRESSAOREF, COTAREF
-    !
-    !.... FUNCTION TO ADD DENSITIES ON VERTICAL DIRECTION
-    !
-    IMPLICIT NONE
-    !
-    INTEGER :: ELEMNT
-    REAL(8) :: XC, YC, ADDPRSR, DENSRSRV, BULKRSRV, WEIGHT
-    REAL(8) :: SOMAPARC, SOMA, YMIN, YMAX, G, RHOEQ, BULKEQ
-    REAL(8) :: BULKROCK, BIOTCOEF, POROSITY, ONEMPORE
-    CHARACTER(6) :: TASK
-    !
-    SOMA     = 0.0D0
-    SOMAPARC = 0.0D0
-    RHOEQ    = MEANRHOW(6)
-    BULKEQ   = 1.0D0/MEANBLKW(6)
-    SOMAPARC = DABS(HIDROSTAT(SEADEPTH,COTAREF,RHOEQ,BULKEQ,G,TASK))
-    SOMAPARC = SOMAPARC + PRESSAOREF
-    WEIGHT   = 0.0D0
-    !
-    !.... SET VERTICAL COORDINATES LIMITS FOR POST-SALT REGION
-    !
-    YMIN     = POSTLINE
-    YMAX     = DOMESURF(XC,SALTLINE,IDome) ! YMARK(1)  !
-    RHOEQ    = MEANDENS(6)
-    BULKEQ   = MEANBULK(6)
-    !
-    !.... NEXT LINES: LOAD INTO POS-SALT REGION
-    !
-    IF ((YC.LT.YMIN).AND.(YC.GT.YMAX)) THEN
-        SOMA    = DABS(HIDROSTAT(DABS(YC),DABS(YMIN),RHOEQ,BULKEQ, &
-            &                       G,TASK))
-        ADDPRSR = SOMA + SOMAPARC
-        RETURN
-    ENDIF
-    !
-    !.... NEXT LINE: COMPUTE PARTIAL LOAD FOR POS_SALT REGION
-    !
-    SOMAPARC = DABS(HIDROSTAT(DABS(YMAX),DABS(YMIN),RHOEQ,BULKEQ, &
-        &                     G,TASK))+SOMAPARC
-    !
-    IF ((PORELAGR(4).EQ.0.0D0).OR.(SALTCREEP)) THEN
-        RHOEQ   = RHODVECT(6)
-        BULKEQ  = 1.0D0
-        POROSITY= PORELAGR(6)
-        ONEMPORE= 1.0D0-POROSITY
-        WEIGHT  = POROSITY*SOMAPARC + &
-            &             ONEMPORE*DABS(HIDROSTAT(DABS(YMAX),DABS(YMIN),RHOEQ, &
-            &             BULKEQ, G,'INCOMP')) + WEIGHT
-    ENDIF
-    !
-    !.... RE-SET VERTICAL COORDINATES LIMITS FOR SALT REGION
-    !
-    YMIN   = YMAX
-    YMAX   = RTOPLINE
-    RHOEQ  = MEANDENS(4)
-    BULKEQ = MEANBULK(4)
-    !
-    !.... NEXT LINES: LOAD INTO SALT REGION
-    !
-    IF ((YC.LT.YMIN).AND.(YC.GT.YMAX)) THEN
-        SOMA    = DABS(HIDROSTAT(DABS(YC),DABS(YMIN),RHOEQ,BULKEQ, &
-            &                       G,TASK))
-        ADDPRSR = SOMA + SOMAPARC
-        IF ((PORELAGR(4).EQ.0.0D0).OR.(SALTCREEP)) ADDPRSR = 0.0D0
-        RETURN
-    ENDIF
-
-    !
-    !.... NEXT LINE: COMPUTE PARTIAL LOAD FOR SALT+POS_SALT REGION
-    !
-    SOMAPARC = DABS(HIDROSTAT(DABS(YMAX),DABS(YMIN),RHOEQ,BULKEQ, &
-        &                     G,TASK)) + SOMAPARC
-    !
-    IF ((PORELAGR(4).EQ.0.0D0).OR.(SALTCREEP)) THEN
-        RHOEQ   = RHODVECT(4)
-        BULKEQ  = 1.0D0
-        POROSITY= PORELAGR(4)
-        ONEMPORE= 1.0D0-POROSITY
-        WEIGHT  = POROSITY*SOMAPARC + &
-            &             ONEMPORE*DABS(HIDROSTAT(DABS(YMAX),DABS(YMIN),RHOEQ, &
-            &             BULKEQ, G,'INCOMP')) + WEIGHT
-        !
-        !.... SETUP BIOT COEFICIENT ALSO CALLED BIOT'S ALPHA
-        !
-        BULKROCK  = BULK(YOUNG(ELEMNT), POISVECT(1), S3DIM)
-        BIOTCOEF  = 1.0D0 - BULKROCK/GRAINBLK(1)
-        !
-        SOMAPARC = BIOTCOEF*WEIGHT
-        !
-    ENDIF
-    !
-    !.... RE-SET VERTICAL COORDINATES LIMITS FOR RESERVOIR REGION
-    !
-    YMIN   = YMAX
-    YMAX   = RBTTLINE
-    POROSITY = 1.0D0
-    IF ((PORELAGR(4).EQ.0.0D0).OR.(SALTCREEP)) POROSITY = PORELAGR(1)
-    ONEMPORE =  1.0D0-POROSITY
-    RHOEQ  = POROSITY*DENSRSRV + ONEMPORE*RHODVECT(1)
-    BULKEQ = POROSITY*BULKRSRV + ONEMPORE/GRAINBLK(1)
-    !
-    !.... NEXT LINES: LOAD INTO RESERVOIR REGION
-    !
-    IF ((YC.LT.YMIN).AND.(YC.GT.YMAX)) THEN
-        SOMA    = DABS(HIDROSTAT(DABS(YC),DABS(YMIN),RHOEQ,BULKEQ, &
-            &             G, TASK))
-        ADDPRSR = SOMA + SOMAPARC
-        RETURN
-    ENDIF
-    !
-    !.... NEXT LINE: COMPUTE PARTIAL LOAD FOR:
-    !                RESERVOIR+SALT+POS_SALT REGION
-    !
-    SOMAPARC = DABS(HIDROSTAT(DABS(YMAX),DABS(YMIN),RHOEQ,BULKEQ, &
-        &                     G,TASK)) + SOMAPARC
-    !
-    !.... RE-SET VERTICAL COORDINATES LIMITS FOR RIFT REGION
-    !
-    YMIN   = YMAX
-    YMAX   = RIFTLINE
-    RHOEQ  = MEANDENS(2)
-    BULKEQ = MEANBULK(2)
-    !
-    !.... NEXT LINES: LOAD INTO RIFT REGION
-    !
-    ADDPRSR = SOMAPARC
-    !
-    IF ((YC.LT.YMIN).AND.(YC.GT.YMAX)) THEN
-        SOMA    = DABS(HIDROSTAT(DABS(YC),DABS(YMIN),RHOEQ,BULKEQ, &
-            &                        G,TASK))
-        ADDPRSR = SOMA + SOMAPARC
-        RETURN
-    ENDIF
-    !
-    RETURN
-    !
-    END FUNCTION
-    !
-    !**** NEW **** FOR INITIAL STRESS *****************************************
-    !
     FUNCTION HIDROSTAT(Z1, Z2, RHOEQ, BULKEQ, G, TASK)
     !
     !.... PROGRAM TO COMPUTE HIDROSTATIC PRESSURE FIELD
@@ -3279,382 +2713,6 @@
     RETURN
     !
     END FUNCTION
-    !
-    !**** NEW **************************************************************
-    !
-    SUBROUTINE VECTOR_SOURC(satElem, p, GEOPRSR, brhsd, lmD)
-    !
-    use mGlobaisEscalares, only: nrowsh, LDRAINED
-    use mGlobaisArranjos,  only: grav
-    use mSolverGaussSkyline, only: addrhs
-    use mFuncoesDeForma,   only: shgq,shlq
-    use mGlobaisEscalares, only: ibbar
-    use mMalha,            only: local, multab
-    use mMalha,            only: X, conecNodaisElem
-    use mMalha,            only: numel, nen, nsd, numelReserv
-    use mPropGeoFisica,    only: GEOINDIC, BULK
-    !
-    !.... PROGRAM TO COMPUTE PLASTIC DEFORMATION OVER THE MACRO DOMAIN
-    !
-    IMPLICIT NONE
-    !
-    !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
-    !
-    LOGICAL DIAG,QUAD,ZERODL
-    !
-    !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
-    !
-    REAL*8,  intent(in)    :: P(1,numelReserv)
-    REAL*8,  intent(in)    :: satElem(numelReserv)
-    REAL*8,  intent(in)    :: GEOPRSR(NUMEL)
-    REAL(8), intent(inout) :: BRHSD(neqD)
-    INTEGER, intent(in)    :: LMD(NED2,NEN,NUMEL)
-    !
-    real(8) :: xl(nesd,nen), disl(ned2,nen)
-    REAL*8 :: ELEFFMD(NEE2,NEE2),ELRESFD(NEE2)
-
-    real*8, external :: rowdot, coldot
-    !
-    !.... LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8) :: BBARI(NROWB,NESD), PRESSURE(NROWB)
-    REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
-    REAL(8) :: SHGBR(NROWSH,NEN)
-    REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
-    !
-    REAL(8) :: C1, RHOTOTAL
-    INTEGER :: NEL, I, L, II, JJ
-    !
-    real(8) :: curP, curSat
-    !
-    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
-    !
-    CALL SHLQ(SHLD,WD,NINTD,NEN)
-    !
-    !... CONSISTENT MATRIX
-    !
-    DIAG = .FALSE.
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        RHOTOTAL = 1.0d0
-        PRESSURE = 0.0D0
-        !
-        !.... SETUP TOTAL DENSITY AND PRESSURE EFFECTS IN DRAINED STATE
-        !
-        curP = 0
-        curSat = 0
-        if (nel <= numelReserv) then
-            curP = P(1,nel)
-            curSat = satElem(nel)
-        end if
-
-
-        CALL DENSLOC(RHOTOTAL,PRESSURE,GEOPRSR(nel),&
-            &               curP,curSat,NEL,LDRAINED)
-        !
-        !         write(2025,4500) nel,xc(2,nel),pressure(2)
-        !RHOMAT, grav(2) !DENFLUID, densolid ! rhomat, poisson, bulkgrain
-        !
-        !... CLEAR STIFFNESS MATRIX AND FORCE ARRAY
-        !
-        ELEFFMD = 0.0D0
-        ELRESFD = 0.0D0
-        !
-        !... LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        QUAD = .TRUE.
-        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
-        !
-        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
-        !
-        !.... SETUP FOR AXISYMMETRIC OPTION
-        !
-        IF (IOPT.EQ.2) THEN
-            DO 100 L=1,NINTD
-                R(L)   = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
-                DETD(L) = DETD(L)*R(L)
-100         CONTINUE
-        ENDIF
-        !
-        !.... FORM STIFFNESS MATRIX
-        !
-        !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... .. FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
-        !
-        !.... .. LOOP OVER INTEGRATIONN POINTS
-        !
-        DO 400 L=1,NINTD
-            !
-            C1 = DETD(L)*WD(L)
-            !
-            !**** **** MOUNT FORCE VECTOR ******************
-            !
-            CALL CLEAR(BBARI,NROWB*NESD)
-            !
-            DO 300 I=1,NEN
-                !
-                CALL SETBB(BBARI,SHGD(1:NROWSH,I,L),&
-                    &              SHGBR(1:NROWSH,I),R(L),NROWSH,NROWB,IOPT,IBBAR)
-                !
-                ELRESFD(NED2*I-1)= ELRESFD(NED2*I-1) &
-                    &                      + COLDOT(BBARI(1:4,1),PRESSURE,4)*C1 &
-                    &                      + RHOTOTAL*GRAV(1)*SHGD(3,I,L)*C1
-                !
-                ELRESFD(NED2*I)  = ELRESFD(NED2*I) &
-                    &                      + COLDOT(BBARI(1:4,2),PRESSURE,4)*C1 &
-                    &                      + RHOTOTAL*GRAV(2)*SHGD(3,I,L)*C1
-                !
-300         CONTINUE
-400     CONTINUE
-        !
-        DO 450 II=1,NEE2
-            DO 450 JJ=1,NEE2
-                ELEFFMD(II,JJ) = AUXM(NEL,II,JJ)
-450     CONTINUE
-        !
-        !...     COMPUTATION OF DIRICHLET B.C. CONTRIBUTION
-        !
-        CALL ZTEST(DISL,NEE2,ZERODL)
-        !
-        IF (.NOT.ZERODL) &
-            &      CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
-        !
-        !.... ASSEMBLE ELEMENT FORCE ARRAY INTO GLOBAL RIGHT-HAND SIDE VECTOR
-        !
-        CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
-        !
-500 CONTINUE
-
-    RETURN
-4500 FORMAT(I7,X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
-    !
-    !**** NEW FOR 3D GEOMECHANICAL COUPLING *************************************
-    !
-    
-    
-    SUBROUTINE DENSLOC(RHOMAT,PRESSURE,GEOP,P,SATURAT,&
-        &                   ELEMNT,LDRAINED)
-    !
-    !.... PROGRAM TO COMPUTE DENSITY FUNCTION OF PRESSURE OR COORDINATE
-    !
-    use mHidroDinamicaRT, only: PRESSAOREF
-    use mPropGeoFisica,    only: YOUNG, PORE
-    use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
-    use mPropGeoFisica,    only: BULK, GEOFORM, GEOINDIC
-    use mGlobaisArranjos,  only: grav
-    use mMalha,            only: XC, NSD
-    !
-    IMPLICIT NONE
-    !
-    LOGICAL :: LDRAINED
-    INTEGER :: ELEMNT
-    REAL(8) :: P, SATURAT, GEOP
-    REAL(8) :: POROSITY, DENSOLID, DENFLUID, BULKFLUD
-    REAL(8) :: RHOWLIN, RHOOLIN, ONEMSAT
-    REAL(8) :: NU, BULKROCK, BULKGRAIN, ALPHABIOT
-    !
-    real*8, external :: coldot
-    REAL(8) :: RHOMAT, DENFLUID0
-    REAL(8) :: PRESSURE(NROWB)
-    !
-    !.... COMPUTE TOTAL DENSITY
-    !
-    POROSITY  = GEOINDIC('POROSTY',GEOFORM(ELEMNT))
-
-    DENSOLID  = GEOINDIC('ROKDENS',GEOFORM(ELEMNT))
-    DENFLUID0 = GEOINDIC('FLUDENS',GEOFORM(ELEMNT))
-    BULKFLUD  = GEOINDIC('BLKFLUD',GEOFORM(ELEMNT))
-    !.... Remember BULKFLUD was inverted on previous subroutine
-    IF (NSD.EQ.2) DENFLUID = GRAV(2)*DABS(XC(2,ELEMNT))
-    IF (NSD.EQ.3) DENFLUID = GRAV(3)*DABS(XC(3,ELEMNT))
-    DENFLUID = DENFLUID0*BULKFLUD*DENFLUID
-    DENFLUID = DENFLUID0/(1.0D0-DENFLUID)
-    IF (LDRAINED) THEN
-        IF (GEOFORM(ELEMNT).EQ.'RESERVATORIO') THEN
-            RHOWLIN  = RHOW*(1.0D0+(P-PRESSAOREF)/BULKWATER)
-            RHOOLIN  = RHOO*(1.0D0+(P-PRESSAOREF)/BULKOIL)
-            ONEMSAT  = 1.0D0-SATURAT
-            BULKFLUD = SATURAT/BULKWATER + ONEMSAT/BULKOIL
-            DENFLUID = SATURAT*RHOWLIN   + ONEMSAT*RHOOLIN
-            DENFLUID = DENFLUID*(1.0D0+BULKFLUD*(P-PRESSAOREF))
-            POROSITY = PORE(ELEMNT)
-        ENDIF
-    ENDIF
-    !
-    RHOMAT = POROSITY*DENFLUID + (1.0D0-POROSITY)*DENSOLID
-    !
-    !... COMPUTE FLUID PRESSURE EFFECTS, FIRST LINES FIND ALPHA-BIOT
-    !
-
-    IF (LDRAINED) THEN
-        NU = GEOINDIC('POISSON',GEOFORM(ELEMNT))
-        BULKGRAIN = GEOINDIC('BLKGRIN',GEOFORM(ELEMNT))
-        BULKROCK  = BULK(YOUNG(ELEMNT),NU,3.0D0)
-        ALPHABIOT = 1.0D0 - BULKROCK/BULKGRAIN
-        !
-        IF (GEOFORM(ELEMNT).EQ.'RESERVATORIO') THEN
-            PRESSURE(1) = ALPHABIOT*P
-        ELSE
-            PRESSURE(1) = ALPHABIOT*GEOP
-        ENDIF
-        !
-        PRESSURE(2) = PRESSURE(1)
-        IF (NSD.EQ.2) THEN
-            PRESSURE(4) = PRESSURE(1)
-            PRESSURE(3) = 0.0D0
-        ELSE
-            PRESSURE(3) = PRESSURE(1)
-            PRESSURE(4) = 0.0D0
-            PRESSURE(5) = 0.0D0
-            PRESSURE(6) = 0.0D0
-        ENDIF
-    ELSE
-        PRESSURE = 0.0D0
-    ENDIF
-    
-    RETURN
-1000 FORMAT('NEL = ',I5,1X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
-    !
-    !**** NEW **** FOR INCOMPRESSIBILITY **************************************
-    !
-    SUBROUTINE VECTOR_SOURC_3D(satElem, p, GEOPRSR, brhsd, lmD)
-    !
-    use mGlobaisEscalares, only: nrowsh, ldrained
-    use mGlobaisArranjos,  only: grav
-    use mSolverGaussSkyline, only: addrhs
-    use mGlobaisEscalares, only: ibbar
-    USE mfuncoesDeForma,   only: shlq3d, shg3d
-    use mMalha,            only: local, multab
-    use mMalha,            only: X, conecNodaisElem
-    use mMalha,            only: numel, nen, nsd, numelReserv
-    !
-    !.... PROGRAM TO COMPUTE PLASTIC DEFORMATION OVER THE MACRO DOMAIN
-    !
-    IMPLICIT NONE
-    !
-    !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
-    !
-    LOGICAL ZERODL
-    !
-    !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
-    !
-    REAL*8,  intent(in)    :: P(1,numelReserv)
-    REAL*8,  intent(in)    :: satElem(numelReserv)
-    REAL*8,  intent(in)    :: GEOPRSR(NUMEL)
-    REAL(8), intent(inout) :: BRHSD(neqD)
-    INTEGER, intent(in)    :: LMD(NED2,NEN,NUMEL)
-    !
-    real(8) :: xl(nesd,nen), disl(ned2,nen)
-    REAL*8 :: ELEFFMD(NEE2,NEE2),ELRESFD(NEE2)
-    !
-    !.... LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8) :: BBARI(NROWB,NESD), PRESSURE(NROWB)
-    REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
-    REAL(8) :: SHGBR(NESD,NEN)
-    REAL(8) :: DETD(NINTD), WD(NINTD)
-    !
-    REAL(8) :: C1, RHOTOTAL
-    INTEGER :: NEL, I, J, L
-
-    real*8, external :: rowdot, coldot
-    !
-    CALL SHLQ3D(SHLD,WD,NINTD,NEN)
-    !
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        !         write(3031,*) xc(3,nel), geoprsr(nel)
-        !
-        PRESSURE = 0.0D0
-        !
-        !.... SETUP TOTAL DENSITY AND PRESSURE EFFECTS IN DRAINED STATE
-        !
-        CALL DENSLOC(RHOTOTAL,PRESSURE,GEOPRSR(nel),&
-            &                P(1,nel),satElem(nel),NEL,LDRAINED)
-        !
-        !... CLEAR LOCAL STIFFNESS MATRIX AND FORCE ARRAY
-        !
-        ELEFFMD = 0.0D0
-        ELRESFD = 0.0D0
-        !
-        !... LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NSD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        CALL SHG3D(XL,DETD,SHLD,SHGD,NINTD,NEL,NEN)
-        !
-        !.... CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH_3D(SHGBR,WD,DETD,SHGD,NEN,NINTD,NROWSH,NESD)
-        !
-        DO 400 L=1,NINTD
-            !
-            C1=DETD(L)*WD(L)
-            !
-            !**** **** MOUNT FORCE VECTOR ******************
-            !
-            BBARI = 0.0D0
-            !
-            DO 300 I=1,NEN
-                !
-                CALL SETBBAR_3D(BBARI,SHGD(1:NROWSH,I,L),&
-                    SHGBR(1:NESD,I),NROWSH,NROWB,NESD,IBBAR)
-                !
-                ELRESFD(NED2*I-2)= ELRESFD(NED2*I-2) &
-                    &                         + COLDOT(BBARI(1:NROWB,1),PRESSURE,6)*C1 &
-                    &                         + RHOTOTAL*GRAV(1)*SHGD(4,I,L)*C1
-                !
-                ELRESFD(NED2*I-1)= ELRESFD(NED2*I-1) &
-                    &                         + COLDOT(BBARI(1:NROWB,2),PRESSURE,6)*C1 &
-                    &                         + RHOTOTAL*GRAV(2)*SHGD(4,I,L)*C1
-                !
-                ELRESFD(NED2*I)  = ELRESFD(NED2*I)   &
-                    &                         + COLDOT(BBARI(1:NROWB,3),PRESSURE,6)*C1 &
-                    &                         + RHOTOTAL*GRAV(3)*SHGD(4,I,L)*C1
-300         CONTINUE
-400     CONTINUE
-        !
-        DO 450 I=1,NEE2
-            DO 450 J=1,NEE2
-                ELEFFMD(I,J) = AUXM(NEL,I,J)
-450     CONTINUE
-        !
-        !.... COMPUTATION OF DIRICHLET B.C. CONTRIBUTION
-        !
-        CALL ZTEST(DISL,NEE2,ZERODL)
-        !
-        IF (.NOT.ZERODL) &
-            &      CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
-        !
-        !.... ASSEMBLE ELEMENT FORCE ARRAY INTO GLOBAL RIGHT-HAND SIDE VECTOR
-        !
-        CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
-        !
-500 CONTINUE
-
-
-    ! !
-
-    RETURN
-    !
-2001 FORMAT('GAUSS=',I1,1X,'NEN=',I1,1X,'SHAPE=',40(1PE9.2,2X))
-3500 FORMAT(I8,X,40(1PE15.8,2X))
-3501 FORMAT(I2,X,I2,X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
     !
     !**** NEW ***************************************************************
     !
@@ -4009,223 +3067,7 @@
     end subroutine pos4inc
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    !
-    !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
-    !
-    subroutine POS4TRNS2(x, conecNodaisElem, p, p0)
-    !
-    use mLeituraEscritaSimHidroGeoMec,   only: CODERROR
-    use mMalha,            only: nen, LOCAL
-    use mMalha,            only: nsd, numnp, numel, numelReserv
-    use mGlobaisEscalares, only: nrowsh, S3DIM
-    use mFuncoesDeForma,   only: shgq, shlq
-    use mGlobaisEscalares, only: ibbar
-    use mPropGeoFisica,    only: YOUNG, PORE, PORE0, PHIEULER
-    use mPropGeoFisica,    only: GRAINBLK, BULKWATER, MASCN, MASCN0
-    use mPropGeoFisica,    only: POISVECT, GEOFORM, GEOINDIC, BULK
-    !
-    !.... PROGRAM TO COMPUTE POROSITY FROM GEOMECHANIC MODEL
-    !
-    IMPLICIT NONE
-    !
-    real*8,  intent(in)    :: x(nsd,numnp), p(1,numelReserv), p0(numelReserv)
-    integer, intent(in)    :: conecNodaisElem(nen,numel)
-    !
-    !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
-    !
-    LOGICAL QUAD
-    real(8) :: xl(nesd,nen), disl(ned2,nen), AREA, c1
-    REAL*8  :: POISSON
-    integer :: nel, l, j, k
-    real*8, external :: rowdot, coldot
-    !
-    !.... ..LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8) :: UNITVEC(NROWB),BBARJ(NROWB,NESD)
-    REAL(8) :: CBBAR(NROWB, NROWB)
-    REAL(8) :: SHLD(NROWSH,NEN,NINTD), SHGD(NROWSH,NEN,NINTD)
-    REAL(8) :: SHGBR(NROWSH,NEN)
-    REAL(8) :: DETD(NINTD), R(NINTD),WD(NINTD)
-    !
-    REAL*8, DIMENSION(NROWB) :: TENSAO
-    !
-    REAL*8 :: STRAIN(NROWB),DEVSTRS(NROWB)
-    REAL*8  :: ROOT3D2, TRCSTRS, QVM, JACOBIAN
-    REAL(8) :: BULKROCK, BIOTCOEF
-    REAL(8) :: DEFNM1, DEFMM1, DIFFDIVU, DIFFPRES
-
-    UNITVEC(1)= 1.0D0
-    UNITVEC(2)= 1.0D0
-    UNITVEC(3)= 0.0D0
-    UNITVEC(4)= 1.0D0
-    ROOT3D2=1.224744871391589D0
-    !
-    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
-    !
-    CALL SHLQ(SHLD,WD,NINTD,NEN)
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        POISSON = GEOINDIC('POISSON',GEOFORM(NEL))
-        !
-        !.... ..SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
-        !
-        CALL SETUPC(CBBAR, YOUNG(NEL),POISSON,NROWB,IOPT)
-        !
-        !...  ..LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        QUAD = .TRUE.
-        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
-        !
-        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
-        !
-        DIVU(NEL) = 0.0D0
-        !..
-        !.... ..CLEAR INITIAL STRAIN
-        !..
-        CALL CLEAR(STRAIN,NROWB)
-        CALL CLEAR(TENSAO,NROWB)
-        !..
-        !.... ..DEFINE ELEMENT AREA
-        !..
-        AREA = 0.0D0
-        !..
-        !.... ..SETUP FOR AXISYMMETRIC OPTION
-        !..
-        IF (IOPT.EQ.2) THEN
-            DO 10 L=1,NINTD
-                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
-                DETD(L) = DETD(L)*R(L)
-10          CONTINUE
-        ENDIF
-        !
-        !.... ..CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... ..FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
-        !
-        !.... ..LOOP OVER INTEGRATIONN POINTS
-        !
-        DO 300 L=1,NINTD
-            !
-            C1 = WD(L)*DETD(L)
-            AREA = AREA + C1
-            DO 200 J=1,NEN
-                !
-                !.... ..UPLOAD B-BAR MATRIX AT NODE J
-                !
-                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), &
-                    &                R(L),NROWSH,NROWB,IOPT,IBBAR)
-                !
-                !.... ..COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
-                !
-                DO 200 K=1,NROWB
-                    STRAIN(K)=STRAIN(K)+                                &
-                        &                  COLDOT(BBARJ(K,1:2),DISL(1:2,J),2)*C1
-200         CONTINUE
-            !..
-            !.... ..COMPUTE STRESS WITHIN INTRINSIC B-BAR FORMULATION
-            !..
-            !.... ..TO COMPUTE MEAN VOLUMETRIC CREEP
-            !.... ....FIRST: COMPUTE DEVIATOR STRESS TENSOR
-            !..
-            CALL DEVTENSOR(DEVSTRS,TRCSTRS,STRSS(NEL,L,1:4),NROWB)
-            !
-            !.... ....SECOND: COMPUTE VON MISES EFFECTIVE STRESS
-            !
-            QVM=ROOT3D2*DSQRT(DEVNORM2(DEVSTRS,NROWB))
-            !
-            DO 220 K=1,NROWB
-                ECREEP(NEL,L,K)=ECREEP(NEL,L,K)+                    &
-                    &                     ROOT3D2*POWERLAW(QVM,1)*DEVSTRS(K)/QVM
-220         CONTINUE
-            !
-            DO 250 K=1,NROWB
-                TENSAO(K) = TENSAO(K)+C1*STRSS(NEL,L,K)
-250         CONTINUE
-            !
-300     CONTINUE
-        !
-        DO 350 K=1,NROWB
-            STRAIN(K)=STRAIN(K)/AREA
-            AVSTRS(K,NEL)=TENSAO(K)/AREA
-350     CONTINUE
-        !
-        !.... ..COMPUTE MEAN DEFORMATION AND MEAN STRESS OVER ELEMENT
-        DIVU(NEL) = COLDOT(UNITVEC,STRAIN,NROWB)
-
-        !        write(888,*) divuloc(nel)
-500 CONTINUE
-    !..
-    !      DO 700 NEL=1,NUMEL
-    !         DIVU(NEL)=DIVULOC(NEL)
-    !700   CONTINUE
-
-    DO 800 NEL=1,NUMELRESERV
-        !.... ..COMPUTE MEAN VOLUMETRIC DEFORMATION FOR RESERVOIR
-        !..
-        BULKROCK  = BULK(YOUNG(NEL),POISVECT(1),S3DIM)
-        BIOTCOEF  = 1.0D0 - BULKROCK/GRAINBLK(1)   !also called ALPHA
-        !
-        !... FIRST DEFINE 1/N from Coussy 2.Edt   EQ. 4.35
-        !
-        DEFNM1    = (BIOTCOEF-PORE0(NEL))/GRAINBLK(1)
-        !
-        !... SECOND DEFINE 1/M FROM Coussy 2.Edt  EQ. 4.61
-        !
-        DEFMM1 = DEFNM1 + PORE0(NEL)/BULKWATER
-        !
-        !... DEFINITION OF JACOBIAN OF INFINITESSIMAL TRANSFORMATION COUSSY EQ 1.27
-        !
-        JACOBIAN  = 1.0D0 + DIVU(NEL)
-        DIFFDIVU  = DIVU(NEL)-DIVU0(NEL)
-        DIFFPRES  = P(1,NEL)-P0(NEL)
-        !
-        ! ..COMPUTE LAGRANGIAN POROSITY
-        !           PORE(NEL) =  1.0D0-(1.0D0-PORE0(NEL))*DEXP(-diffdivu)
-        !
-        !new line: linearized See: Coussy 2.Edt. Eqs. 4.19
-        PORE(NEL) = PORE0(NEL)+BIOTCOEF*DIFFDIVU+DEFNM1*DIFFPRES
-        !
-        !...COMPUTE EULERAIN POROSITY
-        PHIEULER(NEL) = PORE(NEL)/JACOBIAN
-        !
-        !...COMPUTE MASS CONTENT: linearized form Ref: Coussy 2.Edt. Eqs. 4.62
-        !
-        MASCN(NEL)= MASCN0(NEL)+(BIOTCOEF*DIFFDIVU+DEFMM1*DIFFPRES)
-
-        IF ((MASCN(NEL).LT.0.0D0).OR.(PORE(NEL).LT.0.0D0)) THEN
-            write(2020,*) 'nel=',nel
-            write(2020,*) 'alfa=',BIOTCOEF
-            write(2020,*) 'divu=',divu(nel)
-            write(2020,*) 'divu0=',divu0(nel)
-            write(2020,*) 'biotmod=',defmm1
-            write(2020,*) 'diffpress=',diffpres
-            write(2020,*) '1/m(p-p0)=',defmm1*DIFFPRES
-            write(2020,*) 'masscont=',mascn(nel), mascn0(nel)
-            !                               123456789+12345678
-            CALL CODERROR(4,'ALSO SEE fort.2020')
-        ENDIF
-        !..
-800 CONTINUE
-    !
-    !      DO 550 NEL=1,NELX1*NELY1
-    !         DO 550 JJ=1,NROWB
-    !            STRSS(JJ,NEL)=0.0D0
-    ! 550  CONTINUE
-    !
-    RETURN
-    !
-4000 FORMAT(2X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
-    !
-    !
-    !**** NEW ****************************************************************
-    !
+    
     SUBROUTINE UPDTSTRS(STRSS,STRSINIT,NROWB,NUMEL)
     !
     !.... PROGRAM TO UPDATE EFFECTIVE STRESS WITHIN INITIAL EFFECTIVE STRESS
@@ -4246,219 +3088,37 @@
     !
     END SUBROUTINE
     !
-    !**** NEW **************************************************************
-    !
-    SUBROUTINE FTODMANDL(F,NDOF,NUMNP,NLVECT,XTERLOAD,TEMPO)
-    !
-    use mPropGeoFisica,    only: NELX, NELY, NELZ
-    !
-    !.... PROGRAM TO SETUP DISPLACMENTS FOR MANDEL PROBLEM
-    !
-    IMPLICIT NONE
-    !
-    !.... REMOVE ABOCE CARD FOR SINGLE-PRECISION OPERATION
-    !
-    INTEGER :: I,NDOF, NUMNP, NLVECT, INODE
-    REAL(8) :: XTERLOAD,TEMPO
-    REAL(8), DIMENSION(NDOF,NUMNP,NLVECT)  :: F
-    !
-    IF (NDOF.EQ.2) INODE = (NELX+1)*NELY + 1
-    IF (NDOF.EQ.3) INODE = (NELX+1)*(NELY+1)*NELZ + 1
-    !
-    DO 200 I=INODE,NUMNP
-        F(NDOF,I,1) = SOLTEORM2(XTERLOAD,TEMPO)
-200 CONTINUE
-    !
-    RETURN
-    !
-4000 FORMAT(2X,40(1PE15.8,2X))
-    END SUBROUTINE
-    !
-    !**** NEW **************************************************************
-    !
-    SUBROUTINE FTODMANDL_old(F,NDOF,NUMNP,NLVECT,XTERLOAD,TEMPO)
-    !
-    !.... PROGRAM TO SETUP DISPLACMENTS FOR MANDEL PROBLEM
-    !
-    IMPLICIT NONE
-    !
-    !.... REMOVE ABOCE CARD FOR SINGLE-PRECISION OPERATION
-    !
-    INTEGER :: I,NDOF, NUMNP, NLVECT
-    REAL(8) :: XTERLOAD,TEMPO
-    REAL(8), DIMENSION(NDOF,NUMNP,NLVECT)  :: F
-    !
-    DO 200 I=NUMNP-100,NUMNP
-        F(2,I,1) = SOLTEORM2(XTERLOAD,TEMPO)
-200 CONTINUE
-    !
-    RETURN
-    !
-    END SUBROUTINE
-    !
-    !**** NEW ***** FOR MANDEL PROBLEM **********************************
-    !
-    FUNCTION SOLTEORM2(XTERLOAD,TEMPO)
-    !
-    use mMalha,         only: RTOPLINE, RBTTLINE
-    use mMalha,         only: LEFTLINE, RGHTLINE
-    use mPropGeoFisica, only: POISVECT, YUNGVECT, PERMINICIAL
-    !
-    !.....PROGRAM TO COMPUTE EFFECTIVE VON MISES ENERGY
-    !
-    IMPLICIT NONE
-    !
-    INTEGER :: I, IINPUT
-    REAL(8) :: PI, A, B, EE, XNU, GSHEAR, UXNU, XKAPPA, XTERLOAD
-    REAL(8) :: GAMMAW, C, SKEM, FORCE, FSA, TWOFSA, SERIE
-    REAL(8) :: COEFUY, CONSTUY, COEFPRES, COEFSIGM, TEMPO
-    REAL(8) :: BETA, TSTAR, SINCOS, BMSINCOS, UY, SOLTEORM2
-    CHARACTER*30 NIINPUT
-    !
-    !.... NUMBER FOR INPUT FILE
-    !
-    IINPUT  = 741
-    !
-    NIINPUT = 'beta4mandel.dat'
-    !
-    OPEN(UNIT=IINPUT, FILE=NIINPUT, STATUS='OLD')
-    !
-    PI=4.0D0*DATAN(1.0D0)
-    !
-    !.... GEOMETRIC DATA:
-    !
-    !....  HORIZONTAL LENGTH -> A=100 M
-    !....  VERTICAL LENGTH   -> B= 10 M
-    !
-    A = RGHTLINE - LEFTLINE
-    !
-    B = RTOPLINE - RBTTLINE
-    !
-    !.... SOLID PARAMETERS
-    !
-    !.... YOUNG MODULUS: EE=1.0E8 [Pa]
-    !
-    EE  = YUNGVECT(1)
-    !
-    !..... DRAINED POISSON RATIO:
-    !
-    XNU = POISVECT(1)
-    !
-    !.... SHEAR MODULUS: GSHEAR=EE/[2(1+XNU)] [Pa]
-    !
-    GSHEAR=EE/(2.0D0*(1.0D0+XNU))
-    !
-    !.... UNDRAINED POISSON RATIO:
-    !
-    UXNU = 0.5D0
-    !
-    !.... FLUID PARAMETERS
-    !
-    !.... PERMEABILITY XKAPPA:
-    !       1.0 [mD {miliDarcy}]=1.0D-12 [m2 {square meters}]
-    !      XKAPPA = 1.0D-10
-    !
-    XKAPPA = PERMINICIAL
-    !
-    !.... VOLUMETRIC WEIGHT OF WATER GAMMAW=1.0D0  [kN/m3]
-    !
-    GAMMAW = 1.0D0
-    !
-    !.... COEFICIENTE DE CONSOLIDACCAO (VERRUIJT) C [m2/s]
-    !
-    !       CV=KAPPA*EE/GAMMAW
-    !
-    !.... C GENERALIZED CONSOLIDATION CONSTANT
-    !
-    C = 2.0D0*XKAPPA*GSHEAR*(1.0D0-XNU)
-    !
-    C = C/(GAMMAW*(1.0D0-2.0D0*XNU))
-    !
-    !.... SKEMPTON
-    !
-    SKEM = 1.0D0
-    !
-    !.... FORCE
-    !
-    FORCE = XTERLOAD
-    !
-    !.... CONSTANT OF SOLUTIONS
-    !
-    FSA = FORCE/A
-    !
-    TWOFSA = 2.0D0*FSA
-    !
-    COEFUY = FSA*(1.0D0-UXNU)/GSHEAR
-    !
-    CONSTUY = -0.5D0*FSA *(1.0D0-XNU)/GSHEAR
-    !
-    COEFPRES = TWOFSA*SKEM*(1.0D0+UXNU)/(3.0D0)
-    !
-    COEFSIGM = TWOFSA*(UXNU-XNU)/(1.0D0-XNU)
-    !
-    SERIE    = 0.0D0
-    !
-    DO 50 I=1,20
-        !
-        READ(IINPUT,4000) BETA
-        !
-        TSTAR = -BETA*BETA*C*TEMPO/(A*A)
-        !
-        SINCOS = DSIN(BETA)*DCOS(BETA)
-        !
-        BMSINCOS = BETA-SINCOS
-        !
-        SERIE = SERIE + SINCOS*DEXP(TSTAR)/BMSINCOS
-        !
-50  CONTINUE
-    !
-    REWIND(IINPUT)
-    !
-    UY = (CONSTUY + COEFUY*SERIE)*B
-    !
-100 CONTINUE
-    !
-    CLOSE(IINPUT)
-    !
-    SOLTEORM2 = UY
-    !
-    RETURN
-    !
-4000 FORMAT(2X,40(1PE15.8,2X))
-    !
-    END FUNCTION
-    !
     !***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ***** %%% ****
-    SUBROUTINE YIELD(FYIELD,SIGMAB,TAUB,TENSAO,POISSON, misesYield)
+    subroutine yield(fyield,sigmab,taub,tensao,poisson, misesyield)
     !
     !
-    !..... PROGRAM TO COMPUTE GRADIENT (FNABLA) AND HESSIAN (FHESSI)
-    !..... OF MOHR-COLUMB IN FUNCTION FOR NORMAL AND SHEAR STRESS
-    !..... AS INDENDENT VARIABLES.
+    !..... program to compute gradient (fnabla) and hessian (fhessi)
+    !..... of mohr-columb in function for normal and shear stress
+    !..... as indendent variables.
     !
-    REAL(8) :: FYIELD, SIGMAB, TAUB, POISSON, VMPOISSON, misesYield
-    REAL(8), DIMENSION(NROWB) :: TENSAO
+    real(8) :: fyield, sigmab, taub, poisson, vmpoisson, misesyield
+    real(8), dimension(nrowb) :: tensao
     !
-    SIGMAB = 0.5D0*(TENSAO(1)+TENSAO(2))
-    TAUB   = DSQRT((0.5D0*(TENSAO(1)-TENSAO(2)))**2+TENSAO(3)**2)
+    sigmab = 0.5d0*(tensao(1)+tensao(2))
+    taub   = dsqrt((0.5d0*(tensao(1)-tensao(2)))**2+tensao(3)**2)
     !
-    !.... VON MISES CRITERIA
+    !.... von mises criteria
     !
-    VMPOISSON = 2.0D0*(1.0D0-2.0D0*POISSON)**2
-    FYIELD    = VMPOISSON*SIGMAB**2+6.0D0*TAUB**2-6.0D0*misesYield**2
+    vmpoisson = 2.0d0*(1.0d0-2.0d0*poisson)**2
+    fyield    = vmpoisson*sigmab**2+6.0d0*taub**2-6.0d0*misesyield**2
     !
-    RETURN
+    return
 
-    !.... MOHR-COULOMB CRITERIA
+    !.... mohr-coulomb criteria
     !
-    !.... IOPT=4---> LINEAR CLASSICAL MOHR-COULOMB YIELD
-    !....           FOR (SIGMA_N,TAU) STRESS FORMULATION
+    !.... iopt=4---> linear classical mohr-coulomb yield
+    !....           for (sigma_n,tau) stress formulation
     !
-    !      FYIELD = TAUB + SIGMAB*TANFRI-COHESION
+    !      fyield = taub + sigmab*tanfri-cohesion
     !
-    !RETURN
+    !return
     !
-    END SUBROUTINE YIELD
+    end subroutine yield
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     SUBROUTINE GRADS(GRAD,QIXI,TENSAO,HGAMMA,CBBARM1,POISSON,nrowb)
@@ -4508,6 +3168,168 @@
         &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
     !
     END SUBROUTINE GRADS
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, h, alpha)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: fYield, efStress(nrowb)
+    real*8 :: p, biotCoef
+    real*8 :: h, alpha
+    
+    !variables
+    real*8 :: plasticStress(nrowb)
+    real*8 :: devStress(nrowb), traceD3
+    real*8 :: I1, J2
+    
+    !------------------------------------------------------------------------------------------------------------------------------------    
+    ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
+    plasticStress = calcDPPlasticStress(efStress, p, biotCoef, h)
+    
+    !calculates the deviator of the stress tensor
+    call devTensor(devStress,traceD3,plasticStress,nrowb)
+    
+    !calculates auxiliary values for the f function
+    I1 = calcInvariantI1(plasticStress)
+    J2 = calcDevInvariantJ2(devStress)
+    
+    fYield = dpYield(I1, J2, h, alpha)
+    
+    end subroutine dpYieldEfStress
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function dpYield(I1, J2, h, alpha)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: dpYield, I1, J2, h, alpha
+    
+    !variables
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    dpYield = sqrt(J2) + alpha*(1./3.*I1 - h)
+    
+    end function dpYield
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function dpYield1(plasticStress, I1, J2, alpha)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: plasticStress(nrowb), I1, J2, alpha
+    
+    !variables
+    real*8 :: dpYield1(nrowb)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    dpYield1(1) = (1./2. * plasticStress(1)/sqrt(J2)) - (1./6. * I1/ sqrt(J2)) + alpha/3.
+    dpYield1(2) = (1./2. * plasticStress(2)/sqrt(J2)) - (1./6. * I1/ sqrt(J2)) + alpha/3.
+    dpYield1(3) = plasticStress(3) / sqrt(J2)
+    dpYield1(4) = (1./2. * plasticStress(4)/sqrt(J2)) - (1./6. * I1/ sqrt(J2)) + alpha/3.
+    
+    end function dpYield1
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function dpYield2(plasticStress)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: plasticStress(nrowb)
+    
+    !variables
+    real*8 dpYield2(nrowb,nrowb)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    dpYield2(1,1) = (dsqrt(3.0d0)*(plasticStress(4)**2-2*plasticStress(2)*plasticStress(4)+plasticStress(2)**2+4*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(1,2) = -(dsqrt(3.0d0)*(plasticStress(4)**2-plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)+plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(1,3) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)+plasticStress(2)-2*plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(1,4) = (dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(2)**2+plasticStress(1)*plasticStress(2)-2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    
+    dpYield2(2,1) = -(dsqrt(3.0d0)*(plasticStress(4)**2-plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)+plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(2,2) = (dsqrt(3.0d0)*(plasticStress(4)**2-2*plasticStress(1)*plasticStress(4)+4*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(2,3) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)-2*plasticStress(2)+plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(2,4) = -(dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    
+    dpYield2(3,1) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)+plasticStress(2)-2*plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(3,2) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)-2*plasticStress(2)+plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(3,3) = (dsqrt(3.0d0)*(plasticStress(4)**2-plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+plasticStress(1)**2))/(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0)
+    dpYield2(3,4) = -(dsqrt(3.0d0)*plasticStress(3)*(2*plasticStress(4)-plasticStress(2)-plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    
+    dpYield2(4,1) = (dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(2)**2+plasticStress(1)*plasticStress(2)-2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(4,2) = -(dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(4,3) = -(dsqrt(3.0d0)*plasticStress(3)*(2.*plasticStress(4)-plasticStress(2)-plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    dpYield2(4,4) = (dsqrt(3.0d0)*(plasticStress(2)**2.-2.*plasticStress(1)*plasticStress(2)+4*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
+    
+    end function dpYield2
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, h, alpha)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: fYield, fYield1(nrowb), fYield2(nrowb,nrowb)
+    real*8 :: efStress(nrowb), p, biotCoef, h, alpha
+    
+    !variables
+    real*8 :: plasticStress(nrowb), devStress(nrowb), traceD3
+    real*8 :: I1, J2
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
+    plasticStress = calcDPPlasticStress(efStress, p, biotCoef, h)
+    
+    !calculates the deviator of the stress tensor
+    call devTensor(devStress,traceD3,plasticStress,nrowb)
+    
+    !calculates auxiliary values for the f function
+    I1 = calcInvariantI1(plasticStress)
+    J2 = calcDevInvariantJ2(devStress)
+    
+    fYield = dpYield(I1, J2, h, alpha)
+    fYield1 = dpYield1(plasticStress, I1, J2, alpha)
+    fYield2 = dpYield2(plasticStress)
+    
+    end subroutine dpGrads
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: qixi(nrowb,nrowb), cbbarm1(nrowb,nrowb), hGamma, fYield2(nrowb,nrowb)
+    
+    !variables
+    real*8 :: hInvQIxi(nrowb,nrowb)
+    integer :: i,j
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do j=1,nrowb
+        do i=1,nrowb
+            hInvQIxi(I,J) = cbbarm1(i,j) + hgamma*fYield2(i,j)
+        end do
+    end do
+    call compQixi(qixi,hInvQIxi,nrowb)
+    
+    end subroutine calcQixiM1
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     SUBROUTINE SGTAGRAD(GRAD,GRAD2,TENSAO,POISSON,NROWB)
@@ -4802,7 +3624,6 @@
     !.... .. HGAMMA INCREMENT:
     !
     DHGAMMA = (FYIELD+COLDOT(GRAD,QIXIRES,NROWB))*DENOMIN
-    !      WRITE(*,*) 'DHGAMMA = ',DHGAMMA, 'denomin = ',denomin
     !
     !.... .. PLASTIC INCREMENT
     !
@@ -5113,7 +3934,7 @@
     end subroutine incrementMechanicElasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, stressTotal, p, nLoadSteps)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, nLoadSteps)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -5122,8 +3943,9 @@
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
     real*8 :: x(nsd, nnp), u(ndofD,nnp), epsP(nrowb, nintD, nel)
-    real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), stressTotal(nrowB, nintD,nel)
+    real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), trStrainP(nintD,nel), stressTotal(nrowB, nintD,nel)
     real*8 :: p(1,nnp)
+    real*8 :: elementIsPlast(nel)
     integer :: nLoadSteps
 
     ! Variables
@@ -5140,8 +3962,6 @@
     
     real*8 :: tolNewton
     logical :: converged
-    
-    real*8 :: elementIsPlast(nel)
 
     !------------------------------------------------------------------------------------------------------------------------------------
     
@@ -5177,7 +3997,6 @@
         r = fExtNeumann - fIntJ
         
         converged = .false.
-        elementIsPlast = 0.d0
         do j = 1, 50
             alhsD = 0.d0
             brhsD = 0.d0
@@ -5200,7 +4019,7 @@
             u = u + dDis
 
             !updates the plastic strain, and the stress at each gauss point
-            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, stressTotal, hmTTG, elementIsPlast, p)
+            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, trStrainP, stressTotal, hmTTG, elementIsPlast, p)
             
             !computes the internal force
             call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -5217,6 +4036,8 @@
             end if
         end do
         if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
+        
+        !call updatePorosity(x, conecNodaisElem, u)
         
     end do
 
@@ -5356,6 +4177,95 @@
     brhsD = 0.d0
     
     end subroutine montarEstruturasDadosDeslocamentoSkyline
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcTotalStress(efStress, p, biotCoef)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: efStress(nrowB)
+    real*8 :: p, biotCoef
+    
+    !variables
+    real*8 :: calcTotalStress(nrowb)
+    real*8 :: identI(nrowb)
+    integer :: k
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    identI = (/ 1., 1., 0., 1. /)
+    
+    do k = 1, nrowb
+        calcTotalStress(k) = efStress(k) - biotCoef * p * identI(k)
+    end do
+    
+    end function calcTotalStress
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcDPPlasticStress(efStress, p, biotCoef, h)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: efStress(nrowB)
+    real*8 :: p, biotCoef, h
+    
+    !variables
+    real*8 :: calcDPPlasticStress(nrowb)
+    real*8 :: identI(nrowb)
+    integer :: k
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    identI = (/ 1., 1., 0., 1. /)
+    
+    ! terzagui, i.e., plastic incompressibility.
+    do k = 1, nrowb
+        !calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
+        calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))
+    end do
+    
+    end function calcDPPlasticStress
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcInvariantI1(stress)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: stress(nrowb)
+    
+    !variables
+    real*8 :: calcInvariantI1
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    calcInvariantI1 = stress(1) + stress(2) + stress(4)
+    
+    end function calcInvariantI1
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcDevInvariantJ2(devStress)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: devStress(nrowb)
+    
+    !variables
+    real*8 :: calcDevInvariantJ2
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    calcDevInvariantJ2 = (devStress(1)*devStress(1)+devStress(2)*devStress(2) &
+                        & + devStress(4)*devStress(4) + 2.0D0*devStress(3)*devStress(3)) / 2
+    
+    end function calcDevInvariantJ2
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     end module mGeomecanica

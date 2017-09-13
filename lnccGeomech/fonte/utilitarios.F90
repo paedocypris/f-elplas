@@ -905,3 +905,23 @@
     end subroutine estimativasDeDesempenho
     end subroutine solverGaussBanda
     
+    function traceTensor(tensor, nrowb)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: tensor(nrowb)
+    integer :: nrowb
+    
+    !variables
+    real*8 :: traceTensor
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    traceTensor = tensor(1) + tensor(2) + tensor(4)
+    
+    end function traceTensor
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    

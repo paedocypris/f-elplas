@@ -147,7 +147,8 @@
     !
     use mPropGeoFisica
     use mGlobaisEscalares
-    use mInputReader,    only: readIntegerKeywordValue,readRealKeywordValue,readOutFlagKeyword
+    use mMalha, only: nsd
+    use mInputReader,    only: readIntegerKeywordValue,readRealKeywordValue,readOutFlagKeyword, readTensorFlagKeyword
     use mLeituraEscrita, only: iflag_tipoPrint
     !
     implicit none
@@ -195,12 +196,6 @@
     !
     keyword_name = "lz_do_bloco_de_sat"
     call readRealKeywordValue(keyword_name, zlbloco, zlbloco, ierr)
-    !
-    keyword_name = "permeability_reservoir_bottom_region"
-    call readRealKeywordValue(keyword_name, perminicial, perminicial, ierr)
-    !
-    keyword_name = "permeabilidade_do_bloco"
-    call readRealKeywordValue(keyword_name, permbloco, permbloco, ierr)
     !
     keyword_name = "x_central_do_bloco_de_perm"
     call readRealKeywordValue(keyword_name, xcbloco_perm, xcbloco_perm, ierr)
@@ -304,6 +299,10 @@
     !incremental mechanic
     keyword_name = "impressao_do deslocamentoIncremental"
     call readOutFlagKeyword(keyword_name, iflag_imDis, ifimDis_out, npIMDis, reservIMDis, ierr)
+    
+    !permeability
+    keyword_name = "permeabilidade_inicial"
+    call readTensorFlagKeyword(keyword_name, permInicial, nsd, ierr)
 
     !
 1000 FORMAT(A6)
@@ -544,7 +543,7 @@
     use mPropgeoFisica,    only: MEANRHOW, MEANRHOO, MEANDENS
     use mPropgeoFisica,    only: MEANBLKW, MEANBLKO, MEANBULK
     use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
-    use mPropGeoFisica,    only: misesYield
+    use mPropGeoFisica,    only: misesYield, mcFriction, mcC
     use mInputReader, only: readIntegerKeywordValue,readRealKeywordValue
     use mInputReader, only: readStringKeywordValue,readOutFlagKeyword
     use mMalha,       only: nsd
@@ -638,6 +637,12 @@
         
         keyword_name = "epMisesYieldSurface_"//trim(REGION(iRegion))
         call readRealKeywordValue(keyword_name, misesYield(iRegion), misesYield(iRegion), ierr)
+        
+        keyword_name = "epMohrCoulombPhi_"//trim(REGION(iRegion))
+        call readRealKeywordValue(keyword_name, mcFriction(iRegion), mcFriction(iRegion), ierr)
+        
+        keyword_name = "epMohrCoulombC_"//trim(REGION(iRegion))
+        call readRealKeywordValue(keyword_name, mcC(iRegion), mcC(iRegion), ierr)
         
         !
         IF (GRBULK.LE.BULK(YOUNG,POISSON,S3DIM)) THEN
@@ -3438,7 +3443,7 @@
     END SUBROUTINE
 
 
-    subroutine readSetupPhaseDS(nlvectV, nlvectP, nlvectD, optSolverV, optSolverD)
+    subroutine readSetupPhaseDS(nlvectD)
     use mInputReader,      only:readStringKeywordValue, readIntegerKeywordValue
     use mGlobaisArranjos,  only: title
     use mGlobaisEscalares, only: iprtin, TypeProcess
@@ -3449,8 +3454,7 @@
     use mMalha,            only: IrregMesh, Dirichlet, Neumann, I4SeaLoad
 
     implicit none
-    integer :: nlvectV, nlvectP, nlvectD
-    character(len=*) :: optSolverV, optSolverD
+    integer :: nlvectD
 
     character(len=50) keyword_name
     integer :: ierr
@@ -3509,23 +3513,10 @@
 
     numelReserv=nelxReserv*nelyReserv
     if(nsd==3) numelReserv=numelReserv*nelzReserv
-
-
-    !Reads nlvectP
-    keyword_name = "nlvectP"
-    call readIntegerKeywordValue(keyword_name, nlvectP, 0_4, ierr)
-    !Reads nlvectV
-    keyword_name = "nlvectV"
-    call readIntegerKeywordValue(keyword_name, nlvectV, 0_4, ierr)
+    
     !Reads nlvectD
     keyword_name = "nlvectD"
     call readIntegerKeywordValue(keyword_name, nlvectD, 0_4, ierr)
-
-    keyword_name = "solver_hidrodinamica"
-    call readStringKeywordValue(keyword_name, optSolverV, 'skyline',  ierr)
-
-    keyword_name = "solver_geomecanica"
-    call readStringKeywordValue(keyword_name, optSolverD, 'skyline', ierr)
 
 
     return

@@ -40,12 +40,6 @@
 *lz_do_bloco_de_sat{  
 0.2
 }
-*permeability_reservoir_bottom_region{  
-9.869233d-14
-}
-*permeabilidade_do_bloco{  
-9.869233d-14
-}
 *x_central_do_bloco_de_perm{   
 0.5
 }

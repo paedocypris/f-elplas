@@ -859,7 +859,43 @@
 
 1000 format(a12)
     end subroutine
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine readTensorFlagKeyword(keyword_name, tens, nsd, ierr)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    character(len=50) :: keyword_name
+    real*8 :: tens(:)
+    integer :: nsd
+    integer :: ierr
+    
+    !variables
+    integer :: keyword_line
+    integer :: tensDimension
+    integer :: i
 
+    !------------------------------------------------------------------------------------------------------------------------------------
+    keyword_line = findKeyword(keyword_name)
+    if (keyword_line.eq.0) then
+        ierr=1
+        return
+    endif
+    
+    if (nsd == 2) then
+        tensDimension = 3
+    else 
+        tensDimension = 6
+    end if
 
+    read (file_lines(keyword_line), 1000) (tens(i),i=1,tensDimension)
+    
+1000 format(3e15.7)
+    end subroutine readTensorFlagKeyword
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     end module mInputReader
 

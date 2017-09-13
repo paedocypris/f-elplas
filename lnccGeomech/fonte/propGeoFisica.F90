@@ -24,17 +24,18 @@
     real(8) :: eps_df=1.0d+0
     real(8) :: zer_df=1.0d-2
     !
-    real*8, allocatable  :: perm(:), permkx(:), permky(:), permkz(:)
-    real*8, allocatable  :: phi(:), phi0(:)
-    real*8, allocatable  :: YOUNG(:), PORE(:), PORE0(:), PHIEULER(:)
+    real*8, allocatable :: perm(:,:), charLenPorNetworkSquared(:,:)
+    real*8, allocatable  :: poro0(:), poroL(:), poroE(:)
+    real*8, allocatable  :: YOUNG(:)
     real*8, allocatable  :: MASCN(:),MASCN0(:)
     !
     CHARACTER*12, ALLOCATABLE :: GEOFORM(:)
     REAL(8), ALLOCATABLE :: PWELL(:)
+    
+    real*8 :: permInicial(3) !2d exclusive, todo: deixar genérico para dimensão
     !
     real(8) :: xcbloco_perm,ycbloco_perm,zcbloco_perm
     real(8) :: xlbloco_perm,ylbloco_perm,zlbloco_perm
-    real(8) :: permbloco,perminicial
     !
     real(8) :: xcbloco_YNG, ycbloco_YNG, zcbloco_YNG
     real(8) :: xlbloco_YNG, ylbloco_YNG, zlbloco_YNG
@@ -104,6 +105,8 @@
     REAL(8), DIMENSION(9) :: MEANBULK
     REAL(8), DIMENSION(9) :: MEANDENS
     real*8 :: misesYield(9)
+    real*8 :: mcFriction(9), mcC(9)
+    real*8 :: dpH(9), dpAlpha(9)
     !
     CHARACTER(5), DIMENSION(9) :: GEOMECLAW
 
@@ -111,7 +114,7 @@
     !
     !funcoes e subrotinas
     public :: calcdim, readperm, mapeando
-    public :: atribuirPermBloco, atribuirPhiBloco, readphi
+    public :: atribuirPhiBloco, readphi
     public :: estatistica,  xkkc, xlt, xlw,  xlo, xkrw, xkro
     public :: GEOINDIC, GEOYLOC, GEOYLOC3D, FNCMECLAW
     public :: rhoCell
@@ -322,29 +325,6 @@
     AUXMAX=-1E20
     AUXMIN=1E20
     !
-    !    DO J=1,NUMEL
-    !       IF(GEOFORM(J).EQ.'RESERVATORIO')THEN
-    !          DO I=1,NEN
-    !             NO=conecNodaisElem(I,J)-1
-    !             IF(NSD.EQ.2)THEN
-    !                AUX=SQRT(X(1,NO)*X(1,NO)+X(2,NO)*X(2,NO))
-    !                IF(AUX.GT.AUXMAX)THEN
-    !                   AUXMAX=AUX
-    !                   NELEMF=J
-    !                   POINTSUP(1)=X(1,NO)
-    !                   POINTSUP(2)=X(2,NO)
-    !                END IF
-    !                IF(AUX.LT.AUXMIN)THEN
-    !                   AUXMIN=AUX
-    !                   NELEMI=J
-    !                   POINTINF(1)=X(1,NO)
-    !                   POINTINF(2)=X(2,NO)
-    !                END IF
-    !             END IF
-    !          END DO
-    !       END IF
-    !    END DO
-    !ACHAR AS COORDENADAS INICIAIS E FINAIS DO RESERVATORIO
     NELEMI=1
     NELEMF=numelReserv
     !
@@ -804,119 +784,46 @@
     !**** new **********************************************************************
     !
     subroutine lerPropriedadesFisicas()
-    use mMalha, only: numel,nsd,nen
-    use mMalha, only: x, xc, conecNodaisElem
+    use mMalha, only: numel,nsd
     use mMalha, only: numelReserv
-    use mGlobaisEscalares, only: ligarBlocosHetBeta, iflag_beta
-    use mGlobaisArranjos,  only: beta
     !
     implicit none
     !
-    real*8  :: xlx, xly, xlz
-    integer :: nelemx,nelemy,nelemz,nelem,npperm
+    integer :: tensDim
+    integer :: i, j
 
-    !     cria o vetor de permeabilidades
-    npperm = numel*100
-    if(.not.allocated(perm)) allocate(perm(npperm));           perm   = 0.d0
-    if(.not.allocated(permkx)) allocate(permkx(numelReserv));    permkx = 0.d0
-    if(.not.allocated(permky)) allocate(permky(numelReserv));    permky = 0.d0
-    if(nsd==3) then
-        if(.not.allocated(permkz)) allocate(permkz(numelReserv)); permkz = 0.d0
+    if (nsd == 2) then
+        tensDim = 3
+    else
+        tensDim = 6
     end if
-    if(.not.allocated(phi)) allocate(phi(numelReserv)); phi=0.d0
-    if(.not.allocated(phi0)) allocate(phi0(numelReserv)); phi0=0.d0
+    
+    !     cria o vetor de permeabilidades
+    if(.not.allocated(perm)) allocate(perm(tensDim,numelReserv));
+    if(.not.allocated(charLenPorNetworkSquared)) allocate(charLenPorNetworkSquared(tensDim,numelReserv));
+    if(.not.allocated(poro0)) allocate(poro0(numelReserv));
+    if(.not.allocated(poroL)) allocate(poroL(numelReserv));
+    if(.not.allocated(poroE)) allocate(poroE(numelReserv));
     !
-    if(.not.allocated(PORE)) allocate(PORE(numelReserv));     PORE     = 0.0D0
-    if(.not.allocated(PORE0)) allocate(PORE0(numelReserv));    PORE0    = 0.0D0
     if(.not.allocated(YOUNG)) allocate(YOUNG(NUMEL));          YOUNG    = 0.0D0
-    if(.not.allocated(PHIEULER)) allocate(PHIEULER(numelReserv)); PHIEULER = 0.0D0
     IF (NSD.EQ.2) then
         if(.not.allocated(PWELL)) ALLOCATE(PWELL(nelYReserv)); PWELL    = 0.0D0
     ELSE
         if(.not.allocated(PWELL)) ALLOCATE(PWELL(nelZReserv)); PWELL    = 0.0D0
     ENDIF
-    !
-    nelem=nelxReserv*nelyReserv
-    !
-    !.... leitura de dados
-    !
-    if (iflag_read_perm==1) then
-        call readperm(perm_inx,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-        call MAPEIARESERVATORIO(permkx,perm,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd)
-        call readperm(perm_iny,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-        call MAPEIARESERVATORIO(permky,perm,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd)
-        !
-        if (nsd==3) then
-            call readperm(perm_inz,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-        endif
-    else
-        !
-        call READPERMBLOCO0(numelReserv,permkx)
-        call READPERMBLOCO0(numelReserv,permky)
-        if(nsd==3) call READPERMBLOCO0(numelReserv,permkz)
-        !
-    end if
-    !
-    !...  cria o vetor de porosidade
-    !
-    if (iflag_read_phi==1) then
-
-        call readphi(phi0,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-        call MAPEIARESERVATORIO(phi,phi0,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd)
-    else
-        call atribuirPhiBloco(nsd,numelReserv,phi,xc)
-    end if
-    !
-    !.... leitura de dados
-    !
-    if (iflag_beta==1) then
-        call readbeta(beta_in,perm,xlx,xly,xlz,nelemx,nelemy,nelemz,nsd)
-        call MAPEIARESERVATORIO(phi,phi0,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd)
-    else
-        if(ligarBlocosHetBeta.eqv..true.) call atribuirBetaBloco(nsd,numel,beta,xc)
-    end if
-    !
-    !..Bbar.. BEGIN
-    !...
-    !...  MOUNT YOUNG MODULUS STOCHASTIC ARRAY
-    !
-    CALL READYNGBLOCO1(YOUNG, GEOFORM, NUMEL)
-    IF (IFLAG_READ_YNG2==1) THEN
-        CALL READYNG(PERM,XLX,XLY,NELEMX,NELEMY,YNG2_IN,RHOYNG2,KGYNG2)
-        !
-        !...   mapeia o campos de permeabilidades nos elementos
-        !
-        call MAPEIADOMINIO(young,perm,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd,YNGX1,YNGX2)
-    END IF
-    IF (IFLAG_READ_YNG3==1) THEN
-        CALL READYNG(PERM,XLX,XLY,NELEMX,NELEMY,YNG3_IN,RHOYNG3,KGYNG3)
-        !
-        !...   mapeia o campos de permeabilidades nos elementos
-        !
-        call MAPEIADOMINIO(young,perm,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd,YNG3X1,YNG3X2)
-    END IF
-    !
-    IF (IFLAG_READ_YNG==1) THEN
-        CALL READYNG(PERM,XLX,XLY,NELEMX,NELEMY,YNG_IN,RHOYNG,KGYNG)
-        !
-        !...   mapeia o campos de permeabilidades nos elementos
-        !
-        call MAPEIARESERVATORIO(young,perm,conecNodaisElem,x,xlx,xly,xlz, &
-            nelemx,nelemy,nelemz,nelem,nen,nsd)
-    END IF
-    !
-    !... MOVE INITIAL STOCHASTIC POROSITY (PHI) OF RESERVOIR
-    !... TO GEOMECHANICS (PORE) FIELD
-    !
-    PORE=PHI
-    !
-    !..Bbar.. END
+    
+    do j=1,numelReserv
+        poro0(j) = PORELAGR(1)
+        poroL(j) = PORELAGR(1)
+        poroE(j) = PORELAGR(1)
+        
+        do i=1,tensDim
+            perm(i,j) = permInicial(i)
+            charLenPorNetworkSquared(i,j) = permInicial(i) / calcKozenyCarmanCoefficient(poro0(j))
+        end do
+        
+        
+    end do
     !
     end subroutine lerPropriedadesFisicas
     !
@@ -1332,80 +1239,7 @@
     return
     !
     end subroutine
-    !
-    !=======================================================================
-    !
-    subroutine atribuirPermBloco(nsd,numel,ux,uy,uz,x)
-    !
-    implicit none
-    !
-    integer :: nsd,numel
-    real*8  :: x(nsd,*)
-    real(8), dimension(*)   :: ux,uy,uz
-    !
-    integer :: i
-    real(8) :: xx,yy,zz,xi,xf,yi,yf,zi,zf
-    !
-    print*, "em readpermbloco"
-    !
-    !.... Bloco
-    !
-    xi=xcbloco_perm-xlbloco_perm/2.d0
-    xf=xcbloco_perm+xlbloco_perm/2.d0
-    yi=ycbloco_perm-ylbloco_perm/2.d0
-    yf=ycbloco_perm+ylbloco_perm/2.d0
-    if(nsd==3) zi=zcbloco_perm-zlbloco_perm/2.d0
-    if(nsd==3) zf=zcbloco_perm+zlbloco_perm/2.d0
-    !
-    do i=1,numel
-        !
-        xx=x(1,i)
-        yy=x(2,i)
-        if(nsd==3)zz=x(3,i)
-        !
-        ux(i)=perminicial
-        uy(i)=perminicial
-        if(nsd==3) uz(i)=perminicial
-
-        if(nsd==2) then
-            if(xx.gt.xi.and.xx.lt.xf) then
-                if(yy.gt.yi.and.yy.lt.yf) then
-                    ux(i)=permbloco
-                    uy(i)=permbloco
-                end if
-            end if
-        else
-            if(xx.gt.xi.and.xx.lt.xf) then
-                if(yy.gt.yi.and.yy.lt.yf) then
-                    if(zz.gt.zi.and.zz.lt.zf) then
-                        ux(i)=permbloco
-                        uy(i)=permbloco
-                        uz(i)=permbloco
-                    end if
-                end if
-            end if
-        endif
-        !
-    end do
-    !
-    end subroutine atribuirPermBloco
-    !
-    !=======================================================================
-    !
-    SUBROUTINE READPERMBLOCO0(numelReserv, U)
-    !
-    implicit none
-    !
-    INTEGER :: NEL,numelReserv
-    REAL(8), DIMENSION(numelReserv) :: U
-    !
-    DO NEL=1,numelReserv
-        U(NEL) = PERMINICIAL
-    END DO
-    !
-    RETURN
-    !
-    END SUBROUTINE
+    
     !
     !======================================================================
     !
@@ -1842,8 +1676,40 @@
             end if
         end do
         geoindic = geoloc
-
+    case ('MCFRICT')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = mcFriction(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('MCCOHES')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = mcC(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('DPCOHES')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = dpH(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
+    case ('DPALPHA')
+        do i=1,lastregion
+            if (refgeo(i).eq.geof) then
+                geoloc = dpAlpha(i)
+                exit
+            end if
+        end do
+        geoindic = geoloc
         case default
+        
         write(*,*)  "Hmmmm, I don't know"
     end select
     !
@@ -2631,21 +2497,23 @@
     end function
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    function totalCompressibility(curElement, initialPorosityL, curPorosityL)
+    function totalCompressibility(curElement)
     
     implicit none
     
     !variables input
     integer :: curElement
-    real*8 :: initialPorosityL, curPorosityL
     
     ! Variables
     integer :: geoFormIndx
+    real*8 :: initialPorosityL, curPorosityL
     real*8 :: nInv, mInv, biotCoefficient, matrixBulk, grainBulk
     real*8 :: totalCompressibility
     
     !------------------------------------------------------------------------------------------------------------------------------------
     geoFormIndx = getRegionIndex(curElement)
+    initialPorosityL = poro0(curElement)
+    curPorosityL = poroL(curElement)
     
     matrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
     grainBulk = GRAINBLK(geoFormIndx)
@@ -2707,6 +2575,48 @@
     calcMatrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
     
     end function calcMatrixBulk
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcKozenyCarmanPerm(curElement, tensDim)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: curElement, tensDim
+    
+    !variables
+    real*8 :: calcKozenyCarmanPerm(tensDim)
+    real*8 :: deltaN
+    integer :: i
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    deltaN = calcKozenyCarmanCoefficient(poroE(curElement))
+    
+    do i = 1,tensDim
+        calcKozenyCarmanPerm(i) = charLenPorNetworkSquared(i,curElement) * deltaN
+    end do
+    
+    end function calcKozenyCarmanPerm
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcKozenyCarmanCoefficient(porosity)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: porosity
+    
+    !variables
+    real*8 :: calcKozenyCarmanCoefficient
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    calcKozenyCarmanCoefficient = porosity**3/(1-(porosity**2))
+    
+    end function calcKozenyCarmanCoefficient
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     end module
