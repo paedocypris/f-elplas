@@ -35,8 +35,6 @@
     integer, intent(in)   :: idiag(neq)
     character(LEN=4), intent(in) :: parte_
 
-    write(*,*) " em solverGaussSkyline, etapa=", parte_!,", simetria=", simetria_
-
     if(parte_.eq."full".or.parte_.eq."fact") then
         !          if(simetria_) then
         call factor(alhs,                   idiag,neq)

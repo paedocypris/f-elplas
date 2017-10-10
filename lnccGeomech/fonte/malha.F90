@@ -17,7 +17,6 @@
     real*8, allocatable :: x(:,:), xc(:,:)
     integer, allocatable :: conecNodaisElem(:,:), conecLadaisElem(:,:)
     integer, allocatable :: listaDosElemsPorNo(:,:)
-    integer, allocatable :: listaDosElemsPorFace(:,:)
     integer :: nsd, numel, numnp, numnpD, nen, numLadosELem
     integer :: numnpReserv, numelReserv, numLadosReserv
     !

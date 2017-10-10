@@ -113,8 +113,8 @@
     !
     !.... local vectors and matrizes
     !
-    real(8), dimension(nrowb,nesd)    :: bbarj, bbari, qixibbar
-    real(8), dimension(nrowb,nrowb)   :: qixi
+    real(8), dimension(nrowb,nesd)    :: bbarj, bbari, cepbbar
+    real(8), dimension(nrowb,nrowb)   :: cep
     !
     real(8) :: shgd(nrowsh,nen,nintd), shld(nrowsh,nen,nintd)
     real(8) :: shgbr(nrowsh,nen)
@@ -135,9 +135,8 @@
     do nel=1,numel
         bbari    = 0.0d0
         bbarj    = 0.0d0
-        qixibbar = 0.0d0
-        qixi     = 0.0d0
-        r        = 0.0d0
+        cepbbar = 0.0d0
+        cep     = 0.0d0
         eleffmd = 0.0d0
         elresfd = 0.0d0
         
@@ -164,9 +163,9 @@
         !
         do l=1,nintd
             !
-            !... ... setup tangent matrix qixi: order 4x4 for multiplication
+            !... ... setup tangent matrix cep: order 4x4 for multiplication
             !
-            call tang2qx(tangentMatrix(1:16,l,nel),qixi)
+            call tang2qx(tangentMatrix(1:16,l,nel),cep)
             !
             c1=detd(l)*wd(l)
             
@@ -180,9 +179,9 @@
                 call setbb(bbarj,shgd(1:nrowsh,j,l),  &
                     &           shgbr(1:nrowsh,j),r(l),nrowsh,nrowb,iopt,ibbar)
                 !
-                !.... .... multiply qixi*bbarj ===> qixibbar
+                !.... .... multiply cep*bbarj ===> cepbbar
                 !
-                qixibbar=matmul(qixi,bbarj)
+                cepbbar=matmul(cep,bbarj)
                 !
                 !.... .... upload b-bar matrix at node i
                 !
@@ -191,12 +190,12 @@
                         &              shgbr(1:nrowsh,i),r(l),nrowsh,nrowb,iopt,ibbar)
                     !
                     !.... .......  mount elemnt stiffness nodal matrix:
-                    !.... .......  k^e_ij= multiply bbar^t_i*(qixi*bbar_j)
+                    !.... .......  k^e_ij= multiply bbar^t_i*(cep*bbar_j)
                     !
-                    eleffmd(ned2*i-1,ned2*j-1) = eleffmd(ned2*i-1,ned2*j-1) + coldot(bbari(1:4,1),qixibbar(1:4,1),4)*c1
-                    eleffmd(ned2*i-1,ned2*j) = eleffmd(ned2*i-1,ned2*j) + coldot(bbari(1:4,1),qixibbar(1:4,2),4)*c1
-                    eleffmd(ned2*i,ned2*j-1) = eleffmd(ned2*i,ned2*j-1) + coldot(bbari(1:4,2),qixibbar(1:4,1),4)*c1
-                    eleffmd(ned2*i,ned2*j) = eleffmd(ned2*i,ned2*j) + coldot(bbari(1:4,2),qixibbar(1:4,2),4)*c1
+                    eleffmd(ned2*i-1,ned2*j-1) = eleffmd(ned2*i-1,ned2*j-1) + coldot(bbari(1:4,1),cepbbar(1:4,1),4)*c1
+                    eleffmd(ned2*i-1,ned2*j) = eleffmd(ned2*i-1,ned2*j) + coldot(bbari(1:4,1),cepbbar(1:4,2),4)*c1
+                    eleffmd(ned2*i,ned2*j-1) = eleffmd(ned2*i,ned2*j-1) + coldot(bbari(1:4,2),cepbbar(1:4,1),4)*c1
+                    eleffmd(ned2*i,ned2*j) = eleffmd(ned2*i,ned2*j) + coldot(bbari(1:4,2),cepbbar(1:4,2),4)*c1
                 end do
                 
                 ! calc pressure contribution
@@ -241,19 +240,22 @@
     !
     !**** new *******************************************************************
     !
-    subroutine BBARMTRX_ELAST(x, conecNodaisElem,alhsd, brhsd, idiagD, lmD)
+    subroutine BBARMTRX_ELAST(x, conecNodaisElem,alhsd, brhsd, idiagD, lmD, pressure, isUndrained)
     !
     !.... PROGRAM TO CALCULATE STIFNESS MATRIX FOR THE ELASTIC DISPLACEMENT
     !        ELEMENT AND ASSEMBLE INTO THE GLOBAL LEFT-HAND-SIDE MATRIX
     !
-    use mGlobaisEscalares, only: nrowsh, IBBAR, LDRAINED
+    use mGlobaisEscalares, only: nrowsh, IBBAR
 
     use mPropGeoFisica,    only: GEOINDIC
     use mSolverGaussSkyline, only: addrhs, addlhs
+    use mPropGeofisica, only: calcMatrixUndrainedProperties, calcMatrixProperties
+    use mPropGeoFisica, only: rhoCell, calcBiotCoefficient
 
     use mFuncoesDeForma,   only: shgq, shlq
     use mMalha,            only: local, numnp, multab
     use mMalha,            only: nsd, numel, nen
+    use mGlobaisArranjos, only:grav
     !
     implicit none
     !
@@ -262,8 +264,13 @@
     real(8), intent(inout) :: alhsd(nalhsD), brhsd(neqD)
     integer, intent(in)    :: idiagD(neqD)
     integer, intent(in)    :: lmD(ned2,nen,numel)
+    real*8 :: pressure(1,numnp)
+    integer :: isUndrained
+    
     !
-    real(8) :: xl(nesd,nen), disl(ned2,nen)
+    real(8) :: xL(nesd,nen), disL(ned2,nen), pL(1,nen)
+    real*8 :: pLInt, densTotal
+    real*8 :: biotCoef
     real(8) :: ELRESFD(nee2), ELEFFMD(nee2,nee2)
     !
     !.... REMOVE ABOVE CARD FOR SINGLE-PRECISION OPERATION
@@ -275,12 +282,12 @@
     !
     REAL(8) :: BBARJ(NROWB,NESD), BBARI(NROWB,NESD)
     REAL(8) :: QIXIBBAR(NROWB,NESD)
-    INTEGER :: NEL, I, J, L, II, JJ
+    INTEGER :: NEL, I, J, L
     REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
     REAL(8) :: SHGD(NROWSH,NEN,NINTD), SHLD(NROWSH,NEN,NINTD)
     REAL(8) :: SHGBR(NROWSH,NEN)
     REAL(8) :: CBBAR(NROWB, NROWB)
-    REAL(8) :: C1, POISSON, YOUNGMOD, B
+    REAL(8) :: C1, POISSON, YOUNGMOD
     !
     !
     !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
@@ -299,35 +306,35 @@
         BBARJ = 0.0D0
         ELEFFMD=0.D0
         ELRESFD=0.D0
-        R     = 0.0D0
         !
         !.... LOCALIZE COORDINATES AND DIRICHLET B.C.
         !
         CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
         CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
+        call local(conecNodaisElem(1,nel),pressure,pL,nen,1,1)
+        
         QUAD = .TRUE.
         IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
         !
         CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
         !
-        !.... SETUP FOR AXISYMMETRIC OPTION
-        !
-        IF (IOPT.EQ.2) THEN
-            DO 100 L=1,NINTD
-                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
-                DETD(L) = DETD(L)*R(L)
-100         CONTINUE
-        ENDIF
-        !
         !.... SETUP ELASTIC PARAMETERS FOR DRAINED OR UNDRAINED CONDITIONS
         !
-        CALL DRAINCOND(YOUNGMOD,POISSON,B,NEL,LDRAINED)
+        if (isUndrained == 1) then
+            call calcMatrixUndrainedProperties(poisson, youngmod, nel)
+        else if (isUndrained == 0) then
+            call calcMatrixProperties(poisson, youngmod, nel)
+        end if
         !
         !.... SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
         !
         CALL SETUPC(CBBAR,YOUNGMOD,POISSON,NROWB,IOPT)
         !
-        !.... FORM STIFFNESS MATRIX
+        
+        !calculate total density and biot parameters
+        densTotal = rhoCell(nel)
+        biotCoef = calcBiotCoefficient(nel)
+        
         !
         !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
         !.... .. FOR MEAN-DILATATIONAL B-BAR FORMULATION
@@ -336,15 +343,19 @@
         !
         !.... .. LOOP OVER INTEGRATIONN POINTS
         !
-        DO 400  L=1,NINTD
+        DO L=1,NINTD
             !
             !.... ...SETUP ELEMENT DETERMINANT AND GAUSS WEIGHTS
             !
             C1=DETD(L)*WD(L)
+            
+            !calculate the pressure at the integration point
+            pLInt = dot_product(shgD(nrowsh,1:nen,l), pL(1,1:nen))
+            
             !
             !.... ... UPLOAD B-BAR MATRIX AT NODE J
             !
-            DO 200 J=1,NEN
+            DO J=1,NEN
                 !
                 CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L), SHGBR(1:NROWSH,J),R(L),NROWSH,NROWB,IOPT,IBBAR)
                 !
@@ -354,7 +365,7 @@
                 !
                 !.... .... UPLOAD B-BAR MATRIX AT NODE I
                 !
-                DO 200 I=1,NEN
+                DO I=1,NEN
                     !
                     CALL SETBB(BBARI,SHGD(1:NROWSH,I,L), SHGBR(1:NROWSH,I),R(L),NROWSH,NROWB,IOPT,IBBAR)
                     !
@@ -368,9 +379,18 @@
                     ELEFFMD(NED2*I,NED2*J-1)= ELEFFMD(NED2*I,NED2*J-1) + COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,1),4) * C1
                     !
                     ELEFFMD(NED2*I,NED2*J)= ELEFFMD(NED2*I,NED2*J) + COLDOT(BBARI(1:4,2),QIXIBBAR(1:4,2),4) * C1
-                    
-200         CONTINUE
-400     CONTINUE
+                end do
+                
+                ! calc pressure contribution
+                elresfd(ned2*j-1) = elresfd(ned2*j-1) &
+                    &                  + biotCoef * pLInt * shgD(1,j,l) * c1 & ! calc pressure contribution
+                &                  + densTotal * grav(1) * shgD(nrowsh,j,l) * c1   ! calc gravity contribution
+                elresfd(ned2*j) = elresfd(ned2*j) &
+                    &                  + biotCoef * pLInt * shgD(2,j,l) * c1 & ! calc pressure contribution
+                &                  + densTotal * grav(2) * shgD(nrowsh,j,l) * c1     ! calc gravity contribution
+            end do
+            
+        end do
         !
         !      COMPUTATION OF DIRICHLET B.C. CONTRIBUTION
         !
@@ -382,27 +402,9 @@
         !        LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
         !
         LSYM=.TRUE.
-        !
-        if (optSolverD=='skyline')   then
-            CALL ADDLHS(ALHSD,ELEFFMD,LMD(1,1,NEL),IDIAGD,NEE2,DIAG,LSYM)
-        endif
-
-        if (optSolverD=='pardiso')   then
-            write(*,*) ' não implementado '
-            stop 9
-        endif
-
-        if (optSolverD=='hypre')   then ! elast
-            write(*,*) ' não implementado '
-            stop 9
-        endif
-        !
+        
+        CALL ADDLHS(ALHSD,ELEFFMD,LMD(1,1,NEL),IDIAGD,NEE2,DIAG,LSYM)
         CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
-        !
-        DO 450 II=1,NEE2
-            DO 450 JJ=1,NEE2
-                AUXM(NEL,II,JJ)=ELEFFMD(II,JJ)
-450     CONTINUE
         !
 500 CONTINUE
 
@@ -1586,14 +1588,14 @@
     END SUBROUTINE
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, elementIsPlast, pressure)
+    SUBROUTINE POS4PLAST(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, elementIsPlast, pressure, isUndrained)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
     !function import
     use mMalha, only: local
     use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica, only: calcBiotCoefficient
+    use mPropGeoFisica, only: calcBiotCoefficient, calcMatrixProperties, calcMatrixUndrainedProperties
     
     !variables import
     use mMalha,            only: nsd, numnp, numel, nen
@@ -1614,6 +1616,7 @@
     real*8 :: tangentMatrix(nrowb2,nintD, numel)
     real*8 :: elementIsPlast(numel)
     real*8 :: pressure(1,numnp)
+    integer :: isUndrained
     
     !variables
     logical quad
@@ -1642,6 +1645,8 @@
     real*8 :: biotCoef
     logical :: converged
     real*8 :: identI(nrowb)
+    real*8 :: Cep(nrowb,nrowb), NVect(nrowb,1), NxN(nrowb,nrowb)
+    real*8 :: qixiGradf(nrowb), denN, tempResult(1,1)
 
     real*8, external :: rowdot, coldot
     real*8, external :: traceTensor
@@ -1670,8 +1675,12 @@
     stressLEff = 0.0d0
     !
     do nel=1,numel
-        poisson = geoindic('POISSON',geoform(nel))
-        young = geoindic('YOUNGMD',geoform(nel))
+        if (isUndrained == 1) then
+            call calcMatrixUndrainedProperties(poisson,young, nel)
+        else if (isUndrained == 0) then
+            call calcMatrixProperties(poisson, young, nel)
+        end if
+        
         dpH = geoIndic('DPCOHES',geoform(nel))
         dpAlpha = geoIndic('DPALPHA',geoform(nel))
         
@@ -1688,7 +1697,6 @@
         
         !.... ... calculates biot coefficient
         biotCoef = calcBiotCoefficient(nel)
-        
         !
         quad = .true.
         if (conecnodaiselem(3,nel).eq.conecnodaiselem(4,nel)) quad = .false.
@@ -1788,6 +1796,22 @@
                     !.... ... convergence test
                     if ((fYield.lt.tolYield).and.(hNormA.lt.tolePlas)) then
                         converged = .true.
+                        !exit
+                        
+                        qixiGradf = matmul(qixi, fyield1)
+                        call matMulmTn(fyield1, qixiGradf, tempResult, nrowb, 1, nrowb, 1, 1, 1)
+                        denN = dsqrt(tempResult(1,1))
+                        NVect(1:nrowb,1) = qixiGradf / denN
+            
+                        NxN = matmul(NVect,transpose(NVect))
+                        
+                        if (NVect(1,1)*NVect(1,1) + NVect(2,1)*NVect(2,1) + NVect(3,1)*NVect(3,1) + NVect(4,1)*NVect(4,1) < 1.0d-20) then
+                            write(*,*) 'autovalue too small...'
+                            exit
+                        end if
+                        
+                        Cep = qixi - NxN
+                        
                         exit
                     end if
                     
@@ -1796,20 +1820,22 @@
                 end do
                 
                 if (converged.eqv..false.) write(*,*) 'Plastic newton iteration not converged'
-            endif
+            else
+                Cep = cbbar
+            end if
             
             do k=1,nrowb
                 plasticStrain(k,l,nel) = eptrial(k)
                 curStress(k,l,nel) = stressLEff(k)
                 curStressTotal(k,l,nel) = stressLEff(k) - biotCoef*pressureIntPoint*IdentI(k)
             end do
-            curStressS(l,nel) = traceTensor(curStressTotal(:,l,nel),nrowb)/3
+            curStressS(l,nel) = traceTensor(curStressTotal(:,l,nel),nrowb)/3.0d0
             curTrStrainP(l,nel) = traceTensor(plasticStrain(:,l,nel),nrowb)
             
             !
             !.... ... update tangent moduli
             !.... .... transfer 4x4-order matrix to global tangent array
-            call qx2tang(qixi,tangentMatrix(1:16,l,nel))
+            call qx2tang(Cep,tangentMatrix(1:16,l,nel))
         end do
     end do
     
@@ -1823,19 +1849,19 @@
     !
     !**** NEW **** FOR STOCHASTIC AND NON-LINEAR FORMULATION *****************
     !
-    subroutine geosetup(numel,nrowb,nintd,iopt)
+    subroutine geosetup(numel,nrowb,nintd,iopt,isUndrained)
     ! function import
-    use mPropGeofisica, only: geoindic
+    use mPropGeofisica, only: calcMatrixUndrainedProperties, calcMatrixProperties
     
     ! variable import
-    use mPropGeofisica, only:geoform
-    !
+    
     implicit none
     !
     !.... PROGRAM TO SETUP INITIAL INELASTIC TANGENT MATRIX
     !
     !variables input
     integer :: numel,nrowb,nintd,iopt
+    integer :: isUndrained
     
     !variables
     real(8) :: cbbar(nrowb, nrowb)
@@ -1844,8 +1870,12 @@
     integer :: nel, l
     !
     DO NEL=1,NUMEL
-        young = geoindic('YOUNGMD',geoform(nel))
-        poisson = geoindic('POISSON',geoform(nel))
+        if (isUndrained == 1) then
+            call calcMatrixUndrainedProperties(poisson, young, nel)
+        else if (isUndrained == 0) then
+            call calcMatrixProperties(poisson, young, nel)
+        end if
+        
         !
         !.... SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
         !
@@ -2961,7 +2991,7 @@
     END SUBROUTINE POS4STRS
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine pos4inc(x, conecNodaisElem, u, strain, stress)
+    subroutine pos4inc(x, conecNodaisElem, u, stress, stressS, stressTotal, p, isUndrained)
     !
     !.... Program to compute the strain, stress and internal force given an incremental displacement
     !
@@ -2973,15 +3003,16 @@
     use mGlobaisEscalares, only: nrowsh
     use mGlobaisEscalares, only: ibbar
     use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica,    only: YOUNG
-    use mPropGeoFisica,    only: GEOFORM, GEOINDIC
+    use mPropGeoFisica, only: calcBiotCoefficient
+    use mPropGeoFisica, only: calcMatrixUndrainedProperties, calcMatrixProperties
     !variables input
     implicit none
     integer, intent(in)             :: conecNodaisElem(nen,numel)
     real(8), intent(in)             :: x(nsd,numnp)
     real*8, intent(in) :: u(ndofD, numnp)
-    real*8 :: stress(nrowb, nintd, numel)
-    real*8 :: strain(nrowb, nintd, numel)
+    real*8 :: stress(nrowb, nintd, numel), stressS(nintD, numel), stressTotal(nrowB, nintD,numel)
+    real*8 :: p(1,numnp)
+    integer :: isUndrained
     
     !variables
     real*8, external :: rowdot, coldot
@@ -2994,13 +3025,19 @@
     real(8), dimension(nrowsh,nen)       :: shgbr
     real(8), dimension(nrowb,nrowb)      :: cbbar
     real(8), dimension(nrowb,nesd)  :: bbarj
+    real*8 :: strainL(nrowb)
+    real*8 :: pL(1,nen)
+    real*8 :: pressureIntPoint, biotCoeff, identI(nrowb)
     !
-    real*8  :: poisson, c1
+    real*8  :: poisson, young
     integer :: nel, l, j, k
+    
+    real*8, external :: traceTensor
     !
     !-------------------------------------------------------------------------------------------------------------------
+    identI = (/ 1., 1., 0., 1. /)
+    
     !clean stress, strain and initial force
-    strain = 0.d0
     stress = 0.d0
     
     !.... generation of local shape functions and weight values
@@ -3009,16 +3046,24 @@
     !
     do nel=1,numel
         !
-        poisson = geoindic('POISSON',geoform(nel))
+        if (isUndrained == 1) then
+            call calcMatrixUndrainedProperties(poisson,young, nel)
+        else if (isUndrained == 0) then
+            call calcMatrixProperties(poisson, young, nel)
+        end if
         !
         !.... ..setup stochastic elasticity tensor for bbar method
         !
-        call setupc(cbbar, young(nel),poisson,nrowb,iopt)
+        call setupc(cbbar, young, poisson,nrowb,iopt)
         !
         !...  ..localize coordinates and dirichlet b.c.
         !
         call local(conecNodaisElem(1,nel), x, xl, nen, nsd, nesd)
         call local(conecNodaisElem(1,nel), u, disl, nen, ndofd, ned2)
+        call local(conecNodaisElem(1,nel), p, pL, nen, 1, 1)
+        
+        !.... ... calculates biot coefficient
+        biotCoeff = calcBiotCoefficient(nel)
         !
         quad = .true.
         if (conecNodaisElem(3,nel).eq.conecNodaisElem(4,nel)) quad = .false.
@@ -3042,8 +3087,11 @@
         !.... ..loop over integrationn points
         !
         do l=1,nintd
-            !
-            c1=wd(l)*detd(l)
+            ! get pressure value at integration point
+            pressureIntPoint = dot_product(shgD(nrowsh,1:nen,l), pL(1,1:nen))
+            
+            !..... ..clear initial strain
+            strainL = 0.d0
             !
             do j=1,nen
                 !
@@ -3055,11 +3103,18 @@
                 !
                 ! B \cdot a
                 do k=1,nrowb
-                    strain(k, l, nel) = strain(k, l, nel) + coldot(bbarj(k,1:2),disl(1:2,j), 2)
+                    strainL(k) = strainL(k) + dot_product(bbarj(k,1:2),disL(1:2,j))
                 end do
+                
             end do
             
-            stress(1:4,l,nel) = matmul(cbbar,strain(1:nrowb, l, nel))
+            stress(1:nrowb,l,nel) = matmul(cbbar,strainL)
+            
+            do k=1,nrowb
+                stressTotal(k,l,nel) = stress(k,l,nel) - biotCoeff*pressureIntPoint*IdentI(k)
+            end do
+            stressS(l,nel) = traceTensor(stressTotal(:,l,nel),nrowb)/3.0d0
+            
         end do
         
     end do
@@ -3188,7 +3243,7 @@
     
     !------------------------------------------------------------------------------------------------------------------------------------    
     ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
-    plasticStress = calcDPPlasticStress(efStress, p, biotCoef, h)
+    plasticStress = calcDPPlasticStress(efStress, p, biotCoef)
     
     !calculates the deviator of the stress tensor
     call devTensor(devStress,traceD3,plasticStress,nrowb)
@@ -3292,7 +3347,7 @@
     
     !------------------------------------------------------------------------------------------------------------------------------------
     ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
-    plasticStress = calcDPPlasticStress(efStress, p, biotCoef, h)
+    plasticStress = calcDPPlasticStress(efStress, p, biotCoef)
     
     !calculates the deviator of the stress tensor
     call devTensor(devStress,traceD3,plasticStress,nrowb)
@@ -3802,7 +3857,7 @@
     END SUBROUTINE STRSS4PLAST
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u)
+    subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, stress, stressS, stressTotal, p, isUndrained, nLoadSteps)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     
@@ -3813,27 +3868,25 @@
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
     real*8 :: x(nsd, nnp), u(ndofD,nnp)
+    real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), stressTotal(nrowB, nintD,nel)
+    real*8 :: p(1,nnp)
+    integer :: isUndrained, nLoadSteps
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
     real*8, allocatable :: fExtNeumann(:,:), fExtDirichlet(:,:) !fExtT with zeros on dirichlet/neumann nodes
     real*8, allocatable :: fIntDirichlet(:,:), fIntAllElse(:,:) !fint with zeros on dirichlet/ everythin else nodes
     real*8, allocatable :: r(:,:) !r - residual
-    real*8, allocatable :: DeltaDis(:,:), dDis(:,:)
-    real*8, allocatable :: strainInc(:,:,:), stressInc(:,:,:), curStress(:,:,:)
+    real*8, allocatable :: dDis(:,:)
     real*8 :: error
     
-    real*8, external :: coldot
-
-    integer :: nLoadSteps
+    real*8, external :: matrixNorm
     integer :: j, k
     
     real*8 :: tolNewton
     logical :: converged
 
     !------------------------------------------------------------------------------------------------------------------------------------
-    ! for now, total increment is always 10
-    nLoadSteps = 1
 
     ! allocate the required matrices
     if(.not.allocated(fExtT)) allocate(fExtT(ndofD, nnp))
@@ -3847,27 +3900,20 @@
     fIntJ = 0.d0
     r = 0.d0
 
-    if(.not.allocated(DeltaDis)) allocate(DeltaDis(ndofD, nnp))
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     dDis = 0.d0
     
-    if(.not.allocated(strainInc)) allocate(strainInc(nrowB,nintD,nel))
-    if(.not.allocated(stressInc)) allocate(stressInc(nrowB,nintD,nel))
-    if(.not.allocated(curStress)) allocate(curStress(nrowB,nintD,nel))
-    strainInc = 0.d0
-    stressInc = 0.d0
-    curStress = 0.d0
+    tolNewton = 1.0e-6
     
-    tolNewton = 1.0e-8
-    
-    u = 0.d0
     do k = 1, nLoadSteps
-        ! initialize initial displacement with 0
-        DeltaDis = 0.d0
+        write (*,*) "Incremento elástico"
 
         !compute the new external force vector, and split into two, a dirichlet and a neumann one
         call updateIncrementMechanic(fExtT, k, nLoadSteps, nnp)
         call splitBoundaryCondition(idDesloc,fExtT,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
+        
+        !computes the internal force
+        call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
 
         !initialize residual
         r = fExtNeumann - fIntJ
@@ -3879,12 +3925,19 @@
             dDis = 0.d0
 
             ! compute the tangential stiffness matrix
-            call bbarmtrx_elast(x, conecNodaisElem, alhsD, brhsD, idiagD, lmD)
+            call bbarmtrx_elast(x, conecNodaisElem, alhsD, brhsD, idiagD, lmD, p, isUndrained)
 
             ! load force vector in the right side
             if (nlvectD.gt.0) then
                 call load(idDesloc, r, brhsd, ndofD, nnp, nlvectD)
                 call ftod(idDesloc, dDis, fExtDirichlet, ndofD, nnp, nlvectD) !fExtT here is weighted dirichlet condition. Care
+            end if
+            
+            error = dsqrt(dot_product(brhsD,brhsD))/neqD
+            write(*,*) "erro do passo mecanico: ", error
+            if (error < tolNewton .and. j > 1) then
+                converged = .true.
+                exit
             end if
 
             ! solve using LDU decomposition, and store the result in the right array
@@ -3892,30 +3945,21 @@
             call btod(idDesloc, dDis, brhsD, ndofD, nnp)
 
             ! add correction da to the incremental displacement vector
-            DeltaDis = dDis + DeltaDis
+            u = u + dDis
 
             !computes the strain and stress
-            call pos4inc(x, conecNodaisElem, DeltaDis, strainInc, stressInc)
-            curStress = curStress + stressInc
+            call pos4inc(x, conecNodaisElem, u, stress, stressS, stressTotal, p, 0)
             
             !computes the internal force
-            call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, curStress, fIntJ)
+            call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
             
             !updates the residual and check the stop condition
             call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
             
             r = fExtNeumann - fIntAllElse
-            
-            error = dsqrt(coldot(r,r,nee))
-            if (error < tolNewton) then
-                converged = .true.
-                exit
-            end if
         end do
         if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
         
-        ! load the displacement into the answer
-        u = u + DeltaDis
     end do
     
     deallocate(fExtT)
@@ -3925,16 +3969,12 @@
     deallocate(fIntDirichlet)
     deallocate(fIntAllElse)
     deallocate(r)
-    deallocate(DeltaDis)
     deallocate(dDis)
-    deallocate(strainInc)
-    deallocate(stressInc)
-    deallocate(curStress)
 
     end subroutine incrementMechanicElasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, nLoadSteps)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, u, epsP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, isUndrained, nLoadSteps)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -3946,6 +3986,7 @@
     real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), trStrainP(nintD,nel), stressTotal(nrowB, nintD,nel)
     real*8 :: p(1,nnp)
     real*8 :: elementIsPlast(nel)
+    integer :: isUndrained
     integer :: nLoadSteps
 
     ! Variables
@@ -3956,7 +3997,7 @@
     real*8, allocatable :: dDis(:,:)
     real*8 :: error
     
-    real*8, external :: coldot
+    real*8, external :: matrixNorm
 
     integer :: j, k
     
@@ -3984,7 +4025,8 @@
     
     ! hmTTG = current tangent matrix
     do k = 1, nLoadSteps
-        call geoSetup(nel,nrowb,nintd,iopt)
+        write(*,*) "Incremento plastico"
+        call geoSetup(nel,nrowb,nintd,iopt, isUndrained)
 
         !compute the new external force vector, and split into two, a dirichlet and a neumann one
         call updateIncrementMechanic(fExtT, k, nLoadSteps, nnp)
@@ -4010,6 +4052,13 @@
                 call load(idDesloc, r, brhsd, ndofD, nnp, nlvectD)
                 call ftod(idDesloc, dDis, fExtDirichlet, ndofD, nnp, nlvectD) !fExtT here is weighted dirichlet condition. Care
             end if
+            
+            error = dsqrt(dot_product(brhsD,brhsD))/neqD
+            write(*,*) "erro do passo mecanico: ", error
+            if (error < tolNewton .and. j > 1) then
+                converged = .true.
+                exit
+            end if
 
             ! solve using LDU decomposition, and store the result in the right array
             call solverGaussSkyline(alhsD,brhsD,idiagD,nalhsD,neqD, 'full')
@@ -4019,7 +4068,7 @@
             u = u + dDis
 
             !updates the plastic strain, and the stress at each gauss point
-            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, trStrainP, stressTotal, hmTTG, elementIsPlast, p)
+            call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, trStrainP, stressTotal, hmTTG, elementIsPlast, p, isUndrained)
             
             !computes the internal force
             call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -4028,16 +4077,8 @@
             call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
             
             r = fExtNeumann - fIntAllElse
-            
-            error = dsqrt(coldot(r,r,nee))
-            if (error < tolNewton) then
-                converged = .true.
-                exit
-            end if
         end do
         if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
-        
-        !call updatePorosity(x, conecNodaisElem, u)
         
     end do
 
@@ -4204,7 +4245,7 @@
     end function calcTotalStress
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    function calcDPPlasticStress(efStress, p, biotCoef, h)
+    function calcDPPlasticStress(efStress, p, biotCoef)
     !function imports
     
     !variables import
@@ -4212,7 +4253,7 @@
     implicit none
     !variables input
     real*8 :: efStress(nrowB)
-    real*8 :: p, biotCoef, h
+    real*8 :: p, biotCoef
     
     !variables
     real*8 :: calcDPPlasticStress(nrowb)

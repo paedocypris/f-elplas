@@ -26,5 +26,5 @@ GODUNOV
     1.0D-6
 }
 *bbar_method{
-1
+0
 }

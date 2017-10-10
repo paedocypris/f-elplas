@@ -2526,6 +2526,51 @@
     end function totalCompressibility
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    function totalCompressibilityElastoplastic(curElement, tangentMatrix, npint, nel)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: curElement
+    real*8 :: tangentMatrix(16,npint, nel)
+    integer :: npint, nel
+    
+    !variables
+    integer :: geoFormIndx
+    real*8 :: initialPorosityL, curPorosityL
+    real*8 :: nInv, mInv, biotCoefficient, matrixBulk, grainBulk
+    real*8 :: bulkEPIntPoint, bulkEP
+    
+    real*8 :: totalCompressibilityElastoplastic
+    
+    integer :: l
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    initialPorosityL = poro0(curElement)
+    curPorosityL = poroL(curElement)
+    
+    matrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
+    grainBulk = GRAINBLK(geoFormIndx)
+    biotCoefficient = 1 - matrixBulk/grainBulk
+
+    nInv = (biotCoefficient - initialPorosityL)/GRAINBLK(geoFormIndx)
+    mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
+    
+    bulkEP = 0
+    do l=1,npint
+        bulkEPIntPoint = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
+        bulkEP = bulkEP + bulkEPIntPoint
+    end do
+    bulkEP = bulkEP / npint
+    
+    totalCompressibilityElastoplastic = mInv + biotCoefficient*biotCoefficient/bulkEP
+    
+    end function totalCompressibilityElastoplastic
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     function rhoCell(curElement)
     ! variable input
     integer :: curElement
@@ -2577,6 +2622,34 @@
     end function calcMatrixBulk
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    function calcBulkFromMatrix(curTangentMatrix)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: curTangentMatrix(16)
+    
+    !variables
+    real*8 :: calcBulkFromMatrix
+    real*8 :: identI(1,4)
+    real*8 :: qixi(4,4)
+    real*8 :: temp(1,4)
+    real*8 :: scalTemp(1,1)
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    identI = reshape((/ 1., 1., 0., 1. /), shape(identI))
+    
+    qixi = transpose(reshape(curTangentMatrix, shape(qixi)))
+    
+    temp = matmul(identI,qixi)
+    scalTemp = matmul(temp,transpose(identI))
+    calcBulkFromMatrix = scalTemp(1,1) / 9
+    
+    end function calcBulkFromMatrix
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     function calcKozenyCarmanPerm(curElement, tensDim)
     !function imports
     
@@ -2617,6 +2690,130 @@
     calcKozenyCarmanCoefficient = porosity**3/(1-(porosity**2))
     
     end function calcKozenyCarmanCoefficient
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcPoissonUndrained(poisson, biotCoeff, skemptonCoeff)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: poisson, biotCoeff, skemptonCoeff
+    
+    !variables
+    real*8 :: calcPoissonUndrained
+    real*8 :: tempVar
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    tempVar = biotCoeff * skemptonCoeff * (2*poisson - 1)
+    calcPoissonUndrained = (3.0d0*poisson - tempVar)/(tempVar + 3)
+    
+    end function calcPoissonUndrained
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcBulkUndrained(bulkModulus, biotCoeff, biotMModulus)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: bulkModulus, biotCoeff, biotMModulus
+    
+    !variables
+    real*8 :: calcBulkUndrained
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    calcBulkUndrained = bulkModulus + biotCoeff * biotCoeff * biotMModulus
+    
+    end function calcBulkUndrained
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcSkemptonCoefficient(biotCoeff, biotMModulus, bulkModulusUndrained)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: biotCoeff, biotMModulus, bulkModulusUndrained
+    
+    !variables
+    real*8 :: calcSkemptonCoefficient
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    calcSkemptonCoefficient = biotCoeff * biotMModulus / bulkModulusUndrained
+    
+    end function calcSkemptonCoefficient
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine calcMatrixUndrainedProperties(poissonUndrained, youngUndrained, curElement)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: poissonUndrained, youngUndrained
+    integer :: curElement
+    
+    !variables
+    integer :: geoFormIndx
+    real*8 :: initialPorosityL, curPorosityL
+    real*8 :: nInv, mInv, biotMModulus
+    real*8 :: bulkMatrix, bulkUndrained
+    real*8 :: biotCoeff, skemptonCoeff
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
+    !calculates the required moduli biotCoeff, biotMModulus and bulkModulus
+    biotCoeff = calcBiotCoefficient(curElement)
+    
+    initialPorosityL = poro0(curElement)
+    curPorosityL = poroL(curElement)
+    nInv = (biotCoeff - initialPorosityL)/GRAINBLK(geoFormIndx)
+    mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
+    biotMModulus = 1/mInv
+    
+    bulkMatrix = calcMatrixBulk(curElement)
+    
+    !calculate the undrained bulk modulus
+    bulkUndrained = calcBulkUndrained(bulkMatrix, biotCoeff, biotMModulus)
+    
+    !calculate the skempton coefficient
+    skemptonCoeff = calcSkemptonCoefficient(biotCoeff, biotMModulus, bulkUndrained)
+    
+    !calculate the undrained poisson modulus
+    poissonUndrained = calcPoissonUndrained(POISVECT(geoFormIndx), biotCoeff, skemptonCoeff)
+    
+    !calculate the undrained young modulus
+    youngUndrained = 3*bulkUndrained * (1 - 2.0d0*poissonUndrained) 
+    
+    end subroutine calcMatrixUndrainedProperties
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine calcMatrixProperties(poisson, young, curElement)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: poisson, young
+    integer :: curElement
+    
+    !variables
+    integer :: geoFormIndx
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
+    poisson = POISVECT(geoFormIndx)
+    young = YUNGVECT(geoFormIndx)
+    
+    end subroutine calcMatrixProperties
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     end module

@@ -45,8 +45,12 @@
     print*, "Iniciando o PROCESSAMENTO..."
 
     !processa o escoamento
-    call processamentoOneWay()
-    call processamentoTwoWay()
+    call processamentoOneWayPlast()
+    call processamentoTwoWayPlast(1)
+    call processamentoTwoWayElast()
+    
+    !call processamentoTwoWayPlast(2)
+    
 
     !
     call fecharArquivosBase()
@@ -406,12 +410,11 @@
 
     !
     use mMalha,            only: nsd, numel, numelReserv, numnp
-    use mMalha,            only: numLadosReserv, nen, numLadosElem
+    use mMalha,            only: nen
     use mMalha,            only: x, xc
     !
     use mMalha,            only: listaDosElemsPorNo
-    use mMalha,            only: listaDosElemsPorFace
-    use mMalha,            only: conecNodaisElem, conecLadaisElem
+    use mMalha,            only: conecNodaisElem
     use mGeomecanica,      only: EINELAS
     use mGeomecanica,      only: nrowB, nintD, nrowB2
     use mGeomecanica,      only: idDesloc, lmD, ndofD, nlVectD, fDesloc
@@ -432,12 +435,8 @@
     xc = 0.0d0
     allocate(conecNodaisElem(nen,numel))
     conecNodaisElem = 0
-    allocate(conecLadaisElem(numLadosElem,numelReserv))
-    conecLadaisElem = 0
     allocate(listaDosElemsPorNo(nen,numnp))
     listaDosElemsPorNo = 0
-    allocate(listaDosElemsPorFace(numLadosElem,numLadosReserv))
-    listaDosElemsPorFace = 0
     !
     !
     !material
@@ -503,25 +502,22 @@
     use mGlobaisEscalares
     use mGeomecanica, only: ndofD, optSolverD
     use mGlobaisArranjos
-    use mLeituraEscrita, only: iecho, nprint, prntel
+    use mLeituraEscrita, only: nprint, prntel
     use mLeituraEscritaSimHidroGeoMec, only: GEOREGION_DS
     !
     use mGeomecanica,     only: LMD, IDIAGD, IDDESLOC
     use mGeomecanica,     only: AUXM,IOPT,NED,NED2,NEE,NEE2,NEESQ,NEESQ2,NESD,NSTR
     !
     use mMalha,          only: numel, numnp, nsd, nen
-    use mMalha,          only: numLadosElem,numLadosReserv
-    use mMalha,          only: numelReserv,numnpReserv
+    use mMalha,          only: numnpReserv
     use mMalha,          only: x, xc, local
-    use mMalha,          only: conecNodaisElem, conecLadaisElem
+    use mMalha,          only: conecNodaisElem
     use mMalha,          only: listaDosElemsPorNo
-    use mMalha,          only: listaDosElemsPorFace
     use mMalha,          only: criarListaVizinhos
     use mMalha,          only: genel
     use mMalha,          only: formlm
     !
     use mPropGeoFisica,  only: hx,hy,hz, calcdim
-    use mPropGeoFisica,  only: nelxReserv, nelyReserv
 
     use mInputReader,      only: readNodeElementsDS, readMaterialPropertiesDS, readConstantBodyForcesDS
     use mInputReader,      only: genelFacesDS, leituraGeracaoConectividadesDS
@@ -574,31 +570,19 @@
     !
     !....... set memory pointers
     !
-    write(iecho,1000) ntype,numel,numat,nen,npint
-    !
     !     constant body forces
     !
     keyword_name = "constant_body_forces"
-    call readConstantBodyForcesDS(keyword_name, iecho, ierr)
+    call readConstantBodyForcesDS(keyword_name, ierr)
     !
     !    generation of conectivities
     !
     keyword_name = "conectividades_nodais"
     call leituraGeracaoConectividadesDS(keyword_name, conecNodaisElem,mat,nen, ierr)
-    !
-    keyword_name = "conectividades_ladais"
-    if (nsd==2) then
-        call leituraGeracaoConectividadesDS(keyword_name, conecLadaisElem, mat, numLadosELem, ierr)
-    else
-        call genelFacesDS(keyword_name, conecLadaisElem, numLadosElem, nelxReserv, nelyReserv, ierr)
-    endif
 
     listaDosElemsPorNo=0
     call criarListaVizinhos(nen,numnp,numel,conecNodaisElem, &
         &     listaDosElemsPorNo  )
-    listaDosElemsPorFace=0
-    call criarListaVizinhos(numladosElem,numLadosReserv, &
-        &     numelReserv,conecLadaisElem,listaDosElemsPorFace)
 
     !     calculo de xc (centros dos elementos)
     allocate(xl(nsd,nen)); xl=0.0
@@ -795,11 +779,12 @@
     end subroutine initDPProperties
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine processamento(way)
+    subroutine processamento(way, isPlast, plastType)
     !variable imports
     !flow
     use mHidrodinamicaGalerkin, only:hgNumPassosTempo, hgTempoTotal, hgInitialPressure
     use mHidrodinamicaGalerkin, only:hgNdof
+    use mGeomecanica, only:hmTTG
     use mMalha, only: numnp, numel, nen, nsd, conecNodaisElem
     use mMalha, only: x
     
@@ -810,23 +795,24 @@
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
     use mHidrodinamicaGalerkin, only: incrementFlowPressureSolutionOneWay, incrementFlowPressureSolutionTwoWay
     use mGeomecanica, only: incrementMechanicPlasticSolution, montarEstruturasDadosDeslocamentoSkyline
+    use mGeomecanica, only: incrementMechanicElasticSolution
     use mPropGeoFisica, only: lerPropriedadesFisicas
     
     !variables input
     implicit none
-    integer :: way
+    integer :: way, isPlast, plastType
     
     !variables
     integer :: curTimeStep
     real*8 :: t, deltaT
-    character(20) :: filename
+    character(30) :: filename
     
     integer :: k
     
     real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:)
     real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:)
     real*8, allocatable :: vDarcy(:,:), vDarcyNodal(:,:)
-    real*8, allocatable :: stress(:,:,:)
+    real*8, allocatable :: stress(:,:,:), out2waySource(:,:)
     real*8, allocatable :: stressS(:,:), prevStressS(:,:)
     real*8, allocatable :: trStrainP(:,:), prevTrStrainP(:,:)
     real*8, allocatable :: stressTotal(:,:,:)
@@ -836,6 +822,9 @@
     
     real*8 :: uNorm, pNorm
     logical :: converged
+    
+    integer :: outFileUnit
+    
     real*8, external :: matrixNorm
 
     !------------------------------------------------------------------------------------------------------------------------------------
@@ -851,6 +840,7 @@
     allocate(vDarcyNodal(nsd,numnp))
     allocate(stress(nrowb,nintD, numel))
     allocate(stressS(nintD, numel))
+    allocate(out2waySource(nintD, numel))
     allocate(prevStressS(nintD, numel))
     allocate(trStrainP(nintD, numel))
     allocate(prevTrStrainP(nintD, numel))
@@ -858,6 +848,7 @@
     allocate(strainP(nrowb,nintD,numel))
     allocate(elementIsPlast(numel))
     
+    outFileUnit = 5513
     
     !read physical properties
     call lerPropriedadesFisicas()
@@ -873,19 +864,49 @@
     endif
     
     !init stress and strain
+    write(*,*) "Inicializa estado de tensão"
     u = 0.d0
     strainP = 0.d0
     stress = 0.d0
     elementIsPlast = 0.d0
-    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 3)
+    if (isPlast == 1) then
+        call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 0, 1)
+    else if (isPlast == 0) then
+        call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, stress, stressS, stressTotal, p, 0, 1)
+    end if
     uInit = u
     uDif = 0.d0
     prevTrStrainP = trStrainP
 
     ! print initial state
-    if (way==1) filename = "solution1way"
-    if (way==2) filename = "solution2way"
-    call writeCurrentSolution(filename,0, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+    if (isPlast == 1) then
+        if (way==1) filename = "plastSolution1way"
+        if (way==2) then
+            if (plastType == 1) then
+                filename = "plastSolution2waySilva"
+
+                open(unit=outFileUnit, file="out/debugFiles/logSilva.txt", status='replace')
+                write (outFileUnit,*) filename
+
+            else if (plastType == 2) then
+                filename =  "plastSolution2wayKim"
+
+                open(unit=outFileUnit, file="out/debugFiles/logKim.txt", status='replace')
+                write (outFileUnit,*) filename
+            end if
+        end if
+    else if (isPlast == 0) then
+        if (way == 1) filename = "elastSolution1way"
+        if (way==2) then
+            filename = "elastSolution2way"
+            
+            open(unit=outFileUnit, file="out/debugFiles/logElast.txt", status='replace')
+            write (outFileUnit,*) filename
+        end if
+    end if
+    
+    
+    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
     t = 0
@@ -900,14 +921,20 @@
         ! begin split loop
         converged = .false.
         elementIsPlast = 0.d0
-        do k = 1, 500
+        do k = 1, 3000
             if (way == 1 .or. k == 1) then
                 call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
+                pNorm = 1.0
+                uNorm = 1.0
             else
-                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal)
+                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, out2waySource, plastType)
             end if
 
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 1)
+            if (isPlast == 1) then
+                call  incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 0, 1)
+            else if (isPlast == 0) then
+                call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, stress, stressS, stressTotal, p, 0, 1)
+            end if
             uDif = u - uInit
             
             if (way == 1) then
@@ -928,12 +955,15 @@
                 end if
             end if
             
+            write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
+            
             prevPIt = p
             prevUDifIt = uDif
         end do
         
         if ((way == 2) .and.(converged.eqv..false.)) then
             write(*,*) "fixed stress split didn't converged."
+            write (outFileUnit,*) "fixed stress split didn't converged"
             exit
         end if
         
@@ -941,8 +971,12 @@
         prevP = p
         
         !print current solution
-        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+        
+        write (outFileUnit,*) "curtimestep = ", curTimeStep, "k = ", k
+        write(*,*) " "
     end do
+    close(outFileUnit)
     
     deallocate(u)
     deallocate(uInit)
@@ -966,21 +1000,31 @@
     end subroutine processamento
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine processamentoOneWay()
+    subroutine processamentoOneWayPlast()
     
     implicit none
     !------------------------------------------------------------------------------------------------------------------------------------
-    call processamento(1)
-    end subroutine processamentoOneWay
+    call processamento(1, 1, 1)
+    end subroutine processamentoOneWayPlast
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine processamentoTwoWay()
+    subroutine processamentoTwoWayElast()
     
     implicit none
     !------------------------------------------------------------------------------------------------------------------------------------
-    call processamento(2)
+    call processamento(2, 0, 1)
+    end subroutine processamentoTwoWayElast
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine processamentoTwoWayPlast(plastType)
     
-    end subroutine processamentoTwoWay
+    implicit none
+    integer :: plastType
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    call processamento(2, 1, plastType)
+    
+    end subroutine processamentoTwoWayPlast
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine convertStressStoPrintable(stressS, stressSPrint, npint, nel)
@@ -1006,7 +1050,7 @@
     end subroutine convertStressStoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
     !function imports
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
@@ -1021,28 +1065,34 @@
     character(len=*) :: filename
     integer :: curTimeStep
     real*8 :: p(1,nnp), u(nsd,nnp), stressEf(nrowb,nintD,nel), stressTot(nrowb,nintD,nel)
-    real*8 :: stressS(nintD,nel), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
+    real*8 :: stressS(nintD,nel), out2waySource(nintD, nel), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
     real*8 :: elementIsPlast(nel)
     integer :: conecNodaisElem(nen,nel)
     integer :: nnp, nel, nen, nsd, nrowb, nintD
     
     !variables
     integer :: unitNumber
-    real*8 :: stressSPrint(nel)
+    real*8, allocatable :: stressSPrint(:)
     
     !------------------------------------------------------------------------------------------------------------------------------------
     unitNumber = 13587
     
-    call convertStressStoPrintable(stressS, stressSPrint, nintD, nel)
+    allocate(stressSPrint(nel))
+    
     call escreverArqParaviewOpening(filename, p, 1, nnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(u, nsd, nnp, 'u', len('u'), 2, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(vDarcy, nsd, nel, 'vDarcy', len('vDarcy'), 1, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(vDarcyNodal, nsd, nnp, 'vDarcyNodal', len('vDarcyNodal'), 2, unitNumber)
     call escreverarqparaviewintermed_campotensorialelemento(stressef, nrowb, nintd, nel, 'stressef', len('stressef'), unitnumber)
     call escreverarqparaviewintermed_campotensorialelemento(stresstot, nrowb, nintd, nel, 'stresstot', len('stresstot'), unitnumber)
+    call convertStressStoPrintable(stressS, stressSPrint, nintD, nel)
     call escreverarqparaviewintermed_campoescalar(unitnumber, stresssprint, 1, nel, 'stresss', len('stresss'), 1)
+    call convertStressStoPrintable(out2waySource, stressSPrint, nintD, nel)
+    call escreverarqparaviewintermed_campoescalar(unitnumber, stressSPrint, 1, nel, '2waySource', len('2waySource'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, elementIsPlast, 1, nel, 'elementIsPlast', len('elementIsPlast'), 1)
     close(unitNumber)
+    
+    deallocate(stressSPrint)
     
     end subroutine writeCurrentSolution
     !************************************************************************************************************************************

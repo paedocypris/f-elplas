@@ -811,13 +811,13 @@
 
     !> Faz a leitura de constant body forces.
     !> @param keyword_name  Keyword especifica para constant body forces.
-    subroutine readConstantBodyForcesDS(keyword_name, iecho, ierr)
+    subroutine readConstantBodyForcesDS(keyword_name, ierr)
     use mGlobaisArranjos, only: grav
 
     implicit none
     character(len=50) keyword_name
     integer*4 i, keyword_line
-    integer :: iecho, ierr
+    integer :: ierr
 
     keyword_line = findKeyword(keyword_name)
     if (keyword_line.eq.0) then
@@ -826,14 +826,8 @@
     endif
 
     read  (file_lines(keyword_line),  7000) (grav(i),i=1,3)
-    write (iecho,8000) (grav(i),i=1,3)
 
 7000 format(8 f10.0)
-8000 format(///,&
-        ' g r a v i t y   v e c t o r   c o m p o n e n t s     ',//5x,&
-        ' exemplo 1. . . . . . . . . . . . . .  = ',      1pe15.8,//5x,&
-        ' exemplo 2 . . . . . . . . . . . . . . = ',      1pe15.8,//5x,&
-        ' exemplo 3............................ = ',      1pe15.8,//)
     end subroutine readConstantBodyForcesDS
 
     !**************************************************************************
