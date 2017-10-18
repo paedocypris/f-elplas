@@ -1,0 +1,11 @@
+ plastSolution2waySilva        
+ curtimestep =            1 k =           34
+ curtimestep =            2 k =           32
+ curtimestep =            3 k =           33
+ curtimestep =            4 k =           31
+ curtimestep =            5 k =           31
+ curtimestep =            6 k =           31
+ curtimestep =            7 k =           30
+ curtimestep =            8 k =           30
+ curtimestep =            9 k =           29
+ curtimestep =           10 k =           28

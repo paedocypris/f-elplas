@@ -20,7 +20,7 @@
     !
     program reservoirSimulator
     !
-    use mLeituraEscrita,   only: fecharArquivosBase, abrirArquivosInformacoesMalha
+    use mLeituraEscrita,   only: fecharArquivosBase
     use mLeituraEscritaSimHidroGeoMec,   only: fecharArquivosSimHidroGeoMec
     !
     implicit none
@@ -32,7 +32,6 @@
     !
     !.... initialization phase
     !
-    call abrirArquivosInformacoesMalha()
     print*, ""
     print*, "PREPROCESSAMENTO"
     call timing(t1)
@@ -905,7 +904,6 @@
         end if
     end if
     
-    
     call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
@@ -973,7 +971,7 @@
         !print current solution
         call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
         
-        write (outFileUnit,*) "curtimestep = ", curTimeStep, "k = ", k
+        if (way == 2) write (outFileUnit,*) "curtimestep = ", curTimeStep, "k = ", k
         write(*,*) " "
     end do
     close(outFileUnit)

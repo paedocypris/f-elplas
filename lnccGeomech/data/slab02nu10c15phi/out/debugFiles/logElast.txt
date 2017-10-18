@@ -1,0 +1,11 @@
+ elastSolution2way             
+ curtimestep =            1 k =           42
+ curtimestep =            2 k =           42
+ curtimestep =            3 k =           41
+ curtimestep =            4 k =           41
+ curtimestep =            5 k =           41
+ curtimestep =            6 k =           41
+ curtimestep =            7 k =           40
+ curtimestep =            8 k =           41
+ curtimestep =            9 k =           41
+ curtimestep =           10 k =           40

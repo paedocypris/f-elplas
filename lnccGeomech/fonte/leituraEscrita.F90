@@ -22,27 +22,6 @@
 !
       contains
 !
-!==========================================================================
-!
-      subroutine abrirArquivosInformacoesMalha()
-!  
-!        iin    = input unit number
-!        iecho  = output unit of input data
-!        iouter  = output unit of error norms
-!
-      character(len=20) :: nomeIecho
-!
-      iecho         = 12
-      icoords       = 13
-      iconects      = 14
-      iconectsL     = 15
-!
-      nomeIecho='echo.dat'
-      open(unit=iecho , file= nomeIecho)
-!
-
-   end subroutine 
-!
 !========================================================================
 !
       subroutine fecharArquivosBase()
