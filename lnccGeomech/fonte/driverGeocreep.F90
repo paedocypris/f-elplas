@@ -92,13 +92,15 @@
     use mPropGeoFisica,    only: XTERLOAD, GEOMECLAW
     !
     use mGeomecanica,      only: fDesloc, InSeaLoad, optSolverD
-    use mInputReader,      only: readInputFileDS, LEIturaGERacaoCOORdenadasDS
+    use mGeomecanica, only: initStress
+    use mInputReader,      only: readInputFileDS, LEIturaGERacaoCOORdenadasDS, readIntegerKeywordValue
     use mInputReader,      only: leituraCodigosCondContornoDS,leituraValoresCondContornoDS
 
     !
     implicit none
 
     character(len=50) :: keyword_name
+    integer :: ierr
     !
     tempoTotalVelocidade  = 0.d00
     tempoTotalPressao     = 0.d00
@@ -211,6 +213,9 @@
     !
     keyword_name = "valores_cond_contorno_desloc"
     if(nlvectD.gt.0) call leituraValoresCondContornoDS(keyword_name, fDesloc, ndofD, numnp, 0, nlvectD, iprtin, iecho)
+    
+    keyword_name = "initStress"
+    call readIntegerKeywordValue(keyword_name, initStress, 1, ierr)
     !
     !.... NEXT MULTIPLY SEALOAD ON Y DIRECTION 2-D MODEL NEUMANN CONDITIONS
     !
@@ -695,6 +700,8 @@
     subroutine initGalerkinPressure(nnp)
     !variable imports
     use mHidrodinamicaGalerkin, only: hgNumPassosTempo, hgTempoTotal
+    use mHidrodinamicaGalerkin, only: hgNSteps, hgDts, hgNTimeSteps
+    
     use mHidrodinamicaGalerkin, only: hgInitialPressure
     use mHidrodinamicaGalerkin, only: hgNdof, hgNlvect, hgNeq
     use mHidrodinamicaGalerkin, only: hgF
@@ -706,6 +713,7 @@
     !function imports
     use mInputReader,      only: leituraCodigosCondContornoDS, leituraValoresCondContornoDS
     use mInputReader,      only: readRealKeywordValue, readIntegerKeywordValue
+    use mInputReader, only: leituraTabelaTempos
 
     implicit none
 
@@ -714,15 +722,26 @@
 
     !variables
     character(len=50) :: keyword_name
+    integer :: hgIsTable
     integer :: ierr
 
     !------------------------------------------------------------------------------------------------------------------------------------
-    keyword_name = "numeroPassosTempoP"
-    call readIntegerKeywordValue(keyword_name, hgNumPassosTempo, 0_4, ierr)
+    keyword_name = "hgTimeIsTable"
+    call readIntegerKeywordValue(keyword_name, hgIsTable, 0, ierr)
+    
+    if (hgIsTable == 0) then
+        keyword_name = "numeroPassosTempoP"
+        call readIntegerKeywordValue(keyword_name, hgNumPassosTempo, 0_4, ierr)
 
-    keyword_name = "tempoTotal"
-    call readRealKeywordValue(keyword_name, hgTempoTotal, 0.0d0, ierr)
-    hgTempoTotal = hgTempoTotal * 2592000.0 ! converts months to seconds
+        keyword_name = "tempoTotal"
+        call readRealKeywordValue(keyword_name, hgTempoTotal, 0.0d0, ierr)
+        hgTempoTotal = hgTempoTotal * 2592000.0 ! converts months to seconds
+    
+    else if (hgIsTable == 1) then
+        keyword_name = "tabelaTempos"
+        call leituraTabelaTempos(keyword_name, hgNSteps, hgDts, hgNTimeSteps)
+    end if
+    
 
     keyword_name = "hgNlvect"
     call readIntegerKeywordValue(keyword_name, hgNlvect, 0_4, ierr)
@@ -782,8 +801,9 @@
     !variable imports
     !flow
     use mHidrodinamicaGalerkin, only:hgNumPassosTempo, hgTempoTotal, hgInitialPressure
+    use mHidrodinamicaGalerkin, only:hgNSteps, hgDts, hgNTimeSteps
     use mHidrodinamicaGalerkin, only:hgNdof
-    use mGeomecanica, only:hmTTG
+    use mGeomecanica, only:hmTTG, initStress
     use mMalha, only: numnp, numel, nen, nsd, conecNodaisElem
     use mMalha, only: x
     
@@ -806,7 +826,7 @@
     real*8 :: t, deltaT
     character(30) :: filename
     
-    integer :: k
+    integer :: k, i
     
     real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:)
     real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:)
@@ -823,6 +843,7 @@
     logical :: converged
     
     integer :: outFileUnit
+    integer :: currentTimeStepPrint
     
     real*8, external :: matrixNorm
 
@@ -868,11 +889,13 @@
     strainP = 0.d0
     stress = 0.d0
     elementIsPlast = 0.d0
-    if (isPlast == 1) then
-        call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 0, 1)
-    else if (isPlast == 0) then
-        call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, stress, stressS, stressTotal, p, 0, 1)
-    end if
+    if (initStress == 1) then
+        if (isPlast == 1) then
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 0, 1)
+        else if (isPlast == 0) then
+            call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, stress, stressS, stressTotal, p, 0, 1)
+        end if
+    end if 
     uInit = u
     uDif = 0.d0
     prevTrStrainP = trStrainP
@@ -908,72 +931,81 @@
     
     !time loop
     t = 0
-    deltaT = hgTempoTotal / hgNumPassosTempo
-    do curTimeStep = 1, hgNumPassosTempo
-        t = t + deltaT
-        write(*,*) "tempo", t, "passo de tempo", curTimeStep
-        
-        prevStressS = stressS
-        prevTrStrainP = trStrainP
-        
-        ! begin split loop
-        converged = .false.
-        elementIsPlast = 0.d0
-        do k = 1, 3000
-            if (way == 1 .or. k == 1) then
-                call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
-                pNorm = 1.0
-                uNorm = 1.0
-            else
-                call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, out2waySource, plastType)
-            end if
+    currentTimeStepPrint = 1
 
-            if (isPlast == 1) then
-                call  incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 0, 1)
-            else if (isPlast == 0) then
-                call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, stress, stressS, stressTotal, p, 0, 1)
-            end if
-            uDif = u - uInit
-            
-            if (way == 1) then
-                exit
-            end if
-            
-            
-            if (k > 1) then
-                prevPIt = prevPIt - p
-                pNorm = matrixNorm(prevPIt, hgNdof, numnp)
-                
-                prevUDifIt = prevUDifIt - uDif
-                uNorm = matrixNorm(prevUDifIt, ndofD, numnp)
-                
-                if (pNorm < 1.0d-6 .and. uNorm < 1.0d-6) then
-                    converged = .true.
+    do i = 1, hgNTimeSteps
+        deltaT = hgDts(i)
+
+        do curTimeStep = 1, hgNSteps(i)
+            t = t + deltaT
+            write(*,*) "tempo", t, "passo de tempo", curTimeStep
+
+            prevStressS = stressS
+            prevTrStrainP = trStrainP
+
+            ! begin split loop
+            converged = .false.
+            elementIsPlast = 0.d0
+            do k = 1, 3000
+                if (way == 1 .or. k == 1) then
+                    call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
+                    pNorm = 1.0
+                    uNorm = 1.0
+                else
+                    call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, out2waySource, plastType)
+                end if
+
+                if (isPlast == 1) then
+                    call  incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, strainP, stress, stressS, trStrainP, stressTotal, p, elementIsPlast, 0, 1)
+                else if (isPlast == 0) then
+                    call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, u, stress, stressS, stressTotal, p, 0, 1)
+                end if
+                uDif = u - uInit
+
+                if (way == 1) then
                     exit
                 end if
+
+                if (k > 1) then
+                    prevPIt = prevPIt - p
+                    pNorm = matrixNorm(prevPIt, hgNdof, numnp)
+
+                    prevUDifIt = prevUDifIt - uDif
+                    uNorm = matrixNorm(prevUDifIt, ndofD, numnp)
+
+                    if (pNorm < 1.0d-6 .and. uNorm < 1.0d-6) then
+                        converged = .true.
+                        exit
+                    end if
+                end if
+
+                write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
+
+                prevPIt = p
+                prevUDifIt = uDif
+            end do
+
+            if ((way == 2) .and.(converged.eqv..false.)) then
+                write(*,*) "fixed stress split didn't converged."
+                write (outFileUnit,*) "fixed stress split didn't converged"
+                exit
             end if
+
+            !update time
+            prevP = p
+
+            !print current solution
+            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+
+            if (way == 2) write (outFileUnit,*) "load stage = ", i,"curtimestep = ", curTimeStep, "k = ", k
+            write(*,*) " "
             
-            write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
-            
-            prevPIt = p
-            prevUDifIt = uDif
+            currentTimeStepPrint = currentTimeStepPrint + 1
         end do
-        
-        if ((way == 2) .and.(converged.eqv..false.)) then
-            write(*,*) "fixed stress split didn't converged."
-            write (outFileUnit,*) "fixed stress split didn't converged"
-            exit
-        end if
-        
-        !update time
-        prevP = p
-        
-        !print current solution
-        call writeCurrentSolution(filename,curTimeStep, p, uDif, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
-        
-        if (way == 2) write (outFileUnit,*) "curtimestep = ", curTimeStep, "k = ", k
-        write(*,*) " "
     end do
+    
+    deltaT = hgTempoTotal / hgNumPassosTempo
+    
     close(outFileUnit)
     
     deallocate(u)

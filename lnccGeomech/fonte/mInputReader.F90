@@ -66,9 +66,9 @@
 1000 format('1'//,' there are no nonzero prescribed forces and ',&
         'kinematic boundary conditions for load vector number ',i10)
 2000 format('1'//,' there are no nonzero nodal body forces')
-    end subroutine leituraValoresCondContornoDS !**********************************************************************
-
-
+    end subroutine leituraValoresCondContornoDS 
+    
+    
     !> Leitura e geracao de codigos de condicoes de contorno.
     !!
     !! @param keyword_name  Palavra-chave que indica o tipo da condicao de contorno.
@@ -138,7 +138,48 @@
     !
     end subroutine leituraCodigosCondContornoDS !********************************************************************
 
-
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine leituraTabelaTempos(keyword_name, nSteps, dts, nTimeSteps)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    character(len=50) keyword_name
+    integer, allocatable :: nSteps(:)
+    real*8, allocatable :: dts(:)
+    integer :: nTimeSteps
+    
+    !variables
+    integer :: keyword_line
+    integer :: nStep
+    real*8 :: dt
+    integer i
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    keyword_line = findKeyword(keyword_name)
+    if (keyword_line.eq.-1) return
+    
+    read(file_lines(keyword_line),'(1i10)') nTimeSteps
+    keyword_line = keyword_line + 1
+    
+    allocate(nSteps(nTimeSteps))
+    allocate(dts(nTimeSteps))
+    
+    do i=1,nTimeSteps
+        read(file_lines(keyword_line),1000) nStep, dt
+        keyword_line = keyword_line + 1
+        
+        nSteps(i) = nStep
+        dts(i) = dt
+    end do
+    
+    1000 format(1i10,1e15.7)
+    end subroutine leituraTabelaTempos
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
 
     !> Leitura e geracao de coordenadas
     !!

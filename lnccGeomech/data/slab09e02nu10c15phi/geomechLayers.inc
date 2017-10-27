@@ -1,5 +1,5 @@
 *young_modulus_reservoir_region{
-2.34D+08
+2.34D+09
 }
 *poisson_ratio_reservoir_region{
 0.2D+0

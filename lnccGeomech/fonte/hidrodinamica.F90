@@ -19,6 +19,9 @@
     !module variables
     integer :: hgNumPassosTempo
     real*8 :: hgTempoTotal
+    integer, allocatable :: hgNSteps(:)
+    real*8, allocatable :: hgDts(:)
+    integer :: hgNTimeSteps
 
     !various integers
     integer :: hgNeq
@@ -183,9 +186,9 @@
         if (nen.eq.4.and.conecNodaisElem(3,curElement).eq.conecNodaisElem(4,curElement)) quad = .false.
 
         ! calculates global derivatives of shape functions and jacobian determinants
-        if(nen==3) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
-        if(nen==4) call shgq  (xl,det,shL,shG,npint,nel,quad,nen)
-        if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
+        if(nen==3) call shgq  (xl,det,shL,shG,npint,curElement,quad,nen)
+        if(nen==4) call shgq  (xl,det,shL,shG,npint,curElement,quad,nen)
+        if(nen==8) call shg3d (xl,det,shL,shG,npint,curElement,nen)
 
         !get mechanical parameters
         if (way == 1 .or. plastType == 1) then

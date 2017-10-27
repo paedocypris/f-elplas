@@ -66,6 +66,8 @@
     CHARACTER(len=128) :: YNG_IN
     real(8) :: kg,kgphi    ! media geometrica
     real(8) :: rho,rhophi  ! coeficiente da variancia (strenght)
+    
+    integer :: initStress
     !
     contains
     !
