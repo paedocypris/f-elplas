@@ -79,7 +79,8 @@
 		<File RelativePath=".\data\manoharan\malha.inc"/>
 		<File RelativePath=".\data\manoharan\mesh_rsrv_outsburden.inc"/>
 		<File RelativePath=".\data\manoharan\NumericParam.inc"/>
-		<File RelativePath=".\data\manoharan\SimulatorParam.inc"/></Filter>
+		<File RelativePath=".\data\manoharan\SimulatorParam.inc"/>
+		<File RelativePath=".\data\manoharan\timeControl.inc"/></Filter>
 		<Filter Name="slab">
 		<File RelativePath=".\data\slab\condContornoGeom.inc"/>
 		<File RelativePath=".\data\slab\condContornoHidro.inc"/>
