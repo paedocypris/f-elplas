@@ -24,19 +24,13 @@
     use mLeituraEscritaSimHidroGeoMec,   only: fecharArquivosSimHidroGeoMec
     !
     implicit none
-    !
-    real*8 :: t1, t2, t3, t4
-
-    call timing(t3)
 
     !
     !.... initialization phase
     !
     print*, ""
     print*, "PREPROCESSAMENTO"
-    call timing(t1)
     call preprocessador_DS()
-    call timing(t2)
     !
     !.... solution phase
     !
@@ -46,17 +40,13 @@
     !processa o escoamento
     call processamentoOneWayPlast()
     call processamentoTwoWayPlast(1)
+    call processamentoTwoWayPlast(2)
     call processamentoTwoWayElast()
-    
-    !call processamentoTwoWayPlast(2)
-    
 
     !
     call fecharArquivosBase()
     call fecharArquivosSimHidroGeoMec()
 
-    call timing(t4)
-    write(*,*) "TEMPO DE PAREDE TOTAL MEDIDO=", t4 - t3, " segundos "
     !
     end program reservoirSimulator
     !
@@ -699,7 +689,6 @@
     !************************************************************************************************************************************
     subroutine initGalerkinPressure(nnp)
     !variable imports
-    use mHidrodinamicaGalerkin, only: hgNumPassosTempo, hgTempoTotal
     use mHidrodinamicaGalerkin, only: hgNSteps, hgDts, hgNTimeSteps
     
     use mHidrodinamicaGalerkin, only: hgInitialPressure
@@ -722,6 +711,7 @@
 
     !variables
     character(len=50) :: keyword_name
+    real*8 :: tempoTotal
     integer :: hgIsTable
     integer :: ierr
 
@@ -730,18 +720,23 @@
     call readIntegerKeywordValue(keyword_name, hgIsTable, 0, ierr)
     
     if (hgIsTable == 0) then
+        allocate(hgNSteps(1))
+        allocate(hgDts(1))
+        
+        hgNTimeSteps = 1
+        
         keyword_name = "numeroPassosTempoP"
-        call readIntegerKeywordValue(keyword_name, hgNumPassosTempo, 0_4, ierr)
+        call readIntegerKeywordValue(keyword_name, hgNSteps(1), 0_4, ierr)
 
         keyword_name = "tempoTotal"
-        call readRealKeywordValue(keyword_name, hgTempoTotal, 0.0d0, ierr)
-        hgTempoTotal = hgTempoTotal * 2592000.0 ! converts months to seconds
-    
+        call readRealKeywordValue(keyword_name, tempoTotal, 0.0d0, ierr)
+        tempoTotal = tempoTotal * 2592000.0 ! converts months to seconds
+        
+        hgDts(1) = tempoTotal / hgNSteps(1)
     else if (hgIsTable == 1) then
         keyword_name = "tabelaTempos"
         call leituraTabelaTempos(keyword_name, hgNSteps, hgDts, hgNTimeSteps)
     end if
-    
 
     keyword_name = "hgNlvect"
     call readIntegerKeywordValue(keyword_name, hgNlvect, 0_4, ierr)
@@ -800,7 +795,7 @@
     subroutine processamento(way, isPlast, plastType)
     !variable imports
     !flow
-    use mHidrodinamicaGalerkin, only:hgNumPassosTempo, hgTempoTotal, hgInitialPressure
+    use mHidrodinamicaGalerkin, only:hgInitialPressure
     use mHidrodinamicaGalerkin, only:hgNSteps, hgDts, hgNTimeSteps
     use mHidrodinamicaGalerkin, only:hgNdof
     use mGeomecanica, only:hmTTG, initStress
@@ -878,7 +873,7 @@
     call montarEstruturasDadosDeslocamentoSkyline(conecNodaisElem, nen, numel)
     
     !init pressure
-    if(hgNumPassosTempo > 1) then
+    if(hgNTimeSteps > 1 .or. hgNSteps(1) > 1) then
         p = hgInitialPressure
         prevP = p
     endif
@@ -1003,8 +998,6 @@
             currentTimeStepPrint = currentTimeStepPrint + 1
         end do
     end do
-    
-    deltaT = hgTempoTotal / hgNumPassosTempo
     
     close(outFileUnit)
     

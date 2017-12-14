@@ -17,7 +17,6 @@
         & solveGalerkinPressao, incrementFlowPressureSolution
 
     !module variables
-    integer :: hgNumPassosTempo
     real*8 :: hgTempoTotal
     integer, allocatable :: hgNSteps(:)
     real*8, allocatable :: hgDts(:)
@@ -110,8 +109,8 @@
     use mFuncoesDeForma, only: shgq, shg3d
     use mSolverGaussSkyline, only: addlhs, addrhs
     use mMalha, only: local
-    use mPropGeoFisica, only: calcMatrixBulk, calcBiotCoefficient
-    use mPropGeoFisica, only: totalCompressibility, totalCompressibilityElastoplastic
+    use mPropGeoFisica, only: calcMatrixBulk, calcBulkFromMatrix, calcBiotCoefficient
+    use mPropGeoFisica, only: totalCompressibility
     use mPropGeoFisica, only: calcKozenyCarmanPerm
 
     !variable input
@@ -145,6 +144,7 @@
     logical :: quad, zerodl !is diagonal, is degenerated triange, is zero
     
     real*8 :: betaTotalCompressibility
+    real*8 :: matrixBulk
     real*8 :: psi
     real*8, allocatable :: curPerm(:)
     integer :: tensDim
@@ -189,14 +189,6 @@
         if(nen==3) call shgq  (xl,det,shL,shG,npint,curElement,quad,nen)
         if(nen==4) call shgq  (xl,det,shL,shG,npint,curElement,quad,nen)
         if(nen==8) call shg3d (xl,det,shL,shG,npint,curElement,nen)
-
-        !get mechanical parameters
-        if (way == 1 .or. plastType == 1) then
-            betaTotalCompressibility = totalCompressibility(curElement)
-        else if (plastType == 2) then
-            betaTotalCompressibility = totalCompressibilityElastoplastic(curElement, tangentMatrix, npint, nel)
-        end if
-        psi = calcBiotCoefficient(curElement)/calcMatrixBulk(curElement)
         
         ! retrieve permeabilities from material
         curPerm = calcKozenyCarmanPerm(curElement,tensDim)
@@ -205,6 +197,15 @@
 
         do l = 1, npint ! foreach integration point
             cl = w(l)*det(l)
+            
+            !get mechanical parameters
+            if (way == 1 .or. plastType == 1) then
+                matrixBulk = calcMatrixBulk(curElement)
+            else if (plastType == 2) then
+                matrixBulk = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
+            end if
+            betaTotalCompressibility = totalCompressibility(curElement, matrixBulk)
+            psi = calcBiotCoefficient(curElement)/matrixBulk
 
             do i = 1, nen
                 do j = 1, nen !for each pair of nodes in the element

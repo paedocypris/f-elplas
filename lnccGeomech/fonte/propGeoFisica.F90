@@ -2497,17 +2497,18 @@
     end function
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    function totalCompressibility(curElement)
+    function totalCompressibility(curElement, matrixBulk)
     
     implicit none
     
     !variables input
     integer :: curElement
+    real*8 :: matrixBulk
     
     ! Variables
     integer :: geoFormIndx
     real*8 :: initialPorosityL, curPorosityL
-    real*8 :: nInv, mInv, biotCoefficient, matrixBulk, grainBulk
+    real*8 :: nInv, mInv, biotCoefficient, grainBulk
     real*8 :: totalCompressibility
     
     !------------------------------------------------------------------------------------------------------------------------------------
@@ -2515,60 +2516,14 @@
     initialPorosityL = poro0(curElement)
     curPorosityL = poroL(curElement)
     
-    matrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
     grainBulk = GRAINBLK(geoFormIndx)
     biotCoefficient = 1 - matrixBulk/grainBulk
 
-    nInv = (biotCoefficient - initialPorosityL)/GRAINBLK(geoFormIndx)
+    nInv = (biotCoefficient - curPorosityL)/GRAINBLK(geoFormIndx)
     mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
     totalCompressibility = mInv + biotCoefficient*biotCoefficient/matrixBulk
     
     end function totalCompressibility
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    function totalCompressibilityElastoplastic(curElement, tangentMatrix, npint, nel)
-    !function imports
-    
-    !variables import
-    
-    implicit none
-    !variables input
-    integer :: curElement
-    real*8 :: tangentMatrix(16,npint, nel)
-    integer :: npint, nel
-    
-    !variables
-    integer :: geoFormIndx
-    real*8 :: initialPorosityL, curPorosityL
-    real*8 :: nInv, mInv, biotCoefficient, matrixBulk, grainBulk
-    real*8 :: bulkEPIntPoint, bulkEP
-    
-    real*8 :: totalCompressibilityElastoplastic
-    
-    integer :: l
-    
-    !------------------------------------------------------------------------------------------------------------------------------------
-    geoFormIndx = getRegionIndex(curElement)
-    initialPorosityL = poro0(curElement)
-    curPorosityL = poroL(curElement)
-    
-    matrixBulk = bulk(YUNGVECT(geoFormIndx),POISVECT(geoFormIndx),3.d0)
-    grainBulk = GRAINBLK(geoFormIndx)
-    biotCoefficient = 1 - matrixBulk/grainBulk
-
-    nInv = (biotCoefficient - initialPorosityL)/GRAINBLK(geoFormIndx)
-    mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
-    
-    bulkEP = 0
-    do l=1,npint
-        bulkEPIntPoint = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
-        bulkEP = bulkEP + bulkEPIntPoint
-    end do
-    bulkEP = bulkEP / npint
-    
-    totalCompressibilityElastoplastic = mInv + biotCoefficient*biotCoefficient/bulkEP
-    
-    end function totalCompressibilityElastoplastic
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     function rhoCell(curElement)

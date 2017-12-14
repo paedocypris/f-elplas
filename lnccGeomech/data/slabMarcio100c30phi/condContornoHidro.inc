@@ -1,3 +1,7 @@
+*hgTimeIsTable{
+   0
+}
+
 *numeroPassosTempoP{
         10
 }
