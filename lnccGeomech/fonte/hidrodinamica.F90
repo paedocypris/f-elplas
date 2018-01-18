@@ -23,11 +23,11 @@
     integer :: hgNTimeSteps
 
     !various integers
-    integer :: hgNeq
-    integer :: hgNdof, hgNlvect
+    integer :: hgNeq, hgNdof
+    integer :: hgNlvect, hgNltftn, hgNptslf
 
     !global arrays
-    real*8, allocatable :: hgF(:,:)
+    real*8, allocatable :: hgF(:,:,:), hgG(:,:,:)
 
     !flow variables
     real*8 :: hgInitialPressure
@@ -76,23 +76,33 @@
     end subroutine montarEstruturasDadosPressaoSkyline
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
+    subroutine montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
 
     !variable input
     integer ::conecNodaisElem(nen,nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: x(nsd,nnp), curT, deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:, :), prevStressS(:, :), trStrainP(:,:), prevTrStrainP(:,:)
     real*8 :: tangentMatrix(:,:,:)
     real*8 :: out2waySource(:,:)
     integer :: way, plastType
+    
+    !variables
+    real*8 :: g1(hgNltftn)
 
     !------------------------------------------------------------------------------------------------------------------------------------
     hgAlhs = 0.0
     hgBrhs = 0.0
+    
     if (hgNlvect >= 1) then
-        call load(hgId, hgF, hgBrhs, hgNdof, nnp, hgNlvect)
-        call ftod(hgId, p, hgF, hgNdof, nnp, hgNlvect)
+        if (hgNltftn >= 1) then
+            call lfac(hgG, curT, g1, hgNltftn, hgNptslf)
+        else
+            g1 = 1.d0
+        endif
+        
+        call loadtime(hgId, hgF, hgBrhs, g1, hgNdof, nnp, hgNlvect,deltaT)
+        call ftod(hgId, p, hgF, g1, hgNdof, nnp, hgNlvect)
     endif
 
     call calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
@@ -276,11 +286,11 @@
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, way, plastType)
+    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, way, plastType)
     implicit none
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: x(nsd,nnp), curT, deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:,:), prevStressS(:,:)
     real*8 :: trStrainP(:,:), prevTrStrainP(:,:)
@@ -291,7 +301,7 @@
     
     !------------------------------------------------------------------------------------------------------------------------------------
     ! mount equation system
-    call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
+    call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
     
     !solve
     call solveGalerkinPressao(nnp, p)
@@ -302,10 +312,10 @@
     end subroutine incrementFlowPressureSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, vDarcy, vDarcyNodal)
+    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, vDarcy, vDarcyNodal)
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: x(nsd,nnp), curT, deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     
@@ -316,15 +326,15 @@
     real*8 :: tangentMatrix(1,1,1)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, 1, 1)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, 1, 1)
     
     end subroutine incrementFlowPressureSolutionOneWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, plastType)
+    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, plastType)
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp), deltaT
+    real*8 :: x(nsd,nnp), curT, deltaT
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:,:), prevStressS(:,:)
     real*8 :: trStrainP(:,:), prevTrStrainP(:,:)
@@ -334,7 +344,7 @@
     integer :: plastType
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, 2, plastType)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, 2, plastType)
     
     end subroutine incrementFlowPressureSolutionTwoWay
     !************************************************************************************************************************************
@@ -405,7 +415,7 @@
         if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
 
         ! set material index
-        curPerm = calcKozenyCarmanPerm(curElement,3)
+        curPerm = calcKozenyCarmanPerm(curElement,3) !Porosities are global variable, care
         
         do dir=1,nsd
             do l=1,npint

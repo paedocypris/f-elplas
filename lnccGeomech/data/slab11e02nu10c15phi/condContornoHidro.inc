@@ -10,8 +10,8 @@
 }
 
 *codigos_cond_contorno_fluxo{
-         1        51         1         1
-      5101      5151         1         1
+         1        16         1         1
+       481       496         1         1
          0
 }
 *hgNlvect{

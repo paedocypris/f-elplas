@@ -104,6 +104,7 @@
     REAL(8), DIMENSION(9) :: MEANBLKO
     REAL(8), DIMENSION(9) :: MEANBULK
     REAL(8), DIMENSION(9) :: MEANDENS
+    real*8 :: waterViscosity(9)
     real*8 :: misesYield(9)
     real*8 :: mcFriction(9), mcC(9)
     real*8 :: dpH(9), dpAlpha(9)
@@ -2507,20 +2508,19 @@
     
     ! Variables
     integer :: geoFormIndx
-    real*8 :: initialPorosityL, curPorosityL
+    real*8 :: initialPorosityL
     real*8 :: nInv, mInv, biotCoefficient, grainBulk
     real*8 :: totalCompressibility
     
     !------------------------------------------------------------------------------------------------------------------------------------
     geoFormIndx = getRegionIndex(curElement)
     initialPorosityL = poro0(curElement)
-    curPorosityL = poroL(curElement)
     
     grainBulk = GRAINBLK(geoFormIndx)
     biotCoefficient = 1 - matrixBulk/grainBulk
 
-    nInv = (biotCoefficient - curPorosityL)/GRAINBLK(geoFormIndx)
-    mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
+    nInv = calcNInv(curElement, biotCoefficient)
+    mInv = nInv + initialPorosityL/MEANBLKW(geoFormIndx)
     totalCompressibility = mInv + biotCoefficient*biotCoefficient/matrixBulk
     
     end function totalCompressibility
@@ -2617,13 +2617,16 @@
     !variables
     real*8 :: calcKozenyCarmanPerm(tensDim)
     real*8 :: deltaN
+    integer :: geoFormIndx
     integer :: i
     
     !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
     deltaN = calcKozenyCarmanCoefficient(poroE(curElement))
     
     do i = 1,tensDim
-        calcKozenyCarmanPerm(i) = charLenPorNetworkSquared(i,curElement) * deltaN
+        calcKozenyCarmanPerm(i) = charLenPorNetworkSquared(i,curElement) * deltaN / waterViscosity(geoFormIndx)
     end do
     
     end function calcKozenyCarmanPerm
@@ -2715,7 +2718,7 @@
     
     !variables
     integer :: geoFormIndx
-    real*8 :: initialPorosityL, curPorosityL
+    real*8 :: initialPorosityL
     real*8 :: nInv, mInv, biotMModulus
     real*8 :: bulkMatrix, bulkUndrained
     real*8 :: biotCoeff, skemptonCoeff
@@ -2727,9 +2730,8 @@
     biotCoeff = calcBiotCoefficient(curElement)
     
     initialPorosityL = poro0(curElement)
-    curPorosityL = poroL(curElement)
     nInv = (biotCoeff - initialPorosityL)/GRAINBLK(geoFormIndx)
-    mInv = nInv + curPorosityL/MEANBLKW(geoFormIndx)
+    mInv = nInv + initialPorosityL/MEANBLKW(geoFormIndx)
     biotMModulus = 1/mInv
     
     bulkMatrix = calcMatrixBulk(curElement)
@@ -2769,6 +2771,54 @@
     young = YUNGVECT(geoFormIndx)
     
     end subroutine calcMatrixProperties
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    function calcNInv(curElement, biotCoefficient)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: biotCoefficient
+    integer :: curElement
+    
+    !variables
+    integer :: geoFormIndx
+    real*8 :: calcNInv
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
+    calcNInv = (biotCoefficient - poro0(curElement))/GRAINBLK(geoFormIndx)
+    
+    end function calcNInv
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine updatePorosity(curElement, trStrain, trStrainP, pressure, pressureInit)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: curElement
+    real*8 :: trStrain, trStrainP, pressure, pressureInit
+    
+    !variables
+    real*8 :: nInv
+    real*8 :: biotCoefficient
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    biotCoefficient = calcBiotCoefficient(curElement)
+    nInv = calcNInv(curElement, biotCoefficient)
+    
+    poroL(curElement) = poro0(curElement) &
+                    & + trStrainP & ! plastic porosity
+                    & + biotCoefficient*(trStrain - trStrainP) + (pressure-pressureInit)*nInv !elastic component
+    poroE(curElement) = poroL(curElement) / (1 + trStrain)
+    
+    end subroutine updatePorosity
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     end module

@@ -247,7 +247,7 @@
     !
     !**** new **********************************************************************
     !
-    subroutine load(id,f,brhs,ndof,numnp,nlvect)
+    subroutine load(id,f,brhs,g1,ndof,numnp,nlvect)
     !
     !.... program to accumulate nodal forces and transfer into
     !        right-hand-side vector
@@ -257,7 +257,7 @@
     !.... remove above card for single-precision operation
     !
     integer :: id(ndof,numnp)
-    real*8  :: f(ndof,numnp,nlvect),brhs(*)
+    real*8  :: f(ndof,numnp,nlvect),brhs(*), g1(nlvect)
     integer :: ndof, numnp, nlvect
     !
     integer :: nlv
@@ -270,7 +270,7 @@
             if (k.gt.0) then
                 !
                 do 100 nlv=1,nlvect
-                    brhs(k) = brhs(k) + f(i,j,nlv)
+                    brhs(k) = brhs(k) + f(i,j,nlv)*g1(nlv)
 100             continue
                 !
             endif
@@ -282,6 +282,97 @@
     return
     end subroutine
     
+    subroutine loadTime(id,f,brhs,g1,ndof,numnp,nlvect, xtime)!
+    !.... program to accumulate nodal forces and transfer into
+    !        right-hand-side vector, multiplying by a time factor
+    !
+    implicit none
+    !
+    !.... remove above card for single-precision operation
+    !
+    integer :: id(ndof,numnp)
+    real*8  :: f(ndof,numnp,nlvect),brhs(*), g1(nlvect)
+    integer :: ndof, numnp, nlvect
+    real*8 :: xtime
+    !
+    integer :: nlv
+    integer :: i, j, k
+    !
+    do 300 i=1,ndof
+        !
+        do 200 j=1,numnp
+            k = id(i,j)
+            if (k.gt.0) then
+                !
+                do 100 nlv=1,nlvect
+                    brhs(k) = brhs(k) + f(i,j,nlv)*g1(nlv)*xtime
+100             continue
+                !
+            endif
+            !
+200     continue
+        !
+300 continue
+    
+    end subroutine loadTime
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    
+    subroutine lfac(g, t, g1, nltftn, nptslf)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: g(nptslf, 2, nptslf)
+    real*8 :: t, g1(nltftn)
+    integer :: nltftn, nptslf
+    
+    !variables
+    integer :: l
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do l=1,nltftn
+        call interp(g(:,1,l),g(:,2,l),t, g1(l), nptslf)
+    end do
+    
+    end subroutine lfac
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine interp(x, y, xx, yy, n)
+    ! Program to perform linear interpolation
+    
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    real*8 :: x(n), y(n) 
+    real*8 :: xx, yy
+    integer :: n
+    
+    !variables
+    integer :: i
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    if (xx <= x(1)) then
+        yy = y(1)
+    else if (xx >= x(n)) then
+        yy = y(n)
+    else
+        do i=2, n
+            if (x(i) >= xx) then
+                yy = y(i-1) + (xx - x(i-1))*(y(i) - y(i-1))/(x(i) - x(i-1))
+                exit
+            endif 
+        end do
+    endif
+    
+    end subroutine interp
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     subroutine splitBoundaryCondition(id,f,fDirichlet, fNeumann,ndof,numnp,nlvect)
     !
     !.... program to split the force vector into two vectors, a dirichlet and a neumann one
@@ -316,37 +407,6 @@
     !
     return
     end subroutine
-
-    SUBROUTINE LOADTIME(id,f,brhs,ndof,numnp,nlvect,XTIME)
-    !
-    !.... program to accumulate nodal forces and transfer into
-    !        right-hand-side vector
-    !
-    IMPLICIT NONE
-    !
-    !.... remove above card for single-precision operation
-    !
-    integer :: id(ndof,*)
-    real*8  :: f(ndof,numnp,*),brhs(*)
-    integer :: ndof, numnp, nlvect
-    !
-    integer :: nlv
-    integer :: i, j, k
-    REAL*8  :: XTIME
-    !
-    DO 300 I=1,NDOF
-        DO 200 J=1,NUMNP
-            K = ID(I,J)
-            IF (K.GT.0) THEN
-                DO 100 NLV=1,NLVECT
-                    BRHS(K) = BRHS(K) + F(I,J,NLV)*XTIME
-100             CONTINUE
-            ENDIF
-200     CONTINUE
-300 CONTINUE
-    !
-    RETURN
-    END SUBROUTINE
     !
     !**** new **********************************************************************
     subroutine btod(id,d,brhs,ndof,numnp)
@@ -483,72 +543,40 @@
     end subroutine
 
     !**** new **********************************************************************
-    subroutine ftod(id,d,f,ndof,numnp,nlvect)
+    subroutine ftod(id,d,f,g1,ndof,numnp,nlvect)
     !
     !.... program to compute displacement boundary conditions
     !
     implicit none
-    !
-    !.... remove above card for single-precision operation
-    !
+    
+    !variables input
     integer :: id(ndof,*)
-    real*8  :: d(ndof,*),f(ndof,numnp,*)
+    real*8  :: d(ndof,*), f(ndof,numnp,nlvect)
+    real*8 :: g1(nlvect)
     integer :: ndof, numnp, nlvect
-    !
+
+    ! variables
     integer :: i, j, k, lv
     real*8  :: val
+
     !
-    !
-    do 300 i=1,ndof
+    do i=1,ndof
         !
-        do 200 j=1,numnp
+        do j=1,numnp
             !
             k = id(i,j)
-            if (k.gt.0) go to 200
+            if (k.gt.0) cycle
             val = 0.0d0
-            do 100 lv=1,nlvect
-                val = val + f(i,j,lv)
-100         continue
+            do lv=1,nlvect
+                val = val + f(i,j,lv) * g1(lv)
+            end do
             !
             d(i,j) = val
             !
-200     continue
+        end do
         !
-300 continue
-    return
-    end subroutine
-    !
-    !**** new **********************************************************************
-    !
-    subroutine ftodTIME(id,d,f,ndof,numnp,nlvect,XTIME)
-    !
-    !.... program to compute displacement boundary conditions
-    !
-    implicit none
-    !
-    !.... remove above card for single-precision operation
-    !
-    integer :: id(ndof,*)
-    real*8  :: d(ndof,*),f(ndof,numnp,*)
-    integer :: ndof, numnp, nlvect
-    !
-    integer :: i, j, k, lv
-    real*8  :: val, XTIME
-    !
-    do 300 i=1,ndof
-        do 200 j=1,numnp
-            k = id(i,j)
-            if (k.gt.0) go to 200
-            val = 0.0d0
-            do 100 lv=1,nlvect
-                val = val + f(i,j,lv)*XTIME
-100         continue
-            d(i,j) = val
-200     continue
-300 continue
-    !
-    return
-    !
+    end do
+    
     end subroutine
     !
     !**** new **********************************************************************

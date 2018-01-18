@@ -84,7 +84,6 @@
 		<File RelativePath=".\data\slab\condContornoGeom.inc"/>
 		<File RelativePath=".\data\slab\condContornoHidro.inc"/>
 		<File RelativePath=".\data\slab\data.inc"/>
-		<File RelativePath=".\data\slab\echo.dat"/>
 		<File RelativePath=".\data\slab\elmnt_geoformation.inc"/>
 		<File RelativePath=".\data\slab\geomechLayers.inc"/>
 		<File RelativePath=".\data\slab\hidroProp.inc"/>
@@ -146,6 +145,19 @@
 		<File RelativePath=".\data\slabInj10c15phi\mesh_rsrv_outsburden.inc"/>
 		<File RelativePath=".\data\slabInj10c15phi\NumericParam.inc"/>
 		<File RelativePath=".\data\slabInj10c15phi\SimulatorParam.inc"/></Filter>
+		<Filter Name="slabMaicon">
+		<File RelativePath=".\data\slabMaicon\condContornoGeom.inc"/>
+		<File RelativePath=".\data\slabMaicon\condContornoHidro.inc"/>
+		<File RelativePath=".\data\slabMaicon\data.inc"/>
+		<File RelativePath=".\data\slabMaicon\elmnt_geoformation.inc"/>
+		<File RelativePath=".\data\slabMaicon\geomechLayers.inc"/>
+		<File RelativePath=".\data\slabMaicon\hidroProp.inc"/>
+		<File RelativePath=".\data\slabMaicon\inputDS.dat"/>
+		<File RelativePath=".\data\slabMaicon\layer_reference.inc"/>
+		<File RelativePath=".\data\slabMaicon\malha.inc"/>
+		<File RelativePath=".\data\slabMaicon\mesh_rsrv_outsburden.inc"/>
+		<File RelativePath=".\data\slabMaicon\NumericParam.inc"/>
+		<File RelativePath=".\data\slabMaicon\SimulatorParam.inc"/></Filter>
 		<Filter Name="slabMarcio100c30phi">
 		<File RelativePath=".\data\slabMarcio100c30phi\condContornoGeom.inc"/>
 		<File RelativePath=".\data\slabMarcio100c30phi\condContornoHidro.inc"/>

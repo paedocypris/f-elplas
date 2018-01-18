@@ -68,6 +68,44 @@
 2000 format('1'//,' there are no nonzero nodal body forces')
     end subroutine leituraValoresCondContornoDS 
     
+    subroutine leituraLoadTimeFunctions(keyword_name,g, nltftn, nptslf, timeCorrection)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    character(len=50) :: keyword_name
+    integer :: nltftn, nptslf
+    real*8, allocatable :: g(:,:,:)
+    real*8 :: timeCorrection
+    
+    !variables
+    integer :: keyword_line
+    integer :: k, l
+    real*8 :: timeValue, valueLoadTimeFunction
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    keyword_line = findKeyword(keyword_name)
+    if (keyword_line.eq.-1) return
+    
+    allocate(g(nptslf,2,nltftn))
+    
+    do l=1,nltftn
+        do k=1,nptslf
+            read(file_lines(keyword_line),1000) timeValue, valueLoadTimeFunction
+            keyword_line = keyword_line + 1
+
+            g(k,1,l) = timeValue * timeCorrection
+            g(k,2,l) = valueLoadTimeFunction
+        end do
+    end do
+    
+    1000 format(2e15.7)
+    end subroutine leituraLoadTimeFunctions
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    
     
     !> Leitura e geracao de codigos de condicoes de contorno.
     !!
@@ -140,7 +178,7 @@
 
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine leituraTabelaTempos(keyword_name, nSteps, dts, nTimeSteps)
+    subroutine leituraTabelaTempos(keyword_name, nSteps, dts, nTimeSteps, timeCorrection)
     !function imports
     
     !variables import
@@ -151,6 +189,7 @@
     integer, allocatable :: nSteps(:)
     real*8, allocatable :: dts(:)
     integer :: nTimeSteps
+    real*8 :: timeCorrection
     
     !variables
     integer :: keyword_line
@@ -173,7 +212,7 @@
         keyword_line = keyword_line + 1
         
         nSteps(i) = nStep
-        dts(i) = dt
+        dts(i) = dt * timeCorrection
     end do
     
     1000 format(1i10,1e15.7)

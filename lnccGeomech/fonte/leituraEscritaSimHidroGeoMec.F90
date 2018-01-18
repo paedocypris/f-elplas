@@ -543,6 +543,7 @@
     use mPropgeoFisica,    only: MEANRHOW, MEANRHOO, MEANDENS
     use mPropgeoFisica,    only: MEANBLKW, MEANBLKO, MEANBULK
     use mPropGeoFisica,    only: RHOW, RHOO, BULKWATER, BULKOIL
+    use mPropGeoFisica,    only: waterViscosity
     use mPropGeoFisica,    only: misesYield, mcFriction, mcC
     use mInputReader, only: readIntegerKeywordValue,readRealKeywordValue
     use mInputReader, only: readStringKeywordValue,readOutFlagKeyword
@@ -616,6 +617,9 @@
         SATURA = MEANSATR(IREGION)
         !
         MEANDENS(IREGION) = SATURA*MEANWATER+(1.0D0-SATURA)*MEANOIL
+        
+        keyword_name = "water_viscosity_"//trim(REGION(IREGION))
+        call readRealKeywordValue(keyword_name, waterViscosity(IREGION), waterViscosity(IREGION), ierr)
         !
         !
         keyword_name = "mean_bulk_water_"//trim(REGION(IREGION))
@@ -3443,7 +3447,7 @@
     END SUBROUTINE
 
 
-    subroutine readSetupPhaseDS(nlvectD)
+    subroutine readSetupPhaseDS(nlvectD, nltftnD)
     use mInputReader,      only:readStringKeywordValue, readIntegerKeywordValue
     use mGlobaisArranjos,  only: title
     use mGlobaisEscalares, only: iprtin, TypeProcess
@@ -3454,7 +3458,7 @@
     use mMalha,            only: IrregMesh, Dirichlet, Neumann, I4SeaLoad
 
     implicit none
-    integer :: nlvectD
+    integer :: nlvectD, nltftnD
 
     character(len=50) keyword_name
     integer :: ierr
@@ -3517,6 +3521,9 @@
     !Reads nlvectD
     keyword_name = "nlvectD"
     call readIntegerKeywordValue(keyword_name, nlvectD, 0_4, ierr)
+    
+    keyword_name = "nltftnD"
+    call readIntegerKeywordValue(keyword_name, nltftnD, 0_4, ierr)
 
 
     return
