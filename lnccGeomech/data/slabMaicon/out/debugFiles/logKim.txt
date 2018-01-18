@@ -1,0 +1,16 @@
+ plastSolution2wayKim          
+ load stage =            1 curtimestep =            1 k =          105
+ load stage =            1 curtimestep =            2 k =          112
+ load stage =            1 curtimestep =            3 k =          114
+ load stage =            1 curtimestep =            4 k =          115
+ load stage =            1 curtimestep =            5 k =          116
+ load stage =            1 curtimestep =            6 k =          116
+ load stage =            1 curtimestep =            7 k =          117
+ load stage =            1 curtimestep =            8 k =          116
+ load stage =            1 curtimestep =            9 k =          116
+ load stage =            1 curtimestep =           10 k =          116
+ load stage =            2 curtimestep =           11 k =          105
+ load stage =            2 curtimestep =           12 k =          520
+ fixed stress split didn't converged
+ load stage =            3 curtimestep =           13 k =         2818
+ fixed stress split didn't converged
