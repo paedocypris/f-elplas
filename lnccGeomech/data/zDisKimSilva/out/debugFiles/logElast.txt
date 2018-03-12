@@ -1,0 +1,21 @@
+ elastSolution2way             
+ load stage =            1 curtimestep =            1 k =           19
+ load stage =            1 curtimestep =            2 k =           55
+ load stage =            1 curtimestep =            3 k =           18
+ load stage =            1 curtimestep =            4 k =           17
+ load stage =            1 curtimestep =            5 k =           17
+ load stage =            1 curtimestep =            6 k =           15
+ load stage =            1 curtimestep =            7 k =           14
+ load stage =            1 curtimestep =            8 k =           14
+ load stage =            1 curtimestep =            9 k =           13
+ load stage =            1 curtimestep =           10 k =           12
+ load stage =            1 curtimestep =           11 k =           11
+ load stage =            1 curtimestep =           12 k =           10
+ load stage =            1 curtimestep =           13 k =            9
+ load stage =            1 curtimestep =           14 k =            8
+ load stage =            1 curtimestep =           15 k =            8
+ load stage =            1 curtimestep =           16 k =            7
+ load stage =            1 curtimestep =           17 k =            6
+ load stage =            1 curtimestep =           18 k =            5
+ load stage =            1 curtimestep =           19 k =            5
+ load stage =            1 curtimestep =           20 k =            3

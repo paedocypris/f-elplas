@@ -1,21 +1,77 @@
  plastSolution2waySilva        
- load stage =            1 curtimestep =            1 k =          105
- load stage =            1 curtimestep =            2 k =          112
- load stage =            1 curtimestep =            3 k =          114
- load stage =            1 curtimestep =            4 k =          115
- load stage =            1 curtimestep =            5 k =          116
- load stage =            1 curtimestep =            6 k =          116
- load stage =            1 curtimestep =            7 k =          117
- load stage =            1 curtimestep =            8 k =          116
- load stage =            1 curtimestep =            9 k =          116
- load stage =            1 curtimestep =           10 k =          116
- load stage =            2 curtimestep =           11 k =          105
- load stage =            2 curtimestep =           12 k =          104
- load stage =            2 curtimestep =           13 k =          104
- load stage =            2 curtimestep =           14 k =          104
- load stage =            2 curtimestep =           15 k =          103
- load stage =            3 curtimestep =           16 k =           80
- load stage =            3 curtimestep =           17 k =           77
- load stage =            3 curtimestep =           18 k =           74
- load stage =            3 curtimestep =           19 k =           75
- load stage =            3 curtimestep =           20 k =           76
+ load stage =            1 curtimestep =            1 t = 
+   1.00000000000000      k =           67
+ load stage =            1 curtimestep =            2 t = 
+   2.00000000000000      k =           69
+ load stage =            1 curtimestep =            3 t = 
+   3.00000000000000      k =           70
+ load stage =            1 curtimestep =            4 t = 
+   4.00000000000000      k =           70
+ load stage =            1 curtimestep =            5 t = 
+   5.00000000000000      k =           70
+ load stage =            1 curtimestep =            6 t = 
+   6.00000000000000      k =           71
+ load stage =            1 curtimestep =            7 t = 
+   7.00000000000000      k =           70
+ load stage =            1 curtimestep =            8 t = 
+   8.00000000000000      k =           70
+ load stage =            1 curtimestep =            9 t = 
+   9.00000000000000      k =           71
+ load stage =            1 curtimestep =           10 t = 
+   10.0000000000000      k =           70
+ load stage =            2 curtimestep =           11 t = 
+   14.0000000000000      k =           68
+ load stage =            2 curtimestep =           12 t = 
+   18.0000000000000      k =           67
+ load stage =            2 curtimestep =           13 t = 
+   22.0000000000000      k =           67
+ load stage =            2 curtimestep =           14 t = 
+   26.0000000000000      k =           66
+ load stage =            2 curtimestep =           15 t = 
+   30.0000000000000      k =           67
+ load stage =            3 curtimestep =           16 t = 
+   31.0000000000000      k =           64
+ load stage =            3 curtimestep =           17 t = 
+   32.0000000000000      k =           65
+ load stage =            3 curtimestep =           18 t = 
+   33.0000000000000      k =           65
+ load stage =            3 curtimestep =           19 t = 
+   34.0000000000000      k =           66
+ load stage =            3 curtimestep =           20 t = 
+   35.0000000000000      k =           66
+ load stage =            3 curtimestep =           21 t = 
+   36.0000000000000      k =           66
+ load stage =            3 curtimestep =           22 t = 
+   37.0000000000000      k =           66
+ load stage =            3 curtimestep =           23 t = 
+   38.0000000000000      k =           66
+ load stage =            3 curtimestep =           24 t = 
+   39.0000000000000      k =           66
+ load stage =            3 curtimestep =           25 t = 
+   40.0000000000000      k =           66
+ load stage =            4 curtimestep =           26 t = 
+   60.0000000000000      k =           52
+ load stage =            4 curtimestep =           27 t = 
+   80.0000000000000      k =           51
+ load stage =            4 curtimestep =           28 t = 
+   100.000000000000      k =           49
+ load stage =            4 curtimestep =           29 t = 
+   120.000000000000      k =           55
+ load stage =            4 curtimestep =           30 t = 
+   140.000000000000      k =           48
+ load stage =            4 curtimestep =           31 t = 
+   160.000000000000      k =           51
+ load stage =            4 curtimestep =           32 t = 
+   180.000000000000      k =           48
+ load stage =            4 curtimestep =           33 t = 
+   200.000000000000      k =           48
+ load stage =            4 curtimestep =           34 t = 
+   220.000000000000      k =           48
+ load stage =            4 curtimestep =           35 t = 
+   240.000000000000      k =           45
+ load stage =            4 curtimestep =           36 t = 
+   260.000000000000      k =           52
+ load stage =            4 curtimestep =           37 t = 
+   280.000000000000      k =           45
+ load stage =            4 curtimestep =           38 t = 
+   300.000000000000      k =           46

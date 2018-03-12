@@ -1,5 +1,5 @@
 *young_modulus_reservoir_region{
-4.0D+15
+4.0D+9
 }
 *poisson_ratio_reservoir_region{
 0.0D+0
@@ -26,7 +26,7 @@
 1.0D0
 }
 *water_viscosity_reservoir_region{
-581.0D-6
+7.0D-3
 }
 *porosity_reservoir_region{
 0.25D+0
@@ -38,7 +38,7 @@
 30
 }
 *epMohrCoulombC_reservoir_region{
-10.0D+6
+20.0D+6
 }
 *stress-strain_relation_reservoir_region{
 ELASTIC

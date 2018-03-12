@@ -38,10 +38,10 @@
     print*, "Iniciando o PROCESSAMENTO..."
 
     !processa o escoamento
-    call processamentoOneWayPlast()
-    !call processamentoTwoWayPlast(1)
-    !call processamentoTwoWayPlast(2)
-    !call processamentoTwoWayElast()
+    !call processamentoOneWayPlast()
+    call processamentoTwoWayElast()
+    !call processamentoTwoWayPlast(1) !silva
+    !call processamentoTwoWayPlast(2) !kim
     
     !
     call fecharArquivosBase()
@@ -85,6 +85,7 @@
     use mGeomecanica, only: InSeaLoad, optSolverD
     use mGeomecanica, only: initStress
     use mInputReader,      only: readInputFileDS, LEIturaGERacaoCOORdenadasDS, readIntegerKeywordValue
+    use mInputReader, only: readRealKeywordValue
     use mInputReader,      only: leituraCodigosCondContornoDS,leituraValoresCondContornoDS
     use mInputReader, only: leituraLoadTimeFunctions
 
@@ -93,6 +94,7 @@
 
     character(len=50) :: keyword_name
     integer :: ierr
+    real*8 :: tempTimeConvertion
     !
     tempoTotalVelocidade  = 0.d00
     tempoTotalPressao     = 0.d00
@@ -215,8 +217,11 @@
         keyword_name = "nptslfD"
         call readIntegerKeywordValue(keyword_name, nptslfD, 0_4, ierr)
         
+        keyword_name = "hgTimeConvertion"
+        call readRealKeywordValue(keyword_name, tempTimeConvertion, 86400.0d0, ierr)
+        
         keyword_name = "gmLoadTimeFunction"
-        call leituraLoadTimeFunctions(keyword_name, gmG, nltftnD, nptslfD, 86400.d0)
+        call leituraLoadTimeFunctions(keyword_name, gmG, nltftnD, nptslfD, tempTimeConvertion)
     endif
     
     
@@ -712,6 +717,7 @@
     use mHidrodinamicaGalerkin, only: hgNdof, hgNlvect, hgNeq, hgNltftn, hgNptslf
     use mHidrodinamicaGalerkin, only: hgF, hgG
     use mHidrodinamicaGalerkin, only: hgId
+    use mHidrodinamicaGalerkin, only: hgTimeConvertion
 
     use mLeituraEscrita, only:iecho
     use mGlobaisEscalares, only: iprtin
@@ -734,6 +740,9 @@
     integer :: ierr
 
     !------------------------------------------------------------------------------------------------------------------------------------
+    keyword_name = "hgTimeConvertion"
+    call readRealKeywordValue(keyword_name, hgTimeConvertion, 86400.0d0, ierr)
+    
     keyword_name = "hgTimeIsTable"
     call readIntegerKeywordValue(keyword_name, hgIsTable, 0, ierr)
     
@@ -748,12 +757,12 @@
 
         keyword_name = "tempoTotal"
         call readRealKeywordValue(keyword_name, tempoTotal, 0.0d0, ierr)
-        tempoTotal = tempoTotal * 86400.0 ! converts days to seconds
+        tempoTotal = tempoTotal * hgTimeConvertion ! converts days to seconds
         
         hgDts(1) = tempoTotal / hgNSteps(1)
     else if (hgIsTable == 1) then
         keyword_name = "tabelaTempos"
-        call leituraTabelaTempos(keyword_name, hgNSteps, hgDts, hgNTimeSteps, 86400.d0)
+        call leituraTabelaTempos(keyword_name, hgNSteps, hgDts, hgNTimeSteps, hgTimeConvertion)
     end if
 
     keyword_name = "hgNlvect"
@@ -792,7 +801,7 @@
         call readIntegerKeywordValue(keyword_name, hgNptslf, 0_4, ierr)
         
         keyword_name = "hgLoadTimeFunction"
-        call leituraLoadTimeFunctions(keyword_name, hgG, hgNltftn, hgNptslf, 86400.d0)
+        call leituraLoadTimeFunctions(keyword_name, hgG, hgNltftn, hgNptslf, hgTimeConvertion)
     endif
     
 
@@ -964,7 +973,7 @@
         end if
     end if
     
-    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
     currentTimeStepPrint = 1
@@ -1008,14 +1017,14 @@
 
                     prevUDifIt = prevUDifIt - uDif
                     uNorm = matrixNorm(prevUDifIt, ndofD, numnp)
+                    
+                    write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
 
                     if (pNorm < 1.0d-6 .and. uNorm < 1.0d-6) then
                         converged = .true.
                         exit
                     end if
                 end if
-
-                write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
 
                 prevPIt = p
                 prevUDifIt = uDif
@@ -1031,9 +1040,9 @@
             prevP = p
 
             !print current solution
-            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
 
-            if (way == 2) write (outFileUnit,*) "load stage = ", i,"curtimestep = ", currentTimeStepPrint, "k = ", k
+            if (way == 2) write (outFileUnit,*) "load stage = ", i,"curtimestep = ", currentTimeStepPrint,"k = ", k
             write(*,*) " "
             
             currentTimeStepPrint = currentTimeStepPrint + 1
@@ -1092,12 +1101,12 @@
     end subroutine processamentoTwoWayPlast
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine convertStressStoPrintable(stressS, stressSPrint, npint, nel)
+    subroutine convertIntPointsValuetoPrintable(val, valPrint, npint, nel)
     
     implicit none
     !variables input
-    real*8 :: stressS(npint,nel)
-    real*8 :: stressSPrint(nel)
+    real*8 :: val(npint,nel)
+    real*8 :: valPrint(nel)
     integer :: npint, nel
     
     !variables
@@ -1105,17 +1114,17 @@
     
     !------------------------------------------------------------------------------------------------------------------------------------
     do j = 1, nel
-        stressSPrint(j) = 0.
+        valPrint(j) = 0.
         do i = 1, npint
-            stressSPrint(j) = stressSPrint(j) + stressS(i,j)
+            valPrint(j) = valPrint(j) + val(i,j)
         end do
-        stressSPrint(j) = stressSPrint(j)/npInt
+        valPrint(j) = valPrint(j)/npInt
     end do
     
-    end subroutine convertStressStoPrintable
+    end subroutine convertIntPointsValuetoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
     !function imports
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
@@ -1130,7 +1139,7 @@
     character(len=*) :: filename
     integer :: curTimeStep
     real*8 :: p(1,nnp), u(nsd,nnp), stressEf(nrowb,nintD,nel), stressTot(nrowb,nintD,nel)
-    real*8 :: stressS(nintD,nel), out2waySource(nintD, nel), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
+    real*8 :: stressS(nintD,nel), trStrainP(nintD,nel), out2waySource(nintD, nel), vDarcy(nsd,nel), vDarcyNodal(nsd,nnp)
     real*8 :: elementIsPlast(nel)
     real*8 :: poroL(nel)
     integer :: conecNodaisElem(nen,nel)
@@ -1138,12 +1147,12 @@
     
     !variables
     integer :: unitNumber
-    real*8, allocatable :: stressSPrint(:)
+    real*8, allocatable :: valPrint(:)
     
     !------------------------------------------------------------------------------------------------------------------------------------
     unitNumber = 13587
     
-    allocate(stressSPrint(nel))
+    allocate(valPrint(nel))
     
     call escreverArqParaviewOpening(filename, p, 1, nnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(u, nsd, nnp, 'u', len('u'), 2, unitNumber)
@@ -1151,16 +1160,18 @@
     call escreverArqParaviewIntermed_CampoVetorial(vDarcyNodal, nsd, nnp, 'vDarcyNodal', len('vDarcyNodal'), 2, unitNumber)
     call escreverarqparaviewintermed_campotensorialelemento(stressef, nrowb, nintd, nel, 'stressef', len('stressef'), unitnumber)
     call escreverarqparaviewintermed_campotensorialelemento(stresstot, nrowb, nintd, nel, 'stresstot', len('stresstot'), unitnumber)
-    call convertStressStoPrintable(stressS, stressSPrint, nintD, nel)
-    call escreverarqparaviewintermed_campoescalar(unitnumber, stresssprint, 1, nel, 'stresss', len('stresss'), 1)
-    call convertStressStoPrintable(out2waySource, stressSPrint, nintD, nel)
-    call escreverarqparaviewintermed_campoescalar(unitnumber, stressSPrint, 1, nel, '2waySource', len('2waySource'), 1)
+    call convertIntPointsValuetoPrintable(stressS, valPrint, nintD, nel)
+    call escreverarqparaviewintermed_campoescalar(unitnumber, valPrint, 1, nel, 'stressS', len('stressS'), 1)
+    call convertIntPointsValuetoPrintable(out2waySource, valPrint, nintD, nel)
+    call escreverarqparaviewintermed_campoescalar(unitnumber, valPrint, 1, nel, '2waySource', len('2waySource'), 1)
+    call convertIntPointsValuetoPrintable(trStrainP, valPrint, nintD, nel)
+    call escreverarqparaviewintermed_campoescalar(unitnumber, valPrint, 1, nel, 'poroP', len('poroP'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, elementIsPlast, 1, nel, 'elementIsPlast', len('elementIsPlast'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, poroL, 1, nel, 'poroL', len('poroL'), 1)
     close(unitNumber)
     
-    deallocate(stressSPrint)
+    deallocate(valPrint)
     
     end subroutine writeCurrentSolution
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !************************************************************************************
+    !************************************************************************************

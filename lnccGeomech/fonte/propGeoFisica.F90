@@ -2632,6 +2632,33 @@
     end function calcKozenyCarmanPerm
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    function calcKozenyCarmanPermInitialPoro(curElement, tensDim)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: curElement, tensDim
+    
+    !variables
+    real*8 :: calcKozenyCarmanPermInitialPoro(tensDim)
+    real*8 :: deltaN
+    integer :: geoFormIndx
+    integer :: i
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    geoFormIndx = getRegionIndex(curElement)
+    
+    deltaN = calcKozenyCarmanCoefficient(poro0(curElement))
+    
+    do i = 1,tensDim
+        calcKozenyCarmanPermInitialPoro(i) = charLenPorNetworkSquared(i,curElement) * deltaN / waterViscosity(geoFormIndx)
+    end do
+    
+    end function calcKozenyCarmanPermInitialPoro
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     function calcKozenyCarmanCoefficient(porosity)
     !function imports
     

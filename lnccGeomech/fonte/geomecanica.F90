@@ -3172,7 +3172,7 @@
             c1 = detd(l)*wd(l)
             area = area + c1
             
-            elTrStrain = elTrStrain + traceTensor(strainL(l),nrowb)*c1
+            elTrStrain = elTrStrain + traceTensor(strainL,nrowb)*c1
             elP = elP + pressureIntPoint*c1
             elPInit = elPInit + pressureInitIntPoint*c1
         end do

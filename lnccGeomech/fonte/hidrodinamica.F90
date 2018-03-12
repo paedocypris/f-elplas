@@ -21,6 +21,7 @@
     integer, allocatable :: hgNSteps(:)
     real*8, allocatable :: hgDts(:)
     integer :: hgNTimeSteps
+    real*8 :: hgTimeConvertion
 
     !various integers
     integer :: hgNeq, hgNdof
@@ -121,7 +122,7 @@
     use mMalha, only: local
     use mPropGeoFisica, only: calcMatrixBulk, calcBulkFromMatrix, calcBiotCoefficient
     use mPropGeoFisica, only: totalCompressibility
-    use mPropGeoFisica, only: calcKozenyCarmanPerm
+    use mPropGeoFisica, only: calcKozenyCarmanPerm, calcKozenyCarmanPermInitialPoro
 
     !variable input
     integer :: conecNodaisElem(nen,nel), nen, nel, nnp, nsd
@@ -201,7 +202,8 @@
         if(nen==8) call shg3d (xl,det,shL,shG,npint,curElement,nen)
         
         ! retrieve permeabilities from material
-        curPerm = calcKozenyCarmanPerm(curElement,tensDim)
+        curPerm = calcKozenyCarmanPermInitialPoro(curElement, tensDim)
+        !curPerm = calcKozenyCarmanPerm(curElement,tensDim)
         kX = curPerm(1)
         kY = curPerm(2)
 
