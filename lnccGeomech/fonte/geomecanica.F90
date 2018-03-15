@@ -492,7 +492,8 @@
     !
     CBBAR = 0.0
     AMU2 = YOUNG/(1.0D0+POISSON)
-    ALAM = AMU2*POISSON/(1.0D0-2.0D0*POISSON)
+    !plane strain
+    alam = poisson * young / ((1+poisson)*(1-2*poisson))
     !
     !..... COLUMN MATRIX D3
     !

@@ -356,7 +356,7 @@
     use mFuncoesDeForma, only: shlt, shlq, shlq3d
     use mFuncoesDeForma, only: shgq, shg3d
     use mFuncoesDeForma, only: shlqen
-    use mPropGeoFisica, only: calcKozenyCarmanPerm
+    use mPropGeoFisica, only: calcKozenyCarmanPerm, calcKozenyCarmanPermInitialPoro
     use mMalha, only: local
     
     !variables import
@@ -384,6 +384,7 @@
     logical :: quad
     real*8 :: gradP(nsd)
     integer :: curElement, l, dir, i
+    real*8 :: area, c1
     
     !------------------------------------------------------------------------------------------------------------------------------------
     vDarcy = 0.
@@ -417,16 +418,21 @@
         if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
 
         ! set material index
-        curPerm = calcKozenyCarmanPerm(curElement,3) !Porosities are global variable, care
+        curPerm = calcKozenyCarmanPermInitialPoro(curElement,3) !Porosities are global variable, care
+        !curPerm = calcKozenyCarmanPerm(curElement,3) !Porosities are global variable, care
         
         do dir=1,nsd
+            area = 0.d0
             do l=1,npint
+                c1 = det(l)*w(l)
+                area = area + c1
+                
                 gradP(dir) = dot_product(shG(dir,1:nen,l), pressureL(1,1:nen))
                 velL(dir) = -curPerm(dir) * gradP(dir)
 
-                vDarcy(dir,curElement) = vDarcy(dir,curElement) + velL(dir)
+                vDarcy(dir,curElement) = vDarcy(dir,curElement) + velL(dir)*c1
             end do
-            vDarcy(dir,curElement) = vDarcy(dir,curElement)/npint
+            vDarcy(dir,curElement) = vDarcy(dir,curElement)/area
             
             do i = 1, nen
                 globalNodeIndex = conecNodaisElem(i,curElement)

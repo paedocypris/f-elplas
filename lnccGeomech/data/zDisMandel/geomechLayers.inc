@@ -5,7 +5,7 @@
 0.2D+0
 }
 *bulk_solid_grain_reservoir_region{
-8.0D+38
+1.0D+38
 }
 *mean_bulk_water_reservoir_region{
 2.20D+38
