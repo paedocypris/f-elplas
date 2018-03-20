@@ -242,7 +242,7 @@
     !
     !**** new *******************************************************************
     !
-    subroutine BBARMTRX_ELAST(x, conecNodaisElem,alhsd, brhsd, idiagD, lmD, pressure, isUndrained)
+    subroutine BBARMTRX_ELAST(x, conecNodaisElem, disDirichlet, alhsd, brhsd, idiagD, lmD, pressure, isUndrained)
     !
     !.... PROGRAM TO CALCULATE STIFNESS MATRIX FOR THE ELASTIC DISPLACEMENT
     !        ELEMENT AND ASSEMBLE INTO THE GLOBAL LEFT-HAND-SIDE MATRIX
@@ -263,6 +263,7 @@
     !
     real*8,  intent(in)    :: x(nsd,numnp)
     integer, intent(in)    :: conecNodaisElem(nen,numel)
+    real*8 :: disDirichlet(ndofD, numnp)
     real(8), intent(inout) :: alhsd(nalhsD), brhsd(neqD)
     integer, intent(in)    :: idiagD(neqD)
     integer, intent(in)    :: lmD(ned2,nen,numel)
@@ -312,7 +313,7 @@
         !.... LOCALIZE COORDINATES AND DIRICHLET B.C.
         !
         CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
+        CALL LOCAL(conecNodaisElem(1,NEL),disDirichlet,DISL,NEN,NDOFD,NED2)
         call local(conecNodaisElem(1,nel),pressure,pL,nen,1,1)
         
         QUAD = .TRUE.
@@ -707,337 +708,6 @@
     !
     END SUBROUTINE
     !
-    !
-    !*** NEW **** SUBROUTINE FOR 3D ***************************************
-    !
-    SUBROUTINE BBARMTRX_ELAST_3D(X,conecNodaisElem,ALHSD,BRHSD,IDIAGD,LMD)
-    !
-    !.... PROGRAM TO CALCULATE STIFNESS MATRIX OF THE 3D ELASTIC PROBLEM FOR THE
-    !.... DISPLACEMENT ELEMENT IN THE FRAMEWORK OF WEAK--COUPLING OF BIOT MODEL
-    !....  AND ASSEMBLE WITHIN THE B--BAR METHOD THE GLOBAL LEFT-HAND-SIDE MATRIX
-    !
-    !.... BASED ON BIOT2 SUBROUTINE MARCIO'S "biot.f"  CODE
-    !
-    use mGlobaisEscalares, only: NROWSH, LDRAINED
-    use mGlobaisEscalares, only: ibbar
-    use mSolverGaussSkyline, only: addrhs, addlhs
-    !
-    USE mFuncoesDeForma,   only: shlq3d, shg3d
-    use mMalha,            only: local, numnp, multab
-    use mMalha,            only: nsd, numel, nen
-    !
-    IMPLICIT NONE
-    !
-    LOGICAL DIAG, QUAD, ZERODL, LSYM
-    !
-    !.... GLOBAL ARRAYS
-    !
-    REAL*8,  intent(in)    :: X(NSD,NUMNP)
-    INTEGER, intent(in)    :: conecNodaisElem(nen,numel)
-    REAL(8), intent(inout) :: ALHSD(nalhsD)
-    REAL(8), intent(inout) :: BRHSD(neqD)
-    INTEGER, intent(in)    :: IDIAGD(*)
-    INTEGER, intent(in)    :: LMD(NDOFD,NEN,NUMEL)
-    !
-    !.... LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8)  :: XL(NESD,NEN), DISL(NESD,NEN)
-    REAL(8)  :: ELRESFD(NEE2), ELEFFMD(NEE2,NEE2)
-    !
-    REAL(8)  :: BBARJ(NROWB,NESD), BBARI(NROWB,NESD)
-    REAL(8)  :: CBBAR(NROWB,NESD), CCOEF(NROWSH)
-    REAL(8)  :: SHGBR(NESD,NEN)
-    REAL(8)  :: DETD(NINTD), WD(NINTD)
-    REAL(8)  :: SHLD(NROWSH,NEN,NINTD),SHGD(NROWSH,NEN,NINTD)
-    !
-    INTEGER :: NEL, I, J, L
-    !
-    real*8, external :: rowdot, coldot
-    REAL*8  :: C1, POISSON, YOUNGMOD, B
-    !
-    CALL SHLQ3D(SHLD,WD,NINTD,NEN)
-    !
-    !
-    !.... CONSISTENT MATRIX
-    !
-    DIAG = .FALSE.
-    !
-    BBARI = 0.0D0
-    BBARJ = 0.0D0
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        !.... CLEAR STIFFNESS MATRIX AND FORCE ARRAY
-        !
-        ELEFFMD = 0.0D0
-        ELRESFD = 0.0D0
-        !
-        !.... LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NSD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        QUAD = .TRUE.
-        !
-        CALL SHG3D(XL,DETD,SHLD,SHGD,NINTD,NEL,NEN)
-        !
-        !.... SETUP ELASTIC PARAMETERS FOR DRAINED OR UNDRAINED CONDITIONS
-        !
-        CALL DRAINCOND(YOUNGMOD,POISSON,B,NEL,LDRAINED)
-
-        !      write(*,*) nel,youngmod, poisson, geoform(nel)
-
-        CALL SETUPC_3D(CCOEF,YOUNGMOD,POISSON,NROWSH)
-        !
-        !      WRITE(3031,2000) NEL,(CCOEF(I),I=1,4)
-        !
-        !.... FORM STIFFNESS MATRIX
-        !
-        !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... .. FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH_3D(SHGBR,WD,DETD,SHGD,NEN,NINTD,NROWSH,NESD)
-        !
-        !.... .. LOOP OVER INTEGRATIONN POINTS
-        !
-        DO 400  L=1,NINTD
-            !
-            !.... ...SETUP ELEMENT DETERMINANT AND GAUSS WEIGHTS
-            !
-            C1=DETD(L)*WD(L)
-            !
-            !.... ... UPLOAD B-BAR MATRIX AT NODE J
-            !
-            DO 200 J=1,NEN
-
-                print*, SHGD(1:3,J,L)
-                !
-                CALL SETBBAR_3D(BBARJ,SHGD(1:NROWSH,J,L),&
-                    &              SHGBR(1:NESD,J),NROWSH,NROWB,NESD,IBBAR)
-                !
-                !.... .... ..MULTIPLY ELASTICITY_MATRIX*BBARJ TO OBTAIN ==> CBBAR
-                !
-                CALL SETCBBAR(CBBAR,CCOEF,BBARJ,NROWB,NROWSH,NESD)
-                !
-                !             write(3031,2222) NEL,l, j,((cbbar(iI,Jj),Jj=1,nesd),Ii=1,nrowb)
-                !
-                !.... .... ..UPLOAD B-BAR MATRIX AT NODE I
-                !
-                DO 200 I=1,NEN
-                    !
-                    CALL SETBBAR_3D(BBARI,SHGD(1:NROWSH,I,L),&
-                        &             SHGBR(1:NESD,I),NROWSH,NROWB,NESD,IBBAR)
-                    !
-                    !... .. MOUNT ELEMNT STIFFNESS NODAL MATRIX: K^E_IJ= MULTIPLY BBAR^T_I*(C*BBAR_J)
-                    !... .. Line 1
-                    !... ... K_11
-                    ELEFFMD(NED2*I-2,NED2*J-2)= ELEFFMD(NED2*I-2,NED2*J-2)&
-                        +COLDOT(BBARI(1:NROWB,1),CBBAR(1:NROWB,1),6)*C1
-                    !... ... K_12
-                    ELEFFMD(NED2*I-2,NED2*J-1)= ELEFFMD(NED2*I-2,NED2*J-1)&
-                        +COLDOT(BBARI(1:NROWB,1),CBBAR(1:NROWB,2),6)*C1
-                    !... ... K_13
-                    ELEFFMD(NED2*I-2,NED2*J)= ELEFFMD(NED2*I-2,NED2*J)&
-                        +COLDOT(BBARI(1:NROWB,1),CBBAR(1:NROWB,3),6)*C1
-                    !... .. Line 2
-                    !... ... K_21
-                    ELEFFMD(NED2*I-1,NED2*J-2)= ELEFFMD(NED2*I-1,NED2*J-2)&
-                        +COLDOT(BBARI(1:NROWB,2),CBBAR(1:NROWB,1),6)*C1
-                    !... ... K_22
-                    ELEFFMD(NED2*I-1,NED2*J-1)= ELEFFMD(NED2*I-1,NED2*J-1)&
-                        +COLDOT(BBARI(1:NROWB,2),CBBAR(1:NROWB,2),6)*C1
-                    !... ... K_23
-                    ELEFFMD(NED2*I-1,NED2*J)  = ELEFFMD(NED2*I-1,NED2*J)&
-                        +COLDOT(BBARI(1:NROWB,2),CBBAR(1:NROWB,3),6)*C1
-                    !... .. Line 3
-                    !... ... K_31
-                    ELEFFMD(NED2*I,NED2*J-2)  = ELEFFMD(NED2*I,NED2*J-2)&
-                        +COLDOT(BBARI(1:NROWB,3),CBBAR(1:NROWB,1),6)*C1
-                    !... ... K_32
-                    ELEFFMD(NED2*I,NED2*J-1)  = ELEFFMD(NED2*I,NED2*J-1)&
-                        +COLDOT(BBARI(1:NROWB,3),CBBAR(1:NROWB,2),6)*C1
-                    !... ... K_33
-                    ELEFFMD(NED2*I,NED2*J)    = ELEFFMD(NED2*I,NED2*J)&
-                        +COLDOT(BBARI(1:NROWB,3),CBBAR(1:NROWB,3),6)*C1
-                    !
-200         CONTINUE
-
-400     CONTINUE
-        !
-        !.... COMPUTATION OF DIRICHLET B.C. CONTRIBUTION
-        !
-        CALL ZTEST(DISL,NEE2,ZERODL)
-        !
-        IF(.NOT.ZERODL) CALL KDBCGEO(ELEFFMD,ELRESFD,DISL,NEE2,LMD(1,1,NEL))
-        !
-        !.... ASSEMBLE ELEMENT STIFFNESS MATRIX AND FORCE ARRAY INTO GLOBAL
-        !....      LEFT-HAND-SIDE MATRIX AND RIGHT-HAND SIDE VECTOR
-        !
-        LSYM=.TRUE.
-
-        if (optSolverD=='skyline')   then
-            CALL ADDLHS(ALHSD,ELEFFMD,LMD(1,1,NEL),IDIAGD,NEE2,DIAG,LSYM)
-        endif
-
-        if (optSolverD=='pardiso')   then
-            write(*,*) ' não implementado '
-            stop 9
-        endif
-
-        if (optSolverD=='hypre')   then ! elast
-            write(*,*) ' não implementado '
-            stop 9
-        endif
-        !
-        CALL ADDRHS(BRHSD,ELRESFD,LMD(1,1,NEL),NEE2)
-        !
-        DO 450 I=1,NEE2
-            DO 450 J=1,NEE2
-                AUXM(NEL,I,J)=ELEFFMD(I,J)
-450     CONTINUE
-
-500 CONTINUE
-
-    ! !
-    RETURN
-2000 FORMAT('ELEMENTO (NEL)=',I5,2X,' C1, C2, C3, C4 =',4(1PE9.2,2X)/5X)
-    !     &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,
-    !     &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,
-    !     &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
-2001 FORMAT('GAUSS=',I1,1X,'NEN=',I1,1X,'SHAPE= ',40(1PE9.2,2X))
-    !
-2222 FORMAT('NEL =',I5,2X,'GAUSS L =',I2,2X,'NEN J=',I2/2X ,40(1PE9.2,2X))
-    !  &
-    !     &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                    &
-    !     &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                    &
-    !     &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                    &
-    !     &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
-    END SUBROUTINE
-    !
-    !
-    !**** NEW FOR 3D GEOMECHANICAL COUPLING *************************************
-    !
-    SUBROUTINE SETUPC_3D(CCOEF,YOUNG,POISSON,NROWSHD)
-    !
-    !.... PROGRAM TO SET UP ELASTICITY MATRIX PARAMETERS AS VECTOR ARRAY
-    !
-    IMPLICIT NONE
-    !
-    INTEGER :: NROWSHD
-    REAL*8  :: YOUNG, POISSON, TEMP1, TEMP2
-    REAL*8, DIMENSION(NROWSHD) :: CCOEF
-    !
-    TEMP1 = 1.0D0-POISSON
-    TEMP2 = 1.0D0-2.0D0*POISSON
-    !
-    CCOEF(1) = YOUNG/((1.0D0+POISSON)*TEMP2)
-    CCOEF(2) = CCOEF(1)*TEMP1
-    CCOEF(3) = CCOEF(1)*POISSON
-    CCOEF(4) = 0.5D0*CCOEF(1)*TEMP2
-    !
-    RETURN
-    !
-    END SUBROUTINE
-    !
-    !*** NEW *** FOR B--BAR FORMULATION ** REFERENCE HUGHES: PAG 760 *************
-    !
-    SUBROUTINE XMEANSH_3D(SHGBAR,W,DET,SHG,NEN,NINTD,NROWSHD,NESD)
-    !
-    !.... PROGRAM TO CALCULATE MEAN VALUES OF SHAPE FUNCTION
-    !        GLOBAL DERIVATIVES FOR B-BAR METHOD
-    !
-    IMPLICIT NONE
-    !
-    real*8, external :: coldot
-    INTEGER I,J,L,NEN,NINTD,NESD,NROWSHD
-    REAL*8 :: VOLINV, TEMP1
-    !
-    REAL*8, DIMENSION(NESD,NEN)          :: SHGBAR
-    REAL*8, DIMENSION(NINTD)             :: W, DET
-    REAL*8, DIMENSION(NROWSHD,NEN,NINTD) :: SHG
-    !
-    SHGBAR = 0.0D0
-    !
-    VOLINV = 1.0D0/COLDOT(W,DET,NINTD)
-    !
-    DO 300 L=1,NINTD
-        TEMP1 = W(L)*DET(L)*VOLINV
-        DO 200 J=1,NEN
-            DO 100 I=1,NESD
-                SHGBAR(I,J) = SHGBAR(I,J) + TEMP1*SHG(I,J,L)
-100         CONTINUE
-200     CONTINUE
-300 CONTINUE
-    !
-    RETURN
-    !
-    END SUBROUTINE
-    !
-    !**** FROM  HUGHES: THE FINITE ELEMENT METHOD ** PAG 780 ****************
-    !
-    SUBROUTINE SETBBAR_3D(BBAR,SHG,SHGBAR,NROWSHD,NROWB,NESD,IBBAR)
-    !
-    !..... PROGRAM TO SET UP THE STRAIN-DISPLACEMENT MATRIX "B" FOR
-    !         TWO-DIMENSIONAL CONTINUUM ELEMENTS
-    !
-    !         IBBAR = 0,  STANDARD B-MATRIX
-    !         IBBAR = 1,  MEAN-DILATATIONAL B-MATRIX
-    !
-    IMPLICIT NONE
-    !
-    INTEGER  :: NROWSHD,  NROWB, NESD, IBBAR, I, J
-    REAL*8   :: CONSTB
-    !
-    REAL*8, DIMENSION(3)           :: B
-    REAL*8, DIMENSION(NROWSHD)     :: SHG
-    REAL*8, DIMENSION(NESD)        :: SHGBAR
-    REAL*8, DIMENSION(NROWB,NESD)  :: BBAR
-    !
-    BBAR = 0.0D0
-    !
-    !      DO 200 I=1,NROWB
-    !         DO 100 J=1,NESD
-    !            IF (I.EQ.J) BBAR(I,J) = SHG(I)
-    !            K = I + J
-    !            IF (MOD(K,8).EQ.0) BBAR(I,J) = SHG(1)
-    !            IF (MOD(K,6).EQ.0) BBAR(I,J) = SHG(3)
-    !            IF (MOD(K,7).EQ.0) BBAR(I,J) = SHG(2)
-    !100   CONTINUE
-    !200   CONTINUE
-    !
-    BBAR(1,1) = SHG(1)
-    BBAR(2,2) = SHG(2)
-    BBAR(3,3) = SHG(3)
-    !
-    BBAR(4,1) = SHG(2)
-    BBAR(4,2) = SHG(1)
-    !
-    BBAR(5,2) = SHG(3)
-    BBAR(5,3) = SHG(2)
-    !
-    BBAR(6,1) = SHG(3)
-    BBAR(6,3) = SHG(1)
-    !
-    IF (IBBAR.EQ.0) RETURN
-    !
-    CONSTB = 1.0D0/3.0D0
-    !
-    !.... ADD CONTRIBUTIONS TO FORM B-BAR. SEE HUGHES PAG. 234
-    !
-    B(1) = CONSTB*(SHGBAR(1)-SHG(1))
-    B(2) = CONSTB*(SHGBAR(2)-SHG(2))
-    B(3) = CONSTB*(SHGBAR(3)-SHG(3))
-    !
-    DO 400 I=1,3
-        DO 300 J=1,3
-            BBAR(I,J) = BBAR(I,J) + B(J)
-300     CONTINUE
-400 CONTINUE
-    !
-    RETURN
-    !
-    END SUBROUTINE
-    !
     !**** NEW *** FOR GEOMECHANICAL COUPLING ***************************
     !
     SUBROUTINE SETCBBAR(CBBAR,COEF,B,NROWB,NROWSHD,NESD)
@@ -1258,158 +928,6 @@
 4500 FORMAT(I8,X,40(1PE15.8,2X))
 4600 FORMAT(A12,X,40(1PE15.8,2X))
     !
-    END SUBROUTINE
-    !
-    !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
-    !
-    SUBROUTINE POS4ITER_3D(x, conecNodaisElem, STRS3D, DIVU)
-    !
-    !.... PROGRAM TO COMPUTE ELEMENT STRESS AND VOLUMETRIC DEFORMATION
-    !....            FROM GEOMECHANIC ELASTIC MODEL
-    !
-    use mMalha,            only: nsd, numnp, numel
-    use mMalha,            only: nen, LOCAL
-    use mGlobaisEscalares, only: nrowsh, LDRAINED
-    use mGlobaisEscalares, only: ibbar
-    USE mfuncoesDeForma,   only: shlq3d, shg3d
-    !
-    IMPLICIT NONE
-    !
-    REAL*8,  intent(in)             :: X(NSD,NUMNP)
-    INTEGER, intent(in)             :: conecNodaisElem(NEN,NUMEL)
-    REAL(8), DIMENSION(NROWB,NUMEL) :: STRS3D
-    REAL(8), DIMENSION(NUMEL)       :: DIVU
-    !
-    INTEGER :: J,K,L,NEL
-    real*8, external :: coldot, rowdot
-    !
-    REAL(8), DIMENSION(NESD,NEN)          :: XL
-    REAL(8), DIMENSION(NED2,NEN)          :: DISL
-    REAL(8), DIMENSION(NINTD)             :: WD, DETD
-    REAL(8), DIMENSION(NROWSH,NEN,NINTD)  :: SHLD,SHGD
-    REAL(8), DIMENSION(NESD,NEN)          :: SHGBR
-    !
-    !.... ..LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ
-    REAL(8), DIMENSION(NROWB)         :: STRAIN
-    REAL(8), DIMENSION(NROWSH)        :: CCOEF
-    !
-    REAL(8) :: POISSON,VOLUME,C1,YOUNGMOD, B
-    !
-    CALL SHLQ3D(SHLD,WD,NINTD,NEN)
-    !
-    !      do 100 i=1,numnp
-    !         write(3029,1500) i,(dis(k,i),k=1,ndofd)
-    !100   continue
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        !.... SETUP ELASTIC PARAMETERS FOR DRAINED OR UNDRAINED CONDITIONS
-        !
-        CALL DRAINCOND(YOUNGMOD,POISSON,B,NEL,LDRAINED)
-        !
-        !.... ..SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
-        !
-        CALL SETUPC_3D(CCOEF,YOUNGMOD,POISSON,NROWSH)
-        !
-        !...  ..LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NSD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        CALL SHG3D(XL,DETD,SHLD,SHGD,NINTD,NEL,NEN)
-        !
-        !...  ..CLEAR INITIAL STRAIN
-        !
-        DIVU(NEL) = 0.0D0
-        !
-        !...  ..CLEAR INITIAL STRAIN
-        !
-        STRAIN = 0.0D0
-        !
-        !.... ..DEFINE ELEMENT VOLUME
-        !
-        VOLUME = 0.0D0
-        !
-        !.... ..CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... ..FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH_3D(SHGBR,WD,DETD,SHGD,NEN,NINTD,NROWSH,NESD)
-        !
-        !.... ..LOOP OVER INTEGRATIONN POINTS
-        !
-        DO 300 L=1,NINTD
-            C1=WD(L)*DETD(L)
-            VOLUME = VOLUME + C1
-            DO 200 J=1,NEN
-                !.... ... ... UPLOAD B-BAR MATRIX AT NODE J
-                CALL SETBBAR_3D(BBARJ,SHGD(1:NROWSH,J,L), &
-                    SHGBR(1:NESD,J),NROWSH,NROWB,NESD,IBBAR)
-                !
-                !.... ..COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
-                !
-                DO 200 K=1,NROWB
-                    STRAIN(K)=STRAIN(K)+COLDOT(BBARJ(K,1:3),DISL(1:3,J),3)*C1
-200         CONTINUE
-            !
-300     CONTINUE
-        !
-        !.... ..COMPUTE MEAN DEFORMATION OVER ELEMENT
-        !
-        DO 350 K=1,NROWB
-            STRAIN(K)=STRAIN(K)/VOLUME
-350     CONTINUE
-        !
-        !.... ..COMPUTE MEAN VOLUMETRIC DEFORMATION
-        !
-        DIVU(NEL) = STRAIN(1)+STRAIN(2)+STRAIN(3)
-        !
-        !.... ..COMPUTE MEAN ELEMENT STRESS
-        !
-        STRS3D(1,NEL) = CCOEF(2)*STRAIN(1)+CCOEF(3)*(STRAIN(2)+STRAIN(3))
-        STRS3D(2,NEL) = CCOEF(2)*STRAIN(2)+CCOEF(3)*(STRAIN(1)+STRAIN(3))
-        STRS3D(3,NEL) = CCOEF(2)*STRAIN(3)+CCOEF(3)*(STRAIN(1)+STRAIN(2))
-
-        DO 450 K=4,NROWB
-            STRS3D(K,NEL) = CCOEF(4)*STRAIN(K)
-450     CONTINUE
-        !          xno =0.0d0
-        !          do 451 k=1,nrowb
-        !            xno = xno + strs3d(nel,k)**2
-        !451       continue
-        DO 460 K=1,NROWB
-            STRS3D(K,NEL) = STRS3D(K,NEL)  !+STRSS0(K,NEL)
-460     CONTINUE
-        !
-        IF (.NOT.LDRAINED) THEN
-            GEOPRSR(nel)=-B*(strs3d(1,nel)+strs3d(2,nel)+strs3d(3,nel))/3.0D0
-            !             write(2020,1001), NEL, B, geoprsr(nel)
-        ENDIF
-        !          IF (.NOT.LDRAINED) THEN
-        !             write(3030,1000), NEL, strs3d(1,nel),strs3d(2,nel),strs3d(3,nel)
-
-        !XC(1,nel), XC(2,NEL), XC(3,NEL), &
-
-        !     & (STRS3D(NEL,j),j=1,3)
-        !     &                        (strain(k),k=1,3)
-        !             ELSE
-        !             write(3031,1000), NEL, XC(1,nel), XC(2,NEL), XC(3,NEL), &
-        !     & (STRS3D(NEL,j),j=1,3)
-        !     &                        (strain(k),k=1,3)
-        !          ENDIF
-        !          if (xno .gt. 0.0d0) then
-        !          write(3030,1000), NEL, XC(1,nel), XC(2,NEL), XC(3,NEL), &
-        !    &                        (strain(k),k=1,3)
-
-        !          endif
-500 CONTINUE
-    !
-    RETURN
-    !
-1000 FORMAT('ELEMNT=',I8,2X,10(1PE15.8,2X))
-1001 FORMAT('NEL=',I8,2X,'B=',1PE15.8,2X,'tr =',1PE15.8) !,2x,'p=',1PE15.8)
-1500 FORMAT('node=',I8,2X,10(1PE15.8,2X))
     END SUBROUTINE
     !
     !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
@@ -3924,7 +3442,7 @@
     END SUBROUTINE STRSS4PLAST
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, stress, stressS, stressTotal, p, pInit, isUndrained)
+    subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, stress, stressS, stressTotal, p, pInit, isUndrained, isFirstTime)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     
@@ -3938,16 +3456,16 @@
     real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), stressTotal(nrowB, nintD,nel)
     real*8 :: p(1,nnp), pInit(1,nnp)
     integer :: isUndrained
+    integer,intent(inout) :: isFirstTime
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
     real*8, allocatable :: fExtNeumann(:,:), fExtDirichlet(:,:) !fExtT with zeros on dirichlet/neumann nodes
-    real*8, allocatable :: fIntDirichlet(:,:), fIntAllElse(:,:) !fint with zeros on dirichlet/ everythin else nodes
-    real*8, allocatable :: r(:,:) !r - residual
     real*8, allocatable :: dDis(:,:)
     real*8 :: error
     
     real*8 :: g1(nlvectD)
+    real*8 :: g2(nlvectD)
     
     real*8, external :: matrixNorm
     integer :: j
@@ -3962,12 +3480,9 @@
     if(.not.allocated(fExtNeumann)) allocate(fExtNeumann(ndofD, nnp))
     if(.not.allocated(fExtDirichlet)) allocate(fExtDirichlet(ndofD, nnp))
     if(.not.allocated(fIntJ)) allocate(fIntJ(ndofD, nnp))
-    if(.not.allocated(fIntDirichlet)) allocate(fIntDirichlet(ndofD, nnp))
-    if(.not.allocated(fIntAllElse)) allocate(fIntAllElse(ndofD, nnp))
-    if(.not.allocated(r)) allocate(r(ndofD, nnp))
     fExtT = 0.d0
     fIntJ = 0.d0
-    r = 0.d0
+    g2 = -1.d0
 
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     dDis = 0.d0
@@ -3981,18 +3496,12 @@
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
 
-    !initialize residual
-    r = fExtNeumann - fIntJ
-
     converged = .false.
     do j = 1, 15
         alhsD = 0.d0
         brhsD = 0.d0
         dDis = 0.d0
-
-        ! compute the tangential stiffness matrix
-        call bbarmtrx_elast(x, conecNodaisElem, alhsD, brhsD, idiagD, lmD, p, isUndrained)
-
+        
         ! load force vector in the right side
         if (nlvectD.gt.0) then
             if (nltftnD >= 1) then
@@ -4000,10 +3509,17 @@
             else
                 g1 = 1.d0
             endif
-            call load(idDesloc, r, brhsd, g1, ndofD, nnp, nlvectD)
-            call ftod(idDesloc, dDis, fExtDirichlet, g1, ndofD, nnp, nlvectD) !fExtT here is weighted dirichlet condition. Care
+            call load(idDesloc, fExtNeumann, brhsd, g1, ndofD, nnp, nlvectD)
+            call load(idDesloc, fIntJ, brhsd, g2, ndofD, nnp, nlvectD) !g2 is always -1
+            if (isFirstTime == 1) then !only do this on the first iteration (Non-linear Finite Element Analysis of Solids and Structures pg.51)
+                call ftodDif(idDesloc, dDis, fExtDirichlet, u, g1, ndofD, nnp, nlvectD)
+                isFirstTime = 0
+            end if
         end if
 
+        ! compute the tangential stiffness matrix
+        call bbarmtrx_elast(x, conecNodaisElem, dDis, alhsD, brhsD, idiagD, lmD, p, isUndrained)
+        
         error = dsqrt(dot_product(brhsD,brhsD))/neqD
         write(*,*) "erro do passo mecanico: ", error
         if (error < tolNewton .and. j > 1) then
@@ -4023,11 +3539,6 @@
 
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
-
-        !updates the residual and check the stop condition
-        call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
-
-        r = fExtNeumann - fIntAllElse
     end do
     if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
 
@@ -4036,15 +3547,12 @@
     deallocate(fExtNeumann)
     deallocate(fExtDirichlet)
     deallocate(fIntJ)
-    deallocate(fIntDirichlet)
-    deallocate(fIntAllElse)
-    deallocate(r)
     deallocate(dDis)
 
     end subroutine incrementMechanicElasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, epsP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, isUndrained)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, epsP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, isUndrained, isFirstTime)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -4057,16 +3565,16 @@
     real*8 :: p(1,nnp), pInit(1,nnp)
     real*8 :: elementIsPlast(nel)
     integer :: isUndrained
+    integer,intent(inout) :: isFirstTime
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
     real*8, allocatable :: fExtNeumann(:,:), fExtDirichlet(:,:) !fExtT with zeros on dirichlet/neumann nodes
-    real*8, allocatable :: fIntDirichlet(:,:), fIntAllElse(:,:) !fint with zeros on dirichlet/ everythin else nodes
-    real*8, allocatable :: r(:,:) !r - residual
     real*8, allocatable :: dDis(:,:)
     real*8 :: error
     
     real*8 :: g1(nlvectD)
+    real*8 :: g2(nlvectD)
     
     real*8, external :: matrixNorm
 
@@ -4083,12 +3591,9 @@
     if(.not.allocated(fExtNeumann)) allocate(fExtNeumann(ndofD, nnp))
     if(.not.allocated(fExtDirichlet)) allocate(fExtDirichlet(ndofD, nnp))
     if(.not.allocated(fIntJ)) allocate(fIntJ(ndofD, nnp))
-    if(.not.allocated(fIntDirichlet)) allocate(fIntDirichlet(ndofD, nnp))
-    if(.not.allocated(fIntAllElse)) allocate(fIntAllElse(ndofD, nnp))
-    if(.not.allocated(r)) allocate(r(ndofD, nnp))
     fExtT = 0.d0
     fIntJ = 0.d0
-    r = 0.d0
+    g2=-1.0d0
 
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     
@@ -4103,17 +3608,11 @@
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
 
-    !initialize residual
-    r = fExtNeumann - fIntJ
-
     converged = .false.
     do j = 1, 50
         alhsD = 0.d0
         brhsD = 0.d0
         dDis = 0.d0
-
-        ! compute the tangential stiffness matrix, and fill brhsd with the dirichlet node info
-        call bbarmtrx_plast(x, conecNodaisElem, fExtDirichlet, alhsD, brhsD, idiagD, lmD, hmTTG, p)
 
         ! load force vector in the right side
         if (nlvectD.gt.0) then
@@ -4122,10 +3621,17 @@
             else
                 g1 = 1.d0
             endif
-            call load(idDesloc, r, brhsd, g1, ndofD, nnp, nlvectD)
-            call ftod(idDesloc, dDis, fExtDirichlet, g1, ndofD, nnp, nlvectD) 
+            call load(idDesloc, fExtNeumann, brhsd, g1, ndofD, nnp, nlvectD)
+            call load(idDesloc, fIntJ, brhsd, g2, ndofD, nnp, nlvectD)
+            if (isFirstTime==1) then !only do this on the first iteration (Non-linear Finite Element Analysis of Solids and Structures pg.51)
+                call ftodDif(idDesloc, dDis, fExtDirichlet, u, g1, ndofD, nnp, nlvectD) 
+                isFirstTime = 0
+            end if
         end if
-
+        
+        ! compute the tangential stiffness matrix, and fill brhsd with the dirichlet node info
+        call bbarmtrx_plast(x, conecNodaisElem, fExtDirichlet, alhsD, brhsD, idiagD, lmD, hmTTG, p)
+        
         error = dsqrt(dot_product(brhsD,brhsD))/neqD
         write(*,*) "erro do passo mecanico: ", error
         if (error < tolNewton .and. j > 1) then
@@ -4145,11 +3651,6 @@
 
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
-
-        !updates the residual and check the stop condition
-        call splitBoundaryCondition(idDesloc,fIntJ,fIntDirichlet,fIntAllElse,ndofD,nnp,nlvectD)
-
-        r = fExtNeumann - fIntAllElse
     end do
     if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
 

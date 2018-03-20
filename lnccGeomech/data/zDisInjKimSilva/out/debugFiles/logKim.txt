@@ -1,0 +1,21 @@
+ plastSolution2wayKim          
+ load stage =            1 curtimestep =            1 k =           23
+ load stage =            1 curtimestep =            2 k =           23
+ load stage =            1 curtimestep =            3 k =           23
+ load stage =            1 curtimestep =            4 k =           23
+ load stage =            1 curtimestep =            5 k =           23
+ load stage =            1 curtimestep =            6 k =           23
+ load stage =            1 curtimestep =            7 k =           23
+ load stage =            1 curtimestep =            8 k =           23
+ load stage =            1 curtimestep =            9 k =           23
+ load stage =            1 curtimestep =           10 k =           22
+ load stage =            1 curtimestep =           11 k =           22
+ load stage =            1 curtimestep =           12 k =           34
+ load stage =            1 curtimestep =           13 k =           25
+ load stage =            1 curtimestep =           14 k =           22
+ load stage =            1 curtimestep =           15 k =           22
+ load stage =            1 curtimestep =           16 k =           21
+ load stage =            1 curtimestep =           17 k =           21
+ load stage =            1 curtimestep =           18 k =           21
+ load stage =            1 curtimestep =           19 k =           21
+ load stage =            1 curtimestep =           20 k =           21

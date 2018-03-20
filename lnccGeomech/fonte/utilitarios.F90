@@ -325,7 +325,7 @@
     
     implicit none
     !variables input
-    real*8 :: g(nptslf, 2, nptslf)
+    real*8 :: g(nptslf, 2, nltftn)
     real*8 :: t, g1(nltftn)
     integer :: nltftn, nptslf
     
@@ -578,6 +578,42 @@
     end do
     
     end subroutine
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
+    subroutine ftodDif(id,d,fFinal,fAtual,g1,ndof,numnp,nlvect)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: id(ndof,*)
+    real*8  :: d(ndof,*), fFinal(ndof,numnp,nlvect), fAtual(ndof,numnp)
+    real*8 :: g1(nlvect)
+    integer :: ndof, numnp, nlvect
+    
+    ! variables
+    integer :: i, j, k, lv
+    real*8  :: val
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    do i=1,ndof
+        do j=1,numnp
+            k = id(i,j)
+            if (k.gt.0) cycle
+            val = 0.0d0
+            do lv=1,nlvect
+                val = val + fFinal(i,j,lv) * g1(lv)
+            end do
+            val = val - fAtual(i,j)
+            d(i,j) = val
+        end do
+        !
+    end do
+    
+    end subroutine ftodDif
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     !
     !**** new **********************************************************************
     !

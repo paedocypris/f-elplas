@@ -38,10 +38,10 @@
     print*, "Iniciando o PROCESSAMENTO..."
 
     !processa o escoamento
-    !call processamentoOneWayPlast()
+    call processamentoOneWayPlast()
     call processamentoTwoWayElast()
-    !call processamentoTwoWayPlast(1) !silva
-    !call processamentoTwoWayPlast(2) !kim
+    call processamentoTwoWayPlast(1) !silva
+    call processamentoTwoWayPlast(2) !kim
     
     !
     call fecharArquivosBase()
@@ -887,6 +887,8 @@
     integer :: outFileUnit
     integer :: currentTimeStepPrint
     
+    integer :: isMechFirstTime
+    
     real*8, external :: matrixNorm
 
     !------------------------------------------------------------------------------------------------------------------------------------
@@ -935,11 +937,12 @@
     strainP = 0.d0
     stress = 0.d0
     elementIsPlast = 0.d0
+    isMechFirstTime = 1
     if (initStress == 1) then
         if (isPlast == 1) then
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0, isMechFirstTime)
         else if (isPlast == 0) then
-            call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
+            call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0, isMechFirstTime)
         end if
     end if 
     uInit = u
@@ -991,6 +994,7 @@
             ! begin split loop
             converged = .false.
             elementIsPlast = 0.d0
+            isMechFirstTime = 1
             do k = 1, 3000
                 if (way == 1 .or. k == 1) then
                     call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, vDarcy, vDarcyNodal)
@@ -1001,9 +1005,9 @@
                 end if
 
                 if (isPlast == 1) then
-                    call  incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0)
+                    call  incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0, isMechFirstTime)
                 else if (isPlast == 0) then
-                    call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
+                    call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0, isMechFirstTime)
                 end if
                 uDif = u - uInit
 

@@ -202,8 +202,8 @@
         if(nen==8) call shg3d (xl,det,shL,shG,npint,curElement,nen)
         
         ! retrieve permeabilities from material
-        curPerm = calcKozenyCarmanPermInitialPoro(curElement, tensDim)
-        !curPerm = calcKozenyCarmanPerm(curElement,tensDim)
+        !curPerm = calcKozenyCarmanPermInitialPoro(curElement, tensDim)
+        curPerm = calcKozenyCarmanPerm(curElement,tensDim)
         kX = curPerm(1)
         kY = curPerm(2)
 
@@ -418,8 +418,8 @@
         if(nen==8) call shg3d (xl,det,shL,shG,npint,nel,nen)
 
         ! set material index
-        curPerm = calcKozenyCarmanPermInitialPoro(curElement,3) !Porosities are global variable, care
-        !curPerm = calcKozenyCarmanPerm(curElement,3) !Porosities are global variable, care
+        !curPerm = calcKozenyCarmanPermInitialPoro(curElement,3) !Porosities are global variable, care
+        curPerm = calcKozenyCarmanPerm(curElement,3) !Porosities are global variable, care
         
         do dir=1,nsd
             area = 0.d0

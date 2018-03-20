@@ -1,4 +1,3 @@
-
 *pressao_inicial_fluxo{
      6.0d7
 }
@@ -38,11 +37,15 @@
            0.d0           1.d0
            1.d0           1.d0
            0.D0           6.D0
-          10.D0           1.D0
+          1.D-3           1.D0
 }
 
 *hgTimeIsTable{
    1
+}
+
+*hgTimeConvertion{
+ 86400.0d0
 }
 
 *tabelaTempos{
