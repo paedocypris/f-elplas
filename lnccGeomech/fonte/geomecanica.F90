@@ -1304,7 +1304,7 @@
                 !
                 !.... ************* closest point-projection ********************
                 !
-                do nItPlas = 1, 10000000
+                do nItPlas = 1, 1000
                     !
                     !.... ...deform elast (trial): e_elast=e_total-e_plast
                     !
@@ -3442,7 +3442,7 @@
     END SUBROUTINE STRSS4PLAST
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, stress, stressS, stressTotal, p, pInit, isUndrained, isFirstTime)
+    subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, stress, stressS, stressTotal, p, pInit, isUndrained)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     
@@ -3456,7 +3456,6 @@
     real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), stressTotal(nrowB, nintD,nel)
     real*8 :: p(1,nnp), pInit(1,nnp)
     integer :: isUndrained
-    integer,intent(inout) :: isFirstTime
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
@@ -3492,6 +3491,9 @@
 
     !compute the new external force vector, and split into two, a dirichlet and a neumann one
     call splitBoundaryCondition(idDesloc,gmF,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
+    
+    !computes the strain and stress
+    call pos4inc(x, conecNodaisElem, u, stress, stressS, stressTotal, p, pInit, 0)
 
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3511,9 +3513,8 @@
             endif
             call load(idDesloc, fExtNeumann, brhsd, g1, ndofD, nnp, nlvectD)
             call load(idDesloc, fIntJ, brhsd, g2, ndofD, nnp, nlvectD) !g2 is always -1
-            if (isFirstTime == 1) then !only do this on the first iteration (Non-linear Finite Element Analysis of Solids and Structures pg.51)
+            if (j == 1) then !only do this on the first iteration (Non-linear Finite Element Analysis of Solids and Structures pg.51)
                 call ftodDif(idDesloc, dDis, fExtDirichlet, u, g1, ndofD, nnp, nlvectD)
-                isFirstTime = 0
             end if
         end if
 
@@ -3545,14 +3546,13 @@
     
     deallocate(fExtT)
     deallocate(fExtNeumann)
-    deallocate(fExtDirichlet)
     deallocate(fIntJ)
     deallocate(dDis)
 
     end subroutine incrementMechanicElasticSolution
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, epsP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, isUndrained, isFirstTime)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, epsP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, isUndrained)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -3565,7 +3565,6 @@
     real*8 :: p(1,nnp), pInit(1,nnp)
     real*8 :: elementIsPlast(nel)
     integer :: isUndrained
-    integer,intent(inout) :: isFirstTime
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
@@ -3604,6 +3603,9 @@
 
     !compute the new external force vector, and split into two, a dirichlet and a neumann one
     call splitBoundaryCondition(idDesloc,gmF,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
+    
+    !Init stress tensor and other variables
+    call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, trStrainP, stressTotal, hmTTG, elementIsPlast, p, pInit, isUndrained)
 
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3623,9 +3625,8 @@
             endif
             call load(idDesloc, fExtNeumann, brhsd, g1, ndofD, nnp, nlvectD)
             call load(idDesloc, fIntJ, brhsd, g2, ndofD, nnp, nlvectD)
-            if (isFirstTime==1) then !only do this on the first iteration (Non-linear Finite Element Analysis of Solids and Structures pg.51)
-                call ftodDif(idDesloc, dDis, fExtDirichlet, u, g1, ndofD, nnp, nlvectD) 
-                isFirstTime = 0
+            if (j==1) then !only do this on the first iteration (Non-linear Finite Element Analysis of Solids and Structures pg.51)
+                call ftodDif(idDesloc, dDis, fExtDirichlet, u, g1, ndofD, nnp, nlvectD)
             end if
         end if
         

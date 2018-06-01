@@ -35,7 +35,7 @@
 77.3649D+7
 }
 *epMohrCoulombPhi_reservoir_region{
-10
+15
 }
 *epMohrCoulombC_reservoir_region{
 2.0D+7

@@ -892,6 +892,47 @@
     end function matrixNorm
     !************************************************************************************************************************************
     !************************************************************************************************************************************
+    function calcRelErrorMatrix(a, b, ni, nj)
+    !function imports
+    
+    !variables import
+    
+    implicit none
+    !variables input
+    integer :: ni, nj
+    real*8 :: a(ni,nj),b(ni,nj)
+    
+    !variables
+    real*8 :: calcRelErrorMatrix
+    real*8 :: den
+    real*8 :: temp
+    integer :: count
+    integer :: j, i
+    
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    calcRelErrorMatrix = 0
+    count = 0
+    do j = 1, nj
+        do i = 1, ni
+            count = count + 1
+            den = a(i,j)
+            if (den == 0) then
+                if (b(i,j) == 0) then
+                    cycle
+                end if
+                den = b(i,j)
+            end if
+            
+            temp = (a(i,j)-b(i,j))/den
+        	calcRelErrorMatrix = calcRelErrorMatrix + temp*temp
+        end do
+    end do
+    calcRelErrorMatrix = sqrt(calcRelErrorMatrix)/count
+    
+    end function calcRelErrorMatrix
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************
     subroutine solverGaussBanda(s,x,r,ns,lb)
     implicit none
 

@@ -41,7 +41,7 @@
     call processamentoOneWayPlast()
     call processamentoTwoWayElast()
     call processamentoTwoWayPlast(1) !silva
-    call processamentoTwoWayPlast(2) !kim
+    !call processamentoTwoWayPlast(2) !kim
     
     !
     call fecharArquivosBase()
@@ -870,15 +870,14 @@
     
     integer :: k, i
     
-    real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:)
+    real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:), prevU(:,:)
     real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:), pInit(:,:)
     real*8, allocatable :: vDarcy(:,:), vDarcyNodal(:,:)
     real*8, allocatable :: stress(:,:,:), out2waySource(:,:)
     real*8, allocatable :: stressS(:,:), prevStressS(:,:)
     real*8, allocatable :: trStrainP(:,:), prevTrStrainP(:,:)
     real*8, allocatable :: stressTotal(:,:,:)
-    real*8, allocatable :: strainP(:,:,:)
-    
+    real*8, allocatable :: strainP(:,:,:), prevStrainP(:,:,:)
     real*8,allocatable :: elementIsPlast(:)
     
     real*8 :: uNorm, pNorm
@@ -887,15 +886,14 @@
     integer :: outFileUnit
     integer :: currentTimeStepPrint
     
-    integer :: isMechFirstTime
-    
-    real*8, external :: matrixNorm
+    real*8, external :: matrixNorm, calcRelErrorMatrix
 
     !------------------------------------------------------------------------------------------------------------------------------------
     !allocate memory
     allocate(u(ndofD, numnp))
     allocate(uInit(ndofD, numnp))
     allocate(uDif(ndofD, numnp))
+    allocate(prevU(ndofD, numnp))
     allocate(prevUDifIt(ndofD, numnp))
     allocate(p(hgNdof,numnp))
     allocate(pInit(hgNdof,numnp))
@@ -911,6 +909,7 @@
     allocate(prevTrStrainP(nintD, numel))
     allocate(stressTotal(nrowb,nintD,numel))
     allocate(strainP(nrowb,nintD,numel))
+    allocate(prevStrainP(nrowb,nintD,numel))
     allocate(elementIsPlast(numel))
     
     outFileUnit = 5513
@@ -923,31 +922,36 @@
     call montarEstruturasDadosDeslocamentoSkyline(conecNodaisElem, nen, numel)
     
     !init pressure
-    if(hgNTimeSteps > 1 .or. hgNSteps(1) > 1) then
-        p = hgInitialPressure
-        prevP = p
-        pInit = hgInitialPressure
-    endif
+    p = hgInitialPressure
+    prevP = p
+    pInit = hgInitialPressure
     
     !init stress and strain
     t = 0
     
     write(*,*) "Inicializa estado de tensão"
     u = 0.d0
+    prevU = 0.d0
     strainP = 0.d0
+    prevStrainP = 0.d0
     stress = 0.d0
+    stressS = 0.d0
+    stressTotal = 0.d0
     elementIsPlast = 0.d0
-    isMechFirstTime = 1
     if (initStress == 1) then
         if (isPlast == 1) then
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0, isMechFirstTime)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0)
         else if (isPlast == 0) then
-            call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0, isMechFirstTime)
+            call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
         end if
     end if 
     uInit = u
     uDif = 0.d0
+    prevU = u
+    prevStrainP = strainP
     prevTrStrainP = trStrainP
+    vDarcy = 0.d0
+    vDarcyNodal = 0.d0
 
     ! print initial state
     if (isPlast == 1) then
@@ -976,7 +980,7 @@
         end if
     end if
     
-    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD, t)
     
     !time loop
     currentTimeStepPrint = 1
@@ -994,8 +998,7 @@
             ! begin split loop
             converged = .false.
             elementIsPlast = 0.d0
-            isMechFirstTime = 1
-            do k = 1, 3000
+            do k = 1, 500
                 if (way == 1 .or. k == 1) then
                     call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, vDarcy, vDarcyNodal)
                     pNorm = 1.0
@@ -1005,9 +1008,9 @@
                 end if
 
                 if (isPlast == 1) then
-                    call  incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0, isMechFirstTime)
+                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0)
                 else if (isPlast == 0) then
-                    call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0, isMechFirstTime)
+                    call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
                 end if
                 uDif = u - uInit
 
@@ -1016,11 +1019,8 @@
                 end if
 
                 if (k > 1) then
-                    prevPIt = prevPIt - p
-                    pNorm = matrixNorm(prevPIt, hgNdof, numnp)
-
-                    prevUDifIt = prevUDifIt - uDif
-                    uNorm = matrixNorm(prevUDifIt, ndofD, numnp)
+                    pNorm = calcRelErrorMatrix(prevPIt,p,hgNdof, numnp)
+                    uNorm = calcRelErrorMatrix(prevUDifIt,uDif,ndofD, numnp)
                     
                     write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
 
@@ -1032,6 +1032,10 @@
 
                 prevPIt = p
                 prevUDifIt = uDif
+                
+                !if didn't converged, return to previous result so that plastic strains are correctly accounted for
+                u = prevU
+                strainP = prevStrainP
             end do
 
             if ((way == 2) .and.(converged.eqv..false.)) then
@@ -1040,11 +1044,13 @@
                 exit
             end if
 
-            !update time
+            !update variables
             prevP = p
+            prevU = u
+            prevStrainP = strainP
 
             !print current solution
-            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
+            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD, t)
 
             if (way == 2) write (outFileUnit,*) "load stage = ", i,"curtimestep = ", currentTimeStepPrint,"k = ", k
             write(*,*) " "
@@ -1058,6 +1064,7 @@
     deallocate(u)
     deallocate(uInit)
     deallocate(uDif)
+    deallocate(prevU)
     deallocate(prevUDifIt)
     deallocate(p)
     deallocate(pInit)
@@ -1067,11 +1074,13 @@
     deallocate(vDarcyNodal)
     deallocate(stress)
     deallocate(stressS)
-    deallocate(stressTotal)
+    deallocate(out2waySource)
     deallocate(prevStressS)
     deallocate(trStrainP)
     deallocate(prevTrStrainP)
+    deallocate(stressTotal)
     deallocate(strainP)
+    deallocate(prevStrainP)
     deallocate(elementIsPlast)
     
     
@@ -1128,7 +1137,7 @@
     end subroutine convertIntPointsValuetoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD, curT)
     !function imports
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
@@ -1149,14 +1158,18 @@
     integer :: conecNodaisElem(nen,nel)
     integer :: nnp, nel, nen, nsd, nrowb, nintD
     
+    real*8 :: curT
+    
     !variables
     integer :: unitNumber
     real*8, allocatable :: valPrint(:)
+    !real*8, allocatable :: solResultMandel(:,:)
     
     !------------------------------------------------------------------------------------------------------------------------------------
     unitNumber = 13587
     
     allocate(valPrint(nel))
+    !allocate(solResultMandel(1,nnp))
     
     call escreverArqParaviewOpening(filename, p, 1, nnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(u, nsd, nnp, 'u', len('u'), 2, unitNumber)
@@ -1172,10 +1185,89 @@
     call escreverarqparaviewintermed_campoescalar(unitnumber, valPrint, 1, nel, 'poroP', len('poroP'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, elementIsPlast, 1, nel, 'elementIsPlast', len('elementIsPlast'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, poroL, 1, nel, 'poroL', len('poroL'), 1)
+    
+    !call calcAnalyticalMandel(curT, 1.0d8, 0.2d0, 5.0d5, 100.0d0, nnp, solResultMandel)
+    !if (curTimeStep == 0) then
+    !    solResultMandel = 0
+    !end if
+    !call escreverarqparaviewintermed_campoescalar(unitnumber, solResultMandel, 1, nnp, 'solMandel', len('solMandel'), 2)
+    
     close(unitNumber)
     
     deallocate(valPrint)
+    !deallocate(solResultMandel)
     
     end subroutine writeCurrentSolution
     !************************************************************************************
     !************************************************************************************
+    subroutine calcAnalyticalMandel(t, young, nu, p0, a, nnp, solResult)
+    !function imports
+    
+    !variables import
+    use mMalha, only: x
+    
+    implicit none
+    !variables input
+    real*8 :: t, young, nu, p0, a
+    integer :: nnp    
+    real*8 :: solResult(1,nnp)
+    
+    !variables
+    integer :: i, curNode
+    real*8 :: lm, mu, c
+    real*8 :: ai(31)
+    real*8 :: lRes
+    
+    real*8 :: nodeX
+    
+    !------------------------------------------------------------------------------------------------------------------------------------
+    ai(1) = 1.287342153890056
+    ai(2) = 4.631599661823944
+    ai(3) = 7.805978437400664
+    ai(4) = 10.96137659349556
+    ai(5) = 14.11059742448752
+    ai(6) = 17.25703274304722
+    ai(7) = 20.40197374326417
+    ai(8) = 23.54601998980356
+    ai(9) = 26.68948800439867
+    ai(10) = 29.83256071316305
+    ai(11) = 32.97535122231038
+    ai(12) = 36.1179332354503
+    ai(13) = 39.26035684057689
+    ai(14) = 42.4026572686464
+    ai(15) = 45.54486002269396
+    ai(16) = 48.68698401903618
+    ai(17) = 51.82904358499723
+    ai(18) = 54.97104977105948
+    ai(19) = 58.11301123710047
+    ai(20) = 61.2549348657412
+    ai(21) = 64.39682619605998
+    ai(22) = 67.53868973619797
+    ai(23) = 70.68052919255874
+    ai(24) = 73.82234764046014
+    ai(25) = 76.96414765297527
+    ai(26) = 80.1059313994455
+    ai(27) = 83.24770072168032
+    ai(28) = 86.38945719352596
+    ai(29) = 89.53120216788918
+    ai(30) = 92.67293681419403
+    ai(31) = 95.81466214846812
+    
+    lm = nu*young/((1+nu)*(1-2*nu))
+    mu = young/2/(1+nu)
+    c = 1.D-13/1.D-3*(lm+2*mu)
+    
+    do curNode = 1, nnp
+        lRes = 0
+        nodeX = x(1,curNode)
+        
+        do i = 1, 31
+            lRes = lres + p0*(lm+2*mu)*cos(ai(i))/(mu-(lm+2*mu)*(cos(ai(i)))**2)*(cos(ai(i)*nodeX/a)-cos(ai(i)))*exp(-(ai(i)**2)*c*t/(a**2));
+        end do
+        solResult(1,curNode) = lRes
+    end do
+    
+    
+    end subroutine calcAnalyticalMandel
+    !************************************************************************************************************************************
+    !************************************************************************************************************************************

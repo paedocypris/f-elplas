@@ -1,31 +1,31 @@
 *numnp{
-    1456
+    186
 }
 *numel{
-    1350
+    150
 }
 *nelx{
-	15
+	  5
 }
 *nely{
-	90
+	30
 }
 *nelxReserv{
-	15
+	5
 }
 *nelyReserv{
-	90
+	30
 }
 *coordenadas_nodais{
          1         4            0.0           10.0
                                 0.0            0.0
                               100.0            0.0
                               100.0           10.0
-        15         1        90        16
+         5         1        30         6
          0
 }
 *conectividades_nodais{
-         1         1         1         2        18        17        1  
-        15         1         1        90        15        16
+         1         1         1         2         8         7        1  
+         5         1         1        30         5         6
          0
 }

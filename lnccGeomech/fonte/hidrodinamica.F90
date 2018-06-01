@@ -248,10 +248,10 @@
                 if (way == 2) then
                     out2waySource(l, curElement) = (-psi) * (stressS(l,curElement) - prevStressS(l,curElement)) * djn * cl
                     
-                    elementF(nj) = elementF(nj) + out2waySource(l, curElement)
                     if (plastType == 1) then
-                        elementF(nj) = elementF(nj) - (trStrainP(l, curElement) - prevTrStrainP(l, curElement)) * djn * cl
+                        out2waySource(l, curElement) = out2waySource(l, curElement) - (trStrainP(l, curElement) - prevTrStrainP(l, curElement)) * djn * cl
                     end if
+                    elementF(nj) = elementF(nj) + out2waySource(l, curElement)
                 end if
             end do
         end do
