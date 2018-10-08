@@ -39,8 +39,8 @@
 
     !processa o escoamento
     call processamentoOneWayPlast()
-    call processamentoTwoWayElast()
-    call processamentoTwoWayPlast(1) !silva
+    !call processamentoTwoWayElast()
+    !call processamentoTwoWayPlast(1) !silva
     !call processamentoTwoWayPlast(2) !kim
     
     !

@@ -263,7 +263,7 @@
         endif
 
         ! assemble element stifness matrix and force array into the global matrixes
-        call addlhs (hgAlhs, elementK, hgLm(1,1,curElement), hgIdiag, nee, .false., .true.)
+        call addlhs(hgAlhs, elementK, hgLm(1,1,curElement), hgIdiag, nee, .false., .true.)
         call addrhs(hgBrhs, elementF, hgLm(1,1,curElement), nee)
     end do
 
