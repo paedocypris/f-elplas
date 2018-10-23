@@ -155,7 +155,7 @@
     logical :: quad, zerodl !is diagonal, is degenerated triange, is zero
     
     real*8 :: betaTotalCompressibility
-    real*8 :: matrixBulk
+    real*8 :: matrixBulk, matrixBulkEP, biotCoeff
     real*8 :: psi
     real*8, allocatable :: curPerm(:)
     integer :: tensDim
@@ -207,17 +207,26 @@
         kX = curPerm(1)
         kY = curPerm(2)
 
+        biotCoeff = calcBiotCoefficient(curElement)
+        matrixBulk = calcMatrixBulk(curElement)
         do l = 1, npint ! foreach integration point
             cl = w(l)*det(l)
             
             !get mechanical parameters
             if (way == 1 .or. plastType == 1) then
-                matrixBulk = calcMatrixBulk(curElement)
+                betaTotalCompressibility = totalCompressibility(curElement, matrixBulk)
+                psi = calcBiotCoefficient(curElement)/matrixBulk
             else if (plastType == 2) then
-                matrixBulk = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
+                matrixBulkEP = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
+
+                betaTotalCompressibility = totalCompressibility(curElement, matrixBulkEP)
+                psi = calcBiotCoefficient(curElement)/matrixBulkEP
+            else if (plastType == 3) then
+                matrixBulkEP = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
+
+                betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1/3.d0*biotCoeff*3.d0/matrixBulkEP - biotCoeff/matrixBulk
+                psi = calcBiotCoefficient(curElement)/matrixBulk + 1.d0/matrixBulkEP - 1.d0/matrixBulk
             end if
-            betaTotalCompressibility = totalCompressibility(curElement, matrixBulk)
-            psi = calcBiotCoefficient(curElement)/matrixBulk
 
             do i = 1, nen
                 do j = 1, nen !for each pair of nodes in the element

@@ -98,9 +98,6 @@ ELASTIC
 *poisson_ratio_right_side_burden{
 0.2d+00
 }
-*rock_density_right_side_burden{
-2.70d+3
-}
 *bulk_solid_grain_right_side_burden{
 7.5d+09
 }
@@ -115,6 +112,9 @@ ELASTIC
 }
 *mean_bulk_water_right_side_burden{
 2.20d+09
+}
+*rock_density_right_side_burden{
+2.70d+3
 }
 *water_viscosity_right_side_burden{
 581.0D-6

@@ -38,10 +38,11 @@
     print*, "Iniciando o PROCESSAMENTO..."
 
     !processa o escoamento
-    call processamentoOneWayPlast()
-    call processamentoTwoWayElast()
+    !call processamentoOneWayPlast()
+    !call processamentoTwoWayElast()
     call processamentoTwoWayPlast(1) !silva
-    !call processamentoTwoWayPlast(2) !kim
+    call processamentoTwoWayPlast(2) !kim
+    call processamentoTwoWayPlast(3) !erick
     
     !
     call fecharArquivosBase()
@@ -813,7 +814,7 @@
     
     !variables import
     use mMalha, only: nsd
-    use mPropGeoFisica,    only: mcFriction, mcC, dpH, dpAlpha
+    use mPropGeoFisica,    only: mcFriction, mcC, dpK, dpAlpha
     
     implicit none
     !variables input
@@ -828,10 +829,11 @@
     lastRegion = 3*nsd
     do i = 1,lastRegion
         phiRad = mcFriction(i) * piConst / 180
-        
+        ! plane strain condition (desai pag 245)
         constPlaneStrain = 3.0d0 / sqrt(9 + 12*(tan(phiRad)**2))
-        dpAlpha(i) = constPlaneStrain * tan(phiRad)
-        dpH(i) = mcC(i) / tan(phiRad)
+        
+        dpAlpha(i) = tan(phiRad) * constPlaneStrain
+        dpK(i) = mcC(i) * constPlaneStrain
     end do
     
     
@@ -936,6 +938,7 @@
     prevU = 0.d0
     strainP = 0.d0
     prevStrainP = 0.d0
+    trStrainP = 0.d0
     stress = 0.d0
     stressS = 0.d0
     stressTotal = 0.d0
@@ -969,6 +972,11 @@
                 filename =  "plastSolution2wayKim"
 
                 open(unit=outFileUnit, file="out/debugFiles/logKim.txt", status='replace')
+                write (outFileUnit,*) filename
+            else if (plastType == 3) then
+                filename = "plastSolution2wayErick"
+
+                open(unit=outFileUnit, file="out/debugFiles/logErick.txt", status='replace')
                 write (outFileUnit,*) filename
             end if
         end if

@@ -778,335 +778,6 @@
     RETURN
     !
     END SUBROUTINE
-    !
-    !
-    !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
-    !
-    SUBROUTINE POS4ITER(x, conecNodaisElem, STRESS, DIVU)
-    !
-    !.... PROGRAM TO COMPUTE ELEMENT STRESS AND VOLUMETRIC DEFORMATION
-    !....            FROM GEOMECHANIC ELASTIC MODEL
-    !
-    use mMalha,            only: nsd, numnp, numel
-    use mMalha,            only: nen, LOCAL
-    use mGlobaisEscalares, only: nrowsh, LDRAINED
-    use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica,    only: GEOINDIC
-    use mGlobaisEscalares, only: ibbar
-    !
-    IMPLICIT NONE
-    !
-    REAL*8,  intent(in)              :: X(NSD,NUMNP)
-    INTEGER, intent(in)              :: conecNodaisElem(NEN,NUMEL)
-    REAL(8), DIMENSION(NROWB,NUMEL)  :: STRESS
-    REAL(8), DIMENSION(NUMEL)        :: DIVU
-    !
-    LOGICAL QUAD
-    !
-    INTEGER :: J,K,L,NEL
-    !
-    real*8, external :: coldot, rowdot
-    REAL(8), DIMENSION(NESD,NEN)          :: XL
-    REAL(8), DIMENSION(NED2,NEN)          :: DISL
-    REAL(8), DIMENSION(NINTD)             :: WD, DETD, R
-    REAL(8), DIMENSION(NROWSH,NEN,NINTD)  :: SHLD,SHGD
-    REAL(8), DIMENSION(NROWSH,NEN)        :: SHGBR
-    REAL(8), DIMENSION(NROWB,NROWB)       :: CBBAR
-    !
-    !.... LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ
-    REAL(8), DIMENSION(NROWB)         :: STRAIN
-    REAL(8), DIMENSION(4)             :: UNITVEC
-    real*8 :: tempVec2(2)
-    real*8 :: tempVec4(4)
-    !
-    REAL(8) :: POISSON, AREA, C1, YOUNGMOD, B
-    !
-    UNITVEC(1)= 1.0D0
-    UNITVEC(2)= 1.0D0
-    UNITVEC(3)= 0.0D0
-    UNITVEC(4)= 1.0D0
-    !
-    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
-    !
-    CALL SHLQ(SHLD,WD,NINTD,NEN)
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        !.... SETUP ELASTIC PARAMETERS FOR DRAINED OR UNDRAINED CONDITIONS
-        !
-        CALL DRAINCOND(YOUNGMOD,POISSON,B,NEL,LDRAINED)
-        !
-        !.... ..SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
-        !
-        !         POISSON = GEOINDIC('POISSON',GEOFORM(NEL))
-        !
-        !.... ..SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
-        !
-        !         CALL SETUPC(CBBAR,YOUNG(NEL),POISSON,NROWB,IOPT)
-        CALL SETUPC(CBBAR,YOUNGMOD,POISSON,NROWB,IOPT)
-        !
-        !...  ..LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DIS,DISL,NEN,NDOFD,NED2)
-        !
-        QUAD = .TRUE.
-        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
-        !
-        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
-        !
-        DIVU(NEL) = 0.0D0
-        !
-        !...  ..CLEAR INITIAL STRAIN
-        !
-        STRAIN = 0.0D0
-        !
-        !.... ..DEFINE ELEMENT AREA
-        !
-        AREA = 0.0D0
-        !
-        !.... ..SETUP FOR AXISYMMETRIC OPTION
-        !
-        IF (IOPT.EQ.2) THEN
-            DO 150 L=1,NINTD
-                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
-                DETD(L) = DETD(L)*R(L)
-150         CONTINUE
-        ENDIF
-        !
-        !.... ..CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !.... ..FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
-        !
-        !.... ..LOOP OVER INTEGRATIONN POINTS
-        !
-        DO 300 L=1,NINTD
-            C1 = WD(L)*DETD(L)
-            AREA = AREA + C1
-            !
-            DO 200 J=1,NEN
-                !.... ..UPLOAD B-BAR MATRIX AT NODE J
-                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), &
-                    &                 R(L),NROWSH,NROWB,IOPT,IBBAR)
-                !
-                !.... ..COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
-                !
-                DO 200 K=1,NROWB
-                    tempVec2 = BBARJ(K,1:2)
-                    STRAIN(K)=STRAIN(K)+COLDOT(tempVec2 ,DISL(1:2,J),2)*C1
-200         CONTINUE
-300     CONTINUE
-        !
-        !.... ..COMPUTE MEAN DEFORMATION OVER ELEMENT
-        !
-        DO 350 K=1,NROWB
-            STRAIN(K)=STRAIN(K)/AREA
-350     CONTINUE
-        !..
-        DIVU(NEL) = COLDOT(UNITVEC,STRAIN,NROWB)
-        !
-        !.... ..COMPUTE MEAN VOLUMETRIC STRESS
-        !
-        DO 420 K=1,NROWB
-            tempVec4 = CBBAR(K,1:4)
-            STRESS(K,NEL)=COLDOT(tempVec4,STRAIN(1:4),4)  !+STRSS0(K,NEL)
-420     CONTINUE
-        !
-        IF (.NOT.LDRAINED) THEN
-            GEOPRSR(nel)=-B*(stress(1,nel)+stress(2,nel)+stress(4,nel))/3.0D0
-            !           write(2020,1001), NEL, B, geoprsr(nel)
-        ENDIF
-        !
-500 CONTINUE
-    !
-    RETURN
-    !
-4000 FORMAT(2X,40(1PE15.8,2X))
-4500 FORMAT(I8,X,40(1PE15.8,2X))
-4600 FORMAT(A12,X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
-    !
-    !**** NEW **** FOR INCOMPRESSIBILITY ***************************************
-    !
-    SUBROUTINE POS4CREEP(x, conecNodaisElem)
-    !
-    !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR CREEP MODEL
-    !
-    use mMalha,            only: nsd, numnp, numel, nen, LOCAL
-    use mMalha,            only: multab
-    use mGlobaisEscalares, only: nrowsh
-    use mFuncoesDeForma,   only: shgq, shlq
-    use mPropGeoFisica,    only: YOUNG
-    use mGlobaisEscalares, only: ibbar
-    use mPropGeoFisica,    only: GEOFORM, GEOINDIC, FNCMECLAW
-    !
-    IMPLICIT NONE
-    !
-    REAL*8,  intent(in)    :: x(nsd,numnp)
-    INTEGER, intent(in)    :: conecNodaisElem(nen,numel)
-    CHARACTER(5)           :: MECLAW
-    !
-    LOGICAL QUAD
-    !
-    INTEGER :: J,K,L,NEL
-
-    real*8, external :: rowdot, coldot
-    !
-    !.... INPUT/OUTPUT VECTORS AND MATRIZES OF SUBROUTINE
-    !
-    REAL(8), DIMENSION(NESD,NEN)      :: XL
-    REAL(8), DIMENSION(NED2,NEN)      :: DLTRL
-    !
-    !.... LOCAL VECTORS AND MATRIZES
-    !
-    REAL(8), DIMENSION(NROWB,NESD)    :: BBARJ
-    REAL(8), DIMENSION(NROWB,NROWB)   :: QIXI, CBBAR
-    REAL(8), DIMENSION(NROWB)         :: DEVSTRS,TENSAO
-    REAL(8), DIMENSION(4)             :: STRAIN
-    !
-    REAL(8) :: SHLD(NROWSH,NEN,NINTD), SHGD(NROWSH,NEN,NINTD)
-    REAL(8) :: SHGBR(NROWSH,NEN)
-    REAL(8) :: DETD(NINTD), R(NINTD), WD(NINTD)
-
-    REAL(8) :: POISSON
-    REAL(8) :: GTIMES2, GTIMES3, BULKROCK, TRCSTRS
-    REAL(8) :: GAMMA,FX,DERFX,DELTAG, QTRIAL, ROOT3D2
-    !
-    DATA ROOT3D2/1.224744871391589D0/
-    !
-    !.... GENERATION OF LOCAL SHAPE FUNCTIONS AND WEIGHT VALUES
-    !
-    CALL SHLQ(SHLD,WD,NINTD,NEN)
-    !
-    TENSAO = 0.0D0
-    !
-    DO 500 NEL=1,NUMEL
-        !
-        MECLAW  = FNCMECLAW(GEOFORM(NEL))
-        !
-        POISSON = GEOINDIC('POISSON',GEOFORM(NEL))
-        GTIMES2 = YOUNG(NEL)/(1.0D0+POISSON)
-        GTIMES3 = 1.5D0*GTIMES2
-        !
-        BULKROCK = YOUNG(NEL)/(3.0D0*(1.0D0-2.0D0*POISSON))
-        !
-        !.... SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
-        !
-        CALL SETUPC(CBBAR,YOUNG(NEL),POISSON,NROWB,IOPT)
-        !
-        !..... ..LOCALIZE COORDINATES AND DIRICHLET B.C.
-        !
-        CALL LOCAL(conecNodaisElem(1,NEL),X,XL,NEN,NSD,NESD)
-        CALL LOCAL(conecNodaisElem(1,NEL),DTRL,DLTRL,NEN,NDOFD,NED2)
-        !
-        QUAD = .TRUE.
-        IF (conecNodaisElem(3,NEL).EQ.conecNodaisElem(4,NEL)) QUAD = .FALSE.
-        !
-        CALL SHGQ(XL,DETD,SHLD,SHGD,NINTD,NEL,QUAD,NEN)
-        !..
-        !..... ..SETUP FOR AXISYMMETRIC OPTION
-        !..
-        IF (IOPT.EQ.2) THEN
-            DO 100 L=1,NINTD
-                R(L)    = ROWDOT(SHGD(NROWSH,1,L),XL,NROWSH,NESD,NEN)
-                DETD(L) = DETD(L)*R(L)
-100         CONTINUE
-        ENDIF
-        !
-        !.... .. CALCULATE MEAN VALUES OF SHAPE FUNCTION GLOBAL DERIVATIVES
-        !....     FOR MEAN-DILATATIONAL B-BAR FORMULATION
-        !
-        CALL XMEANSH(SHGBR,WD,DETD,R,SHGD,NEN,NINTD,IOPT,NESD,NROWSH)
-        !..
-        !.... ...LOOP OVER INTEGRATION POINTS
-        !..
-        DO 400 L=1,NINTD
-            !..
-            !..... ..CLEAR INITIAL STRAIN
-            !..
-            STRAIN=0.0D0
-            !
-            DO 200 J=1,NEN
-                !..
-                !.... ..... UPLOAD B-BAR MATRIX AT NODE J
-                !..
-                CALL SETBB(BBARJ,SHGD(1:NROWSH,J,L),SHGBR(1:NROWSH,J), &
-                    &                    R(L),NROWSH,NROWB,IOPT,IBBAR)
-                !..
-                !.... ..... COMPUTE STRAINS WITHIN INTRINSIC B-BAR FORMULATION
-                !..
-                DO 200 K=1,NROWB
-                    STRAIN(K)=STRAIN(K)+ &
-                        &                    COLDOT(BBARJ(K,1:2),DLTRL(1:2,J),2)
-200         CONTINUE
-            !..
-            !.... ..... COMPUTE STRESS
-            !..
-            !            CALL MULTAB(CBBAR,STRAIN,TENSAO,4,4,4,4,4,1,1)
-            TENSAO=matmul(CBBAR,STRAIN)
-            !..
-            !.... ..... COMPUTE DEVIATOR STRESS TENSOR
-            !..
-            CALL DEVTENSOR(DEVSTRS,TRCSTRS,TENSAO,NROWB)
-            !
-            !.... ..... COMPUTE EFFECTIVE TRIAL STRESS
-            !
-            QTRIAL=ROOT3D2*DSQRT(DEVNORM2(DEVSTRS,NROWB))
-            !..
-            !... SOLVE NON LINEAR EQUATION FOR GAMMA FRAMEWORK: NEWTON METHOD
-            !..
-            GAMMA=0.0D0
-            !
-            !            IF (MOD(NNP,NCREEP).EQ.0) THEN
-            IF (MECLAW.EQ.'CREEP') THEN
-220             CONTINUE
-                FX =  FNOTLIN(QTRIAL,GTIMES3,1,GAMMA)
-                DERFX = FNOTLIN(QTRIAL,GTIMES3,2,GAMMA)
-                DELTAG = -FX/DERFX
-                GAMMA = GAMMA+DELTAG
-                IF (DABS(DELTAG).GT.1.0D-6) GOTO 220
-            ENDIF
-            !            ENDIF
-            !..
-            !.... ...  UPDATE DEVIATOR STRESS
-            !..
-            DO 230 K=1,NROWB
-                DEVSTRS(K)=(1.0D0-GAMMA*GTIMES3/QTRIAL)*DEVSTRS(K)
-230         CONTINUE
-            !
-            STRSS(NEL,L,1) = DEVSTRS(1)+TRCSTRS
-            STRSS(NEL,L,2) = DEVSTRS(2)+TRCSTRS
-            STRSS(NEL,L,3) = DEVSTRS(3)
-            STRSS(NEL,L,4) = DEVSTRS(4)+TRCSTRS
-            !..
-            !.... .... UPDATE LOCAL TANGENT MATRIX
-            !..
-            CALL SETTGMX(QIXI,DEVSTRS,GTIMES2,GTIMES3,BULKROCK, &
-                &                   QTRIAL,GAMMA,MECLAW)
-            !..
-            !.... .... TRANSFER 4X4-ORDER MATRIX TO GLOBAL TANGENT ARRAY
-            !..
-            CALL QX2TANG(QIXI,hmTTG(1:16,l,nel))
-            !
-400     CONTINUE
-        !
-500 CONTINUE
-    !
-    RETURN
-    !
-2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X  &
-        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                  &
-        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                  &
-        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                  &
-        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
-4000 FORMAT(2X,40(1PE15.8,2X))
-5000 FORMAT(I4,2X,I1,2X,40(1PE15.8,2X))
-    !
-    END SUBROUTINE
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine pos4plast(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, elementIsPlast, pressure, pInit, isUndrained)
@@ -1163,7 +834,7 @@
 
     real(8) :: young, poisson, fyield, fYield1(nrowb), fYield2(nrowb,nrowb)
     real*8 :: hgamma, hnorma
-    real*8 :: dpH, dpAlpha
+    real*8 :: dpK, dpAlpha
     real*8 :: pressureL(1,nen), pressureInitL(1,nen), pressureIntPoint, pressureInitIntPoint
     real*8 :: biotCoef
     logical :: converged
@@ -1211,7 +882,7 @@
             call calcMatrixProperties(poisson, young, nel)
         end if
         
-        dpH = geoIndic('DPCOHES',geoform(nel))
+        dpK = geoIndic('DPCOHES',geoform(nel))
         dpAlpha = geoIndic('DPALPHA',geoform(nel))
         
         !.... setup stochastic elasticity tensor for bbar method
@@ -1294,7 +965,7 @@
             stressLEff = matmul(cbbar, elasticStrain)
             
             !.... ... compute yield function:
-            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpH, dpAlpha)
+            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha)
             
             if (fyield.ge.tolyield) then
                 elementIsPlast(nel) = 1.d0
@@ -1318,7 +989,7 @@
                     stressLEff = matmul(cbbar, elasticStrain)
                     
                     !.... ... compute the yield function, its gradient and hessian (drucker-prager):
-                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpH, dpAlpha)
+                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha)
                     
                     !.... ... residual computation
                     do k=1,nrowb
@@ -2810,7 +2481,7 @@
     END SUBROUTINE GRADS
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, h, alpha)
+    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, k, alpha)
     !function imports
     
     !variables import
@@ -2819,7 +2490,7 @@
     !variables input
     real*8 :: fYield, efStress(nrowb)
     real*8 :: p, biotCoef
-    real*8 :: h, alpha
+    real*8 :: k, alpha
     
     !variables
     real*8 :: plasticStress(nrowb)
@@ -2837,82 +2508,82 @@
     I1 = calcInvariantI1(plasticStress)
     J2 = calcDevInvariantJ2(devStress)
     
-    fYield = dpYield(I1, J2, h, alpha)
+    fYield = dpYield(I1, J2, k, alpha)
     
     end subroutine dpYieldEfStress
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    function dpYield(I1, J2, h, alpha)
+    function dpYield(I1, J2, k, alpha)
     !function imports
     
     !variables import
     
     implicit none
     !variables input
-    real*8 :: dpYield, I1, J2, h, alpha
+    real*8 :: dpYield, I1, J2, k, alpha
     
     !variables
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    dpYield = sqrt(J2) + alpha*(1./3.*I1 - h)
+    dpYield = sqrt(J2) + alpha * I1/3.d0 - k
     
     end function dpYield
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    function dpYield1(plasticStress, I1, J2, alpha)
+    function dpYield1(devStress, J2, alpha)
     !function imports
     
     !variables import
     
     implicit none
     !variables input
-    real*8 :: plasticStress(nrowb), I1, J2, alpha
+    real*8 :: devStress(nrowb), J2, alpha
     
     !variables
     real*8 :: dpYield1(nrowb)
     
-    !------------------------------------------------------------------------------------------------------------------------------------
-    dpYield1(1) = (1./2. * plasticStress(1)/sqrt(J2)) - (1./6. * I1/ sqrt(J2)) + alpha/3.
-    dpYield1(2) = (1./2. * plasticStress(2)/sqrt(J2)) - (1./6. * I1/ sqrt(J2)) + alpha/3.
-    dpYield1(3) = plasticStress(3) / sqrt(J2)
-    dpYield1(4) = (1./2. * plasticStress(4)/sqrt(J2)) - (1./6. * I1/ sqrt(J2)) + alpha/3.
+    !---------------------------------------------------------------------------------------
+    dpYield1(1) = devStress(1)/2.d0/dsqrt(J2) + alpha/3.d0
+    dpYield1(2) = devStress(2)/2.d0/dsqrt(J2) + alpha/3.d0
+    dpYield1(3) = devStress(3)/dsqrt(J2)
+    dpYield1(4) = devStress(4)/2.d0/dsqrt(J2) + alpha/3.d0
     
     end function dpYield1
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    function dpYield2(plasticStress)
+    !***************************************************************************************
+    !***************************************************************************************
+    function dpYield2(plasticStress,I1,J2)
     !function imports
     
     !variables import
     
     implicit none
     !variables input
-    real*8 :: plasticStress(nrowb)
+    real*8 :: plasticStress(nrowb), I1, J2
     
     !variables
     real*8 dpYield2(nrowb,nrowb)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    dpYield2(1,1) = (dsqrt(3.0d0)*(plasticStress(4)**2-2*plasticStress(2)*plasticStress(4)+plasticStress(2)**2+4*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(1,2) = -(dsqrt(3.0d0)*(plasticStress(4)**2-plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)+plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(1,3) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)+plasticStress(2)-2*plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(1,4) = (dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(2)**2+plasticStress(1)*plasticStress(2)-2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    
-    dpYield2(2,1) = -(dsqrt(3.0d0)*(plasticStress(4)**2-plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)+plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(2,2) = (dsqrt(3.0d0)*(plasticStress(4)**2-2*plasticStress(1)*plasticStress(4)+4*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(2,3) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)-2*plasticStress(2)+plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(2,4) = -(dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    
-    dpYield2(3,1) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)+plasticStress(2)-2*plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(3,2) = (dsqrt(3.0d0)*plasticStress(3)*(plasticStress(4)-2*plasticStress(2)+plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(3,3) = (dsqrt(3.0d0)*(plasticStress(4)**2-plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+plasticStress(1)**2))/(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0)
-    dpYield2(3,4) = -(dsqrt(3.0d0)*plasticStress(3)*(2*plasticStress(4)-plasticStress(2)-plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    
-    dpYield2(4,1) = (dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(2)**2+plasticStress(1)*plasticStress(2)-2*plasticStress(3)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(4,2) = -(dsqrt(3.0d0)*(plasticStress(2)*plasticStress(4)-plasticStress(1)*plasticStress(4)-plasticStress(1)*plasticStress(2)+2*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(4,3) = -(dsqrt(3.0d0)*plasticStress(3)*(2.*plasticStress(4)-plasticStress(2)-plasticStress(1)))/(2*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    dpYield2(4,4) = (dsqrt(3.0d0)*(plasticStress(2)**2.-2.*plasticStress(1)*plasticStress(2)+4*plasticStress(3)**2+plasticStress(1)**2))/(4*(plasticStress(4)**2+(-plasticStress(2)-plasticStress(1))*plasticStress(4)+plasticStress(2)**2-plasticStress(1)*plasticStress(2)+3*plasticStress(3)**2+plasticStress(1)**2)**(3.0d0/2.0d0))
-    
+    dpYield2(1,1) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(1)*plasticStress(4)-I1*plasticStress(4)+3*plasticStress(1)*plasticStress(2)-I1*plasticStress(2)-6*plasticStress(1)**2+2*I1*plasticStress(1)+12*J2))/3.6d+1
+    dpYield2(1,2) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(1)*plasticStress(4)-I1*plasticStress(4)-6*plasticStress(1)*plasticStress(2)+2*I1*plasticStress(2)+3*plasticStress(1)**2-I1*plasticStress(1)-6*J2))/3.6d+1
+    dpYield2(1,3) = -(J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(1)-I1)*plasticStress(3))/6.0d+0
+    dpYield2(1,4) = -(J2**((-3.0d+0)/2.0d+0)*(6*plasticStress(1)*plasticStress(4)-2*I1*plasticStress(4)-3*plasticStress(1)*plasticStress(2)+I1*plasticStress(2)-3*plasticStress(1)**2+I1*plasticStress(1)+6*J2))/3.6d+1
+
+    dpYield2(2,1) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(2)*plasticStress(4)-I1*plasticStress(4)+3*plasticStress(2)**2-6*plasticStress(1)*plasticStress(2)-I1*plasticStress(2)+2*I1*plasticStress(1)-6*J2))/3.6d+1
+    dpYield2(2,2) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(2)*plasticStress(4)-I1*plasticStress(4)-6*plasticStress(2)**2+3*plasticStress(1)*plasticStress(2)+2*I1*plasticStress(2)-I1*plasticStress(1)+12*J2))/3.6d+1
+    dpYield2(2,3) = -(J2**((-3.0d+0)/2.0d+0)*plasticStress(3)*(3*plasticStress(2)-I1))/6.0d+0
+    dpYield2(2,4) = -(J2**((-3.0d+0)/2.0d+0)*(6*plasticStress(2)*plasticStress(4)-2*I1*plasticStress(4)-3*plasticStress(2)**2-3*plasticStress(1)*plasticStress(2)+I1*plasticStress(2)+I1*plasticStress(1)+6*J2))/3.6d+1
+
+    dpYield2(3,1) = (J2**((-3.0d+0)/2.0d+0)*plasticStress(3)*(plasticStress(4)+plasticStress(2)-2*plasticStress(1)))/6.0d+0
+    dpYield2(3,2) = (J2**((-3.0d+0)/2.0d+0)*plasticStress(3)*(plasticStress(4)-2*plasticStress(2)+plasticStress(1)))/6.0d+0
+    dpYield2(3,3) = -J2**((-3.0d+0)/2.0d+0)*(plasticStress(3)**2-J2)
+    dpYield2(3,4) = -(J2**((-3.0d+0)/2.0d+0)*plasticStress(3)*(2*plasticStress(4)-plasticStress(2)-plasticStress(1)))/6.0d+0
+
+    dpYield2(4,1) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(2)*plasticStress(4)-6*plasticStress(1)*plasticStress(4)+I1*plasticStress(4)-3*plasticStress(2)**2+I1*plasticStress(2)-6*plasticStress(3)**2-3*plasticStress(1)**2+4*I1*plasticStress(1)-I1**2))/3.6d+1
+    dpYield2(4,2) = -(J2**((-3.0d+0)/2.0d+0)*(6*plasticStress(2)*plasticStress(4)-3*plasticStress(1)*plasticStress(4)-I1*plasticStress(4)+3*plasticStress(2)**2-4*I1*plasticStress(2)+6*plasticStress(3)**2+3*plasticStress(1)**2-I1*plasticStress(1)+I1**2))/3.6d+1
+    dpYield2(4,3) = -(J2**((-3.0d+0)/2.0d+0)*plasticStress(3)*(3*plasticStress(4)-I1))/6.0d+0
+    dpYield2(4,4) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(2)*plasticStress(4)+3*plasticStress(1)*plasticStress(4)-2*I1*plasticStress(4)+6*plasticStress(2)**2-5*I1*plasticStress(2)+12*plasticStress(3)**2+6*plasticStress(1)**2-5*I1*plasticStress(1)+2*I1**2))/3.6d+1
+
     end function dpYield2
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -2942,8 +2613,8 @@
     J2 = calcDevInvariantJ2(devStress)
     
     fYield = dpYield(I1, J2, h, alpha)
-    fYield1 = dpYield1(plasticStress, I1, J2, alpha)
-    fYield2 = dpYield2(plasticStress)
+    fYield1 = dpYield1(devStress, J2, alpha)
+    fYield2 = dpYield2(plasticStress, I1, J2)
     
     end subroutine dpGrads
     !************************************************************************************************************************************

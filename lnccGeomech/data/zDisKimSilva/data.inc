@@ -160,3 +160,8 @@ dominioCompleto
 40
 dominioCompleto  
 }
+*producao{     
+0
+./out/
+40
+}

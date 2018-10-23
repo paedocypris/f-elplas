@@ -32,7 +32,7 @@
     CHARACTER*12, ALLOCATABLE :: GEOFORM(:)
     REAL(8), ALLOCATABLE :: PWELL(:)
     
-    real*8 :: permInicial(3) !2d exclusive, todo: deixar genérico para dimensão
+    real*8 :: permInicial(3) !2d exclusive, todo: deixar genï¿½rico para dimensï¿½o
     !
     real(8) :: xcbloco_perm,ycbloco_perm,zcbloco_perm
     real(8) :: xlbloco_perm,ylbloco_perm,zlbloco_perm
@@ -107,7 +107,7 @@
     real*8 :: waterViscosity(9)
     real*8 :: misesYield(9)
     real*8 :: mcFriction(9), mcC(9)
-    real*8 :: dpH(9), dpAlpha(9)
+    real*8 :: dpK(9), dpAlpha(9)
     !
     CHARACTER(5), DIMENSION(9) :: GEOMECLAW
 
@@ -1696,7 +1696,7 @@
     case ('DPCOHES')
         do i=1,lastregion
             if (refgeo(i).eq.geof) then
-                geoloc = dpH(i)
+                geoloc = dpK(i)
                 exit
             end if
         end do
