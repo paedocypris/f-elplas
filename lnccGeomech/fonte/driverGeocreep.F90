@@ -39,8 +39,8 @@
 
     !processa o escoamento
     call processamentoOneWayPlast()
-    !call processamentoTwoWayElast()
-    !call processamentoTwoWayPlast(1) !silva
+    call processamentoTwoWayElast()
+    call processamentoTwoWayPlast(1) !silva
     !call processamentoTwoWayPlast(2) !kim
     
     !
@@ -236,11 +236,11 @@
     !
     !.... input element data
     !
-    call TOPologiaMALhaSistEQUAcoesDS(NALHSD, NEQD)
+    call TOPologiaMALhaSistEQUAcoesDS(NALHSD, NEQD) 
     !
     !.... inicializa os tempos de impressao
     !
-    call inittime
+    !call inittime
     !
     !    inicializa a pressão para o galerkin
     !
@@ -812,19 +812,21 @@
     !function imports
     
     !variables import
+    use mMalha, only: nsd
     use mPropGeoFisica,    only: mcFriction, mcC, dpH, dpAlpha
     
     implicit none
     !variables input
     
     !variables
-    integer :: i 
+    integer :: i, lastRegion
     real*8, parameter :: piConst = 3.141592653589793
     real*8 :: constPlaneStrain
     real*8 :: phiRad
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    do i = 1,9
+    lastRegion = 3*nsd
+    do i = 1,lastRegion
         phiRad = mcFriction(i) * piConst / 180
         
         constPlaneStrain = 3.0d0 / sqrt(9 + 12*(tan(phiRad)**2))
@@ -980,7 +982,7 @@
         end if
     end if
     
-    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD, t)
+    call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
     
     !time loop
     currentTimeStepPrint = 1
@@ -1050,7 +1052,7 @@
             prevStrainP = strainP
 
             !print current solution
-            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD, t)
+            call writeCurrentSolution(filename,currentTimeStepPrint, p, uDif, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
 
             if (way == 2) write (outFileUnit,*) "load stage = ", i,"curtimestep = ", currentTimeStepPrint,"k = ", k
             write(*,*) " "
@@ -1137,7 +1139,7 @@
     end subroutine convertIntPointsValuetoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD, curT)
+    subroutine writeCurrentSolution(filename,curTimeStep, p, u, stressEf, stressTot, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, nnp, nel, nen, nsd, nrowb, nintD)
     !function imports
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewOpening
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
@@ -1158,7 +1160,7 @@
     integer :: conecNodaisElem(nen,nel)
     integer :: nnp, nel, nen, nsd, nrowb, nintD
     
-    real*8 :: curT
+    !real*8 :: curT
     
     !variables
     integer :: unitNumber
