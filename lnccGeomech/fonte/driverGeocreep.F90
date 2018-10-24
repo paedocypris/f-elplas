@@ -39,11 +39,11 @@
 
     !processa o escoamento
     !call processamentoOneWayPlast()
-    !call processamentoTwoWayElast()
-    call processamentoTwoWayPlast(1) !silva
-    call processamentoTwoWayPlast(2) !kim
-    call processamentoTwoWayPlast(3) !erick
-    
+    call processamentoTwoWayElast()
+    !call processamentoTwoWayPlast(1) !silva
+    !call processamentoTwoWayPlast(2) !kim
+    !call processamentoTwoWayPlast(3) !erick
+
     !
     call fecharArquivosBase()
     call fecharArquivosSimHidroGeoMec()
@@ -208,24 +208,24 @@
     !
     keyword_name = "valores_cond_contorno_desloc"
     if(nlvectD.gt.0) call leituraValoresCondContornoDS(keyword_name, gmF, ndofD, numnp, 0, nlvectD, iprtin, iecho)
-    
+
     if (nltftnD.ne.0) then
         if (nltftnD.ne.nlvectD) then
             write (*,*) "GM: nltftn e nlvect tem que ser iguais."
             stop 225
         endif
-        
+
         keyword_name = "nptslfD"
         call readIntegerKeywordValue(keyword_name, nptslfD, 0_4, ierr)
-        
+
         keyword_name = "hgTimeConvertion"
         call readRealKeywordValue(keyword_name, tempTimeConvertion, 86400.0d0, ierr)
-        
+
         keyword_name = "gmLoadTimeFunction"
         call leituraLoadTimeFunctions(keyword_name, gmG, nltftnD, nptslfD, tempTimeConvertion)
     endif
-    
-    
+
+
     keyword_name = "initStress"
     call readIntegerKeywordValue(keyword_name, initStress, 1, ierr)
     !
@@ -237,7 +237,7 @@
     !
     !.... input element data
     !
-    call TOPologiaMALhaSistEQUAcoesDS(NALHSD, NEQD) 
+    call TOPologiaMALhaSistEQUAcoesDS(NALHSD, NEQD)
     !
     !.... inicializa os tempos de impressao
     !
@@ -246,7 +246,7 @@
     !    inicializa a pressão para o galerkin
     !
     call initGalerkinPressure(numnpReserv)
-    
+
     !inicializa variáveis de drucker prager
     call initDPProperties
     !
@@ -474,8 +474,8 @@
     !
     IF (nlvectD.ne.0) THEN
         ALLOCATE(gmF(ndofD,numnp,nlvectD));   gmF = 0.0d0
-    ENDIF    
-    
+    ENDIF
+
     ALLOCATE(IDDIS(NDOFD, NUMNP));        IDDIS   = 0
     ALLOCATE(DIS(NDOFD, NUMNP));          DIS     = 0.0D0
     ALLOCATE(DIS0(NDOFD, NUMNP));         DIS0    = 0.0D0
@@ -706,14 +706,14 @@
     END IF
     DESPRESSURIZAR = BWP
     END FUNCTION DESPRESSURIZAR
-    
+
 
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine initGalerkinPressure(nnp)
     !variable imports
     use mHidrodinamicaGalerkin, only: hgNSteps, hgDts, hgNTimeSteps
-    
+
     use mHidrodinamicaGalerkin, only: hgInitialPressure
     use mHidrodinamicaGalerkin, only: hgNdof, hgNlvect, hgNeq, hgNltftn, hgNptslf
     use mHidrodinamicaGalerkin, only: hgF, hgG
@@ -743,23 +743,23 @@
     !------------------------------------------------------------------------------------------------------------------------------------
     keyword_name = "hgTimeConvertion"
     call readRealKeywordValue(keyword_name, hgTimeConvertion, 86400.0d0, ierr)
-    
+
     keyword_name = "hgTimeIsTable"
     call readIntegerKeywordValue(keyword_name, hgIsTable, 0, ierr)
-    
+
     if (hgIsTable == 0) then
         allocate(hgNSteps(1))
         allocate(hgDts(1))
-        
+
         hgNTimeSteps = 1
-        
+
         keyword_name = "numeroPassosTempoP"
         call readIntegerKeywordValue(keyword_name, hgNSteps(1), 0_4, ierr)
 
         keyword_name = "tempoTotal"
         call readRealKeywordValue(keyword_name, tempoTotal, 0.0d0, ierr)
         tempoTotal = tempoTotal * hgTimeConvertion ! converts days to seconds
-        
+
         hgDts(1) = tempoTotal / hgNSteps(1)
     else if (hgIsTable == 1) then
         keyword_name = "tabelaTempos"
@@ -788,55 +788,55 @@
 
     keyword_name = "valores_cond_contorno_fluxo"
     call leituraValoresCondContornoDS(keyword_name,hgF, hgNdof,nnp, 1, hgNlvect, iprtin, iecho)
-    
+
     keyword_name = "hgNltftn"
     call readIntegerKeywordValue(keyword_name, hgNltftn, 0_4, ierr)
-    
+
     if (hgNltftn.ne.0) then
         if (hgNltftn.ne.hgNlvect) then
             write (*,*) "HG: nltftn e nlvect tem que ser iguais."
             stop 225
         endif
-        
+
         keyword_name = "hgNptslf"
         call readIntegerKeywordValue(keyword_name, hgNptslf, 0_4, ierr)
-        
+
         keyword_name = "hgLoadTimeFunction"
         call leituraLoadTimeFunctions(keyword_name, hgG, hgNltftn, hgNptslf, hgTimeConvertion)
     endif
-    
+
 
     end subroutine initGalerkinPressure
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine initDPProperties()
     !function imports
-    
+
     !variables import
     use mMalha, only: nsd
     use mPropGeoFisica,    only: mcFriction, mcC, dpK, dpAlpha
-    
+
     implicit none
     !variables input
-    
+
     !variables
     integer :: i, lastRegion
     real*8, parameter :: piConst = 3.141592653589793
     real*8 :: constPlaneStrain
     real*8 :: phiRad
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     lastRegion = 3*nsd
     do i = 1,lastRegion
         phiRad = mcFriction(i) * piConst / 180
         ! plane strain condition (desai pag 245)
-        constPlaneStrain = 3.0d0 / sqrt(9 + 12*(tan(phiRad)**2))
-        
-        dpAlpha(i) = tan(phiRad) * constPlaneStrain
+        constPlaneStrain = 3.0d0 / dsqrt(9 + 12*(dtan(phiRad)**2))
+
+        dpAlpha(i) = dtan(phiRad) * constPlaneStrain
         dpK(i) = mcC(i) * constPlaneStrain
     end do
-    
-    
+
+
     end subroutine initDPProperties
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -849,31 +849,31 @@
     use mGeomecanica, only:hmTTG, initStress
     use mMalha, only: numnp, numel, nen, nsd, conecNodaisElem
     use mMalha, only: x
-    
+
     !mechanics
     use mGeomecanica, only: ndofD, nrowB, nintD
-    
+
     !prop
     use mPropGeoFisica, only: poroL
-    
+
     !function imports
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
     use mHidrodinamicaGalerkin, only: incrementFlowPressureSolutionOneWay, incrementFlowPressureSolutionTwoWay
     use mGeomecanica, only: incrementMechanicPlasticSolution, montarEstruturasDadosDeslocamentoSkyline
     use mGeomecanica, only: incrementMechanicElasticSolution
     use mPropGeoFisica, only: lerPropriedadesFisicas
-    
+
     !variables input
     implicit none
     integer :: way, isPlast, plastType
-    
+
     !variables
     integer :: curTimeStep
     real*8 :: t, deltaT
     character(30) :: filename
-    
+
     integer :: k, i
-    
+
     real*8, allocatable :: u(:,:), uInit(:,:), uDif(:,:), prevUDifIt(:,:), prevU(:,:)
     real*8, allocatable :: p(:,:), prevP(:,:), prevPIt(:,:), pInit(:,:)
     real*8, allocatable :: vDarcy(:,:), vDarcyNodal(:,:)
@@ -882,14 +882,15 @@
     real*8, allocatable :: trStrainP(:,:), prevTrStrainP(:,:)
     real*8, allocatable :: stressTotal(:,:,:)
     real*8, allocatable :: strainP(:,:,:), prevStrainP(:,:,:)
+    real*8, allocatable :: biotP(:,:,:)
     real*8,allocatable :: elementIsPlast(:)
-    
+
     real*8 :: uNorm, pNorm
     logical :: converged
-    
+
     integer :: outFileUnit
     integer :: currentTimeStepPrint
-    
+
     real*8, external :: matrixNorm, calcRelErrorMatrix
 
     !------------------------------------------------------------------------------------------------------------------------------------
@@ -914,25 +915,26 @@
     allocate(stressTotal(nrowb,nintD,numel))
     allocate(strainP(nrowb,nintD,numel))
     allocate(prevStrainP(nrowb,nintD,numel))
+    allocate(biotP(nrowb,nintD,numel))
     allocate(elementIsPlast(numel))
-    
+
     outFileUnit = 5513
-    
+
     !read physical properties
     call lerPropriedadesFisicas()
-    
+
     ! mount data structure
     call montarEstruturasDadosPressaoSkyline(conecNodaisElem, nen, numel)
     call montarEstruturasDadosDeslocamentoSkyline(conecNodaisElem, nen, numel)
-    
+
     !init pressure
     p = hgInitialPressure
     prevP = p
     pInit = hgInitialPressure
-    
+
     !init stress and strain
     t = 0
-    
+
     write(*,*) "Inicializa estado de tensão"
     u = 0.d0
     prevU = 0.d0
@@ -945,11 +947,11 @@
     elementIsPlast = 0.d0
     if (initStress == 1) then
         if (isPlast == 1) then
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0)
         else if (isPlast == 0) then
             call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
         end if
-    end if 
+    end if
     uInit = u
     uDif = 0.d0
     prevU = u
@@ -984,14 +986,14 @@
         if (way == 1) filename = "elastSolution1way"
         if (way==2) then
             filename = "elastSolution2way"
-            
+
             open(unit=outFileUnit, file="out/debugFiles/logElast.txt", status='replace')
             write (outFileUnit,*) filename
         end if
     end if
-    
+
     call writeCurrentSolution(filename,0, p, u, stress, stressTotal, stressS, trStrainP, out2waySource, vDarcy, vDarcyNodal, elementIsPlast, poroL, conecNodaisElem, numnp, numel, nen, nsd, nrowb, nintD)
-    
+
     !time loop
     currentTimeStepPrint = 1
 
@@ -1014,11 +1016,11 @@
                     pNorm = 1.0
                     uNorm = 1.0
                 else
-                    call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, out2waySource, plastType)
+                    call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, biotP, out2waySource, plastType)
                 end if
 
                 if (isPlast == 1) then
-                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, 0)
+                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0)
                 else if (isPlast == 0) then
                     call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
                 end if
@@ -1031,7 +1033,7 @@
                 if (k > 1) then
                     pNorm = calcRelErrorMatrix(prevPIt,p,hgNdof, numnp)
                     uNorm = calcRelErrorMatrix(prevUDifIt,uDif,ndofD, numnp)
-                    
+
                     write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
 
                     if (pNorm < 1.0d-6 .and. uNorm < 1.0d-6) then
@@ -1042,10 +1044,9 @@
 
                 prevPIt = p
                 prevUDifIt = uDif
-                
+
                 !if didn't converged, return to previous result so that plastic strains are correctly accounted for
                 u = prevU
-                strainP = prevStrainP
             end do
 
             if ((way == 2) .and.(converged.eqv..false.)) then
@@ -1064,13 +1065,13 @@
 
             if (way == 2) write (outFileUnit,*) "load stage = ", i,"curtimestep = ", currentTimeStepPrint,"k = ", k
             write(*,*) " "
-            
+
             currentTimeStepPrint = currentTimeStepPrint + 1
         end do
     end do
-    
+
     close(outFileUnit)
-    
+
     deallocate(u)
     deallocate(uInit)
     deallocate(uDif)
@@ -1091,14 +1092,15 @@
     deallocate(stressTotal)
     deallocate(strainP)
     deallocate(prevStrainP)
+    deallocate(biotP)
     deallocate(elementIsPlast)
-    
-    
+
+
     end subroutine processamento
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine processamentoOneWayPlast()
-    
+
     implicit none
     !------------------------------------------------------------------------------------------------------------------------------------
     call processamento(1, 1, 1)
@@ -1106,7 +1108,7 @@
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine processamentoTwoWayElast()
-    
+
     implicit none
     !------------------------------------------------------------------------------------------------------------------------------------
     call processamento(2, 0, 1)
@@ -1114,27 +1116,27 @@
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine processamentoTwoWayPlast(plastType)
-    
+
     implicit none
     integer :: plastType
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     call processamento(2, 1, plastType)
-    
+
     end subroutine processamentoTwoWayPlast
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine convertIntPointsValuetoPrintable(val, valPrint, npint, nel)
-    
+
     implicit none
     !variables input
     real*8 :: val(npint,nel)
     real*8 :: valPrint(nel)
     integer :: npint, nel
-    
+
     !variables
     integer :: i,j
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     do j = 1, nel
         valPrint(j) = 0.
@@ -1143,7 +1145,7 @@
         end do
         valPrint(j) = valPrint(j)/npInt
     end do
-    
+
     end subroutine convertIntPointsValuetoPrintable
     !************************************************************************************************************************************
     !************************************************************************************************************************************
@@ -1153,10 +1155,10 @@
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoEscalar
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoVetorial
     use mLeituraEscritaSimHidroGeoMec, only:escreverArqParaviewIntermed_CampoTensorialElemento
-    
+
     !variables import
     use mLeituraEscritaSimHidroGeoMec, only:reservHGPres
-    
+
     implicit none
     !variables input
     character(len=*) :: filename
@@ -1167,20 +1169,20 @@
     real*8 :: poroL(nel)
     integer :: conecNodaisElem(nen,nel)
     integer :: nnp, nel, nen, nsd, nrowb, nintD
-    
+
     !real*8 :: curT
-    
+
     !variables
     integer :: unitNumber
     real*8, allocatable :: valPrint(:)
     !real*8, allocatable :: solResultMandel(:,:)
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     unitNumber = 13587
-    
+
     allocate(valPrint(nel))
     !allocate(solResultMandel(1,nnp))
-    
+
     call escreverArqParaviewOpening(filename, p, 1, nnp, nen, conecNodaisElem, 2, 'p', len('p'), reservHGPres, curTimeStep, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(u, nsd, nnp, 'u', len('u'), 2, unitNumber)
     call escreverArqParaviewIntermed_CampoVetorial(vDarcy, nsd, nel, 'vDarcy', len('vDarcy'), 1, unitNumber)
@@ -1195,41 +1197,41 @@
     call escreverarqparaviewintermed_campoescalar(unitnumber, valPrint, 1, nel, 'poroP', len('poroP'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, elementIsPlast, 1, nel, 'elementIsPlast', len('elementIsPlast'), 1)
     call escreverarqparaviewintermed_campoescalar(unitnumber, poroL, 1, nel, 'poroL', len('poroL'), 1)
-    
+
     !call calcAnalyticalMandel(curT, 1.0d8, 0.2d0, 5.0d5, 100.0d0, nnp, solResultMandel)
     !if (curTimeStep == 0) then
     !    solResultMandel = 0
     !end if
     !call escreverarqparaviewintermed_campoescalar(unitnumber, solResultMandel, 1, nnp, 'solMandel', len('solMandel'), 2)
-    
+
     close(unitNumber)
-    
+
     deallocate(valPrint)
     !deallocate(solResultMandel)
-    
+
     end subroutine writeCurrentSolution
     !************************************************************************************
     !************************************************************************************
     subroutine calcAnalyticalMandel(t, young, nu, p0, a, nnp, solResult)
     !function imports
-    
+
     !variables import
     use mMalha, only: x
-    
+
     implicit none
     !variables input
     real*8 :: t, young, nu, p0, a
-    integer :: nnp    
+    integer :: nnp
     real*8 :: solResult(1,nnp)
-    
+
     !variables
     integer :: i, curNode
     real*8 :: lm, mu, c
     real*8 :: ai(31)
     real*8 :: lRes
-    
+
     real*8 :: nodeX
-    
+
     !------------------------------------------------------------------------------------------------------------------------------------
     ai(1) = 1.287342153890056
     ai(2) = 4.631599661823944
@@ -1262,22 +1264,22 @@
     ai(29) = 89.53120216788918
     ai(30) = 92.67293681419403
     ai(31) = 95.81466214846812
-    
+
     lm = nu*young/((1+nu)*(1-2*nu))
     mu = young/2/(1+nu)
     c = 1.D-13/1.D-3*(lm+2*mu)
-    
+
     do curNode = 1, nnp
         lRes = 0
         nodeX = x(1,curNode)
-        
+
         do i = 1, 31
             lRes = lres + p0*(lm+2*mu)*cos(ai(i))/(mu-(lm+2*mu)*(cos(ai(i)))**2)*(cos(ai(i)*nodeX/a)-cos(ai(i)))*exp(-(ai(i)**2)*c*t/(a**2));
         end do
         solResult(1,curNode) = lRes
     end do
-    
-    
+
+
     end subroutine calcAnalyticalMandel
     !************************************************************************************************************************************
     !************************************************************************************************************************************

@@ -77,7 +77,7 @@
     end subroutine montarEstruturasDadosPressaoSkyline
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
+    subroutine montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, biotP, out2waySource, way, plastType)
 
     !variable input
     integer ::conecNodaisElem(nen,nel), nen, nel, nnp, nsd
@@ -85,6 +85,7 @@
     real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
     real*8 :: stressS(:, :), prevStressS(:, :), trStrainP(:,:), prevTrStrainP(:,:)
     real*8 :: tangentMatrix(:,:,:)
+    real*8 :: biotP(:,:,:)
     real*8 :: out2waySource(:,:)
     integer :: way, plastType
     
@@ -106,12 +107,12 @@
         call ftod(hgId, p, hgF, g1, hgNdof, nnp, hgNlvect)
     endif
 
-    call calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
+    call calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, biotP, out2waySource, way, plastType)
 
     end subroutine montarSistemaEquacoesPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
+    subroutine calcCoeficientesSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, biotP, out2waySource, way, plastType)
     !variable imports
     use mGlobaisEscalares, only: nrowsh, npint
 
@@ -133,6 +134,7 @@
     real*8 :: out2waySource(npint, nel)
     real*8 :: trStrainP(npint, nel), prevTrStrainP(npint, nel)
     real*8 :: tangentMatrix(16,npint,nel)
+    real*8 :: biotP(4,npint,nel)
     integer :: way, plastType
 
     !variables
@@ -159,6 +161,8 @@
     real*8 :: psi
     real*8, allocatable :: curPerm(:)
     integer :: tensDim
+
+    real*8, external :: traceTensor
 
     !------------------------------------------------------------------------------------------------------------------------------------
     if (nsd > 2) then
@@ -224,7 +228,7 @@
             else if (plastType == 3) then
                 matrixBulkEP = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
 
-                betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1/3.d0*biotCoeff*3.d0/matrixBulkEP - biotCoeff/matrixBulk
+                betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1/3.d0*traceTensor(biotP(1:4,l,curElement),4)/matrixBulkEP - biotCoeff/matrixBulk
                 psi = calcBiotCoefficient(curElement)/matrixBulk + 1.d0/matrixBulkEP - 1.d0/matrixBulk
             end if
 
@@ -297,7 +301,7 @@
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, way, plastType)
+    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, way, plastType)
     implicit none
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
@@ -308,11 +312,12 @@
     real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     real*8 :: out2waySource(:,:)
     real*8 :: tangentMatrix(:,:,:)
+    real*8 :: biotP(:,:,:)
     integer :: way, plastType
     
     !------------------------------------------------------------------------------------------------------------------------------------
     ! mount equation system
-    call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, out2waySource, way, plastType)
+    call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, biotP, out2waySource, way, plastType)
     
     !solve
     call solveGalerkinPressao(nnp, p)
@@ -335,14 +340,15 @@
     real*8 :: trStrainP(1,1), prevTrStrainP(1,1)
     real*8 :: out2waySource(1,1)
     real*8 :: tangentMatrix(1,1,1)
+    real*8 :: biotP(1,1,1)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, 1, 1)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, 1, 1)
     
     end subroutine incrementFlowPressureSolutionOneWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, plastType)
+    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, plastType)
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), curT, deltaT
@@ -352,10 +358,11 @@
     real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     real*8 :: out2waySource(:,:)
     real*8 :: tangentMatrix(:,:,:)
+    real*8 :: biotP(:,:,:)
     integer :: plastType
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, out2waySource, 2, plastType)
+    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, 2, plastType)
     
     end subroutine incrementFlowPressureSolutionTwoWay
     !************************************************************************************************************************************

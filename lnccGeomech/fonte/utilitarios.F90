@@ -887,7 +887,7 @@
         end do
     end do
     
-    matrixNorm = sqrt(matrixNorm)
+    matrixNorm = dsqrt(matrixNorm)
     
     end function matrixNorm
     !************************************************************************************************************************************
@@ -928,7 +928,7 @@
         	calcRelErrorMatrix = calcRelErrorMatrix + temp*temp
         end do
     end do
-    calcRelErrorMatrix = sqrt(calcRelErrorMatrix)/count
+    calcRelErrorMatrix = dsqrt(calcRelErrorMatrix)/count
     
     end function calcRelErrorMatrix
     !************************************************************************************************************************************

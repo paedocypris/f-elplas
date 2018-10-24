@@ -1,4 +1,4 @@
-    !     *******************************************************************
+    !     *********************
     !     *                                                                 *
     !     *            * * *    G E O M E C H A N I C      * * *            *
     !     *                                                                 *
@@ -20,7 +20,7 @@
     !     *                                                                 *
     !     *                      MODIFY ON 30/11/2015                       *
     !     *                                                                 *
-    !**** new module ********************************************************
+    !**** new module **********
     !
     module mGeomecanica
     !
@@ -71,7 +71,7 @@
     !
     contains
     !
-    !**** new ********************************************************************
+    !**** new **********************
     !
     subroutine bbarmtrx_plast(x, conecnodaiselem, disDirichlet, alhsd, brhsd, idiagd, lmd, tangentMatrix, pressure)
     !
@@ -240,7 +240,7 @@
     !
     end subroutine bbarmtrx_plast
     !
-    !**** new *******************************************************************
+    !**** new *********************
     !
     subroutine BBARMTRX_ELAST(x, conecNodaisElem, disDirichlet, alhsd, brhsd, idiagD, lmD, pressure, isUndrained)
     !
@@ -537,8 +537,8 @@
 2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE SETCBBM1(CBBARM1,YOUNG,POISSON,NROWB)
     !
     !.... PROGRAM TO SETUP INVERSE OF ELASTICITY TENSOR
@@ -596,8 +596,8 @@
 2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE SETCBBM1
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     !
     !**** FROM  HUGHES: THE FINITE ELEMENT METHOD ** PAG 760 ***************
     !
@@ -744,7 +744,7 @@
     !
     END SUBROUTINE
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     SUBROUTINE KDBCGEO(ELEFFM,ELRESF,DL,NEE,LM)
     !
@@ -778,9 +778,9 @@
     RETURN
     !
     END SUBROUTINE
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    subroutine pos4plast(x, conecNodaisElem, u, plasticStrain, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, elementIsPlast, pressure, pInit, isUndrained)
+    !**************************************************************************************
+    !**************************************************************************************
+    subroutine pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, biotP, elementIsPlast, pressure, pInit, isUndrained)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
@@ -801,12 +801,14 @@
     real(8), intent(in)    :: x(nsd,numnp)
     integer, intent(in)    :: conecnodaiselem(nen,numel)
     real*8 :: u(ndofD, numnp)
-    real*8 :: plasticStrain(nrowb, nintD, numel)
+    real*8 :: strainP(nrowb, nintD, numel)
+    real*8 :: prevStrainP(nrowb, nintD,numel)
     real*8 :: curStress(nrowB, nintD, numel)
     real*8 :: curStressTotal(nrowB, nintD, numel)
     real*8 :: curStressS(nintD, numel)
     real*8 :: curTrStrainP(nintD, numel)
     real*8 :: tangentMatrix(nrowb2,nintD, numel)
+    real*8 :: biotP(nrowb,nintD,numel)
     real*8 :: elementIsPlast(numel)
     real*8 :: pressure(1,numnp)
     real*8 :: pInit(1,numnp)
@@ -840,7 +842,7 @@
     logical :: converged
     real*8 :: identI(nrowb)
     real*8 :: Cep(nrowb,nrowb), NVect(nrowb,1), NxN(nrowb,nrowb)
-    real*8 :: qixiGradf(nrowb), denN, tempResult(1,1)
+    real*8 :: qixiGradf(nrowb), gradfQixiGradf, gradfIdentI, denN, tempResult(1,1)
     
     real*8 :: c1
     real*8 :: area
@@ -866,9 +868,9 @@
     !
     !.... generation of local shape functions and weight values
     !
-    !------------------------------------------------------------------------
+    !--------------------------
     qixigrad = 0.0d0
-    identI = (/ 1., 1., 0., 1. /)
+    identI = (/ 1.d0, 1.d0, 0.d0, 1.d0 /)
     !      qixip    = 0.0d0
     !
     call shlq(shld,wd,nintd,nen)
@@ -881,7 +883,7 @@
         else if (isUndrained == 0) then
             call calcMatrixProperties(poisson, young, nel)
         end if
-        
+            
         dpK = geoIndic('DPCOHES',geoform(nel))
         dpAlpha = geoIndic('DPALPHA',geoform(nel))
         
@@ -948,8 +950,8 @@
             !material iteration
             !initialize plastic strains
             do k=1,nrowb
-                ePTrial(k) = plasticStrain(k,l,nel)
-                ePInit(k)  = plasticStrain(k,l,nel)
+                ePTrial(k) = prevStrainP(k,l,nel)
+                ePInit(k)  = prevStrainP(k,l,nel)
             end do
             
             call tang2qx(tangentMatrix(1:16,l,nel),qixi)
@@ -989,7 +991,7 @@
                     stressLEff = matmul(cbbar, elasticStrain)
                     
                     !.... ... compute the yield function, its gradient and hessian (drucker-prager):
-                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha)
+                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, .false.)
                     
                     !.... ... residual computation
                     do k=1,nrowb
@@ -999,9 +1001,6 @@
                     !.... ... compute norm of residuo
                     hNorma = dsqrt(dot_product(residuo,residuo))
                     
-                    !... compute inverse definition of QIXI (simo pag.175. equation 4.3.15)
-                    call calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
-                    
                     !.... part 2b de box 4.1 simo-hughes: convergence test:
                     !.... ... convergence test
                     if ((fYield.lt.tolYield).and.(hNormA.lt.tolePlas)) then
@@ -1010,36 +1009,43 @@
                         
                         qixiGradf = matmul(qixi, fyield1)
                         call matMulmTn(fyield1, qixiGradf, tempResult, nrowb, 1, nrowb, 1, 1, 1)
-                        denN = dsqrt(tempResult(1,1))
+                        gradfQixiGradf = tempResult(1,1)
+                        denN = dsqrt(gradfQixiGradf)
                         NVect(1:nrowb,1) = qixiGradf / denN
             
                         NxN = matmul(NVect,transpose(NVect))
-                        
-                        if (NVect(1,1)*NVect(1,1) + NVect(2,1)*NVect(2,1) + NVect(3,1)*NVect(3,1) + NVect(4,1)*NVect(4,1) < 1.0d-20) then
-                            write(*,*) 'autovalue too small...'
-                            exit
-                        end if
+                        gradfIdentI = dot_product(fYield1, identI)
                         
                         Cep = qixi - NxN
-                        
+                        !calc alphaP
+                        biotP(1:nrowb,l,nel) = biotCoef*identI(1:nrowb) + (1-biotCoef) * gradfIdentI / gradfQixiGradf * qixiGradf(1:nrowb)
+
                         exit
                     end if
+
+                    !... compute inverse definition of QIXI (simo pag.175. equation 4.3.15)
+                    call calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
                     
                     !.... ... update trial plastic deformation, gamma and qixigrad values
                     call trials(eptrial,hgamma,qixigrad,qixi, residuo, fYield1, fyield,cbbarm1,nrowb)
                 end do
                 
-                if (converged.eqv..false.) write(*,*) 'Plastic newton iteration not converged'
+                if (converged .eqv. .false.) then
+                    write(*,*) 'Plastic newton iteration not converged'
+                    exit
+                end if
             else
                 Cep = cbbar
+                biotP(1:nrowb,l,nel) = biotCoef*identI(1:nrowb)
             end if
             
             do k=1,nrowb
-                plasticStrain(k,l,nel) = eptrial(k)
+                strainP(k,l,nel) = eptrial(k)
                 curStress(k,l,nel) = stressLEff(k)
                 curStressTotal(k,l,nel) = stressLEff(k) - biotCoef*pressureIntPoint*IdentI(k)
             end do
-            intTrStrainP = traceTensor(plasticStrain(:,l,nel),nrowb)
+
+            intTrStrainP = traceTensor(strainP(:,l,nel),nrowb)
             
             curStressS(l,nel) = traceTensor(curStressTotal(:,l,nel),nrowb)/3.0d0
             curTrStrainP(l,nel) = intTrStrainP
@@ -1071,16 +1077,16 @@
     return
     
     end subroutine pos4plast
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
 
 
     !
     !**** NEW **** FOR STOCHASTIC AND NON-LINEAR FORMULATION *****************
     !
-    subroutine geosetup(numel,nrowb,nintd,iopt,isUndrained)
+    subroutine geosetup(numel,nrowb,nintd,iopt,isUndrained, biotP)
     ! function import
-    use mPropGeofisica, only: calcMatrixUndrainedProperties, calcMatrixProperties
+    use mPropGeofisica, only: calcMatrixUndrainedProperties, calcMatrixProperties, calcBiotCoefficient
     
     ! variable import
     
@@ -1091,13 +1097,18 @@
     !variables input
     integer :: numel,nrowb,nintd,iopt
     integer :: isUndrained
+    real*8 :: biotP(nrowb,nintD,numel)
     
     !variables
     real(8) :: cbbar(nrowb, nrowb)
     real(8) :: young
     real(8) :: poisson
+    real*8 :: biotCoef
     integer :: nel, l
+    real*8 :: identI(nrowb)
     !
+    identI = (/ 1.d0, 1.d0, 0.d0, 1.d0 /)
+
     DO NEL=1,NUMEL
         if (isUndrained == 1) then
             call calcMatrixUndrainedProperties(poisson, young, nel)
@@ -1109,11 +1120,16 @@
         !.... SETUP STOCHASTIC ELASTICITY TENSOR FOR BBAR METHOD
         !
         call setupc(cbbar,young,poisson,nrowb,iopt)
+        biotCoef = calcBiotCoefficient(nel)
         !
         !.... SETUP INITIAL TANGENT MATRIX AT ELEMENT GAUSS POINT
         !
         do l=1,nintd
+            ! set D
             call qx2tang(cbbar,hmTTG(1:16,l,nel))
+
+            ! set alphaP
+            biotP(1:nrowb,l,nel) = biotCoef * identI
         end do
     end do
     !
@@ -1121,7 +1137,7 @@
     !
     END SUBROUTINE
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     FUNCTION POWERLAW(X,NDERHO)
     !
@@ -1154,7 +1170,7 @@
     !
     END FUNCTION
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     FUNCTION FNOTLIN(QTRIAL,THREEG,NDERHO,XINPUT)
     !
@@ -1184,7 +1200,7 @@
     !
     END FUNCTION
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     FUNCTION DEVNORM2(X,NROWB)
     !
@@ -1203,7 +1219,7 @@
     !
     END FUNCTION
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     SUBROUTINE COMPTRACE(P,STRS,SIGMAT,NROWB,NUMEL,numelReserv)
     !
@@ -1711,7 +1727,7 @@
     !
     END SUBROUTINE
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     SUBROUTINE PRSRINIT(GEOPRSR,P,NUMEL,numelReserv,LDRAINED)
     !
@@ -1791,7 +1807,7 @@
     !
     END SUBROUTINE
     !
-    !**** NEW ****************************************************************
+    !**** NEW ******************
     !
     SUBROUTINE PRSRINIT3D(GEOPRSR,P, NUMEL,numelReserv,LDRAINED)
     !
@@ -1973,7 +1989,7 @@
     !
     END FUNCTION
     !
-    !**** NEW ***************************************************************
+    !**** NEW *****************
     !
     SUBROUTINE POS4_MASSCNT(DIVU,DIVU0, P, P0, &
         &         PORE,PORE0,YOUNG,MASCN,MASCN0,PHIEULER,NUMEL,NUMELRESERV)
@@ -2218,8 +2234,8 @@
 4000 FORMAT(2X,40(1PE15.8,2X))
     !
     END SUBROUTINE POS4STRS
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     subroutine pos4inc(x, conecNodaisElem, u, stress, stressS, stressTotal, p, pInit, isUndrained)
     !
     !.... Program to compute the strain, stress and internal force given an incremental displacement
@@ -2270,7 +2286,7 @@
     
     real*8, external :: traceTensor
     !
-    !-------------------------------------------------------------------------------------------------------------------
+    !---------------------------------------------------------------------
     identI = (/ 1., 1., 0., 1. /)
     
     !clean stress, strain and initial force
@@ -2376,8 +2392,8 @@
     end do
     
     end subroutine pos4inc
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     
     SUBROUTINE UPDTSTRS(STRSS,STRSINIT,NROWB,NUMEL)
     !
@@ -2430,8 +2446,8 @@
     !return
     !
     end subroutine yield
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE GRADS(GRAD,QIXI,TENSAO,HGAMMA,CBBARM1,POISSON,nrowb)
     !
     !.... PROGRAM TO CALCULATE YIELD'S GRADIENT: GRAD,
@@ -2479,8 +2495,8 @@
         &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
     !
     END SUBROUTINE GRADS
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, k, alpha)
     !function imports
     
@@ -2493,26 +2509,14 @@
     real*8 :: k, alpha
     
     !variables
-    real*8 :: plasticStress(nrowb)
-    real*8 :: devStress(nrowb), traceD3
-    real*8 :: I1, J2
+    real*8 :: dummyFYield1(nrowb), dummyFYield2(nrowb,nrowb)
     
-    !------------------------------------------------------------------------------------------------------------------------------------    
-    ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
-    plasticStress = calcDPPlasticStress(efStress, p, biotCoef)
-    
-    !calculates the deviator of the stress tensor
-    call devTensor(devStress,traceD3,plasticStress,nrowb)
-    
-    !calculates auxiliary values for the f function
-    I1 = calcInvariantI1(plasticStress)
-    J2 = calcDevInvariantJ2(devStress)
-    
-    fYield = dpYield(I1, J2, k, alpha)
+    !------------------------------------------------------------------------------------------------------------------------------------
+    call dpGrads(fYield, dummyFYield1, dummyFYield2, efStress, p, biotCoef, k, alpha, .true.)
     
     end subroutine dpYieldEfStress
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     function dpYield(I1, J2, k, alpha)
     !function imports
     
@@ -2524,12 +2528,12 @@
     
     !variables
     
-    !------------------------------------------------------------------------------------------------------------------------------------
-    dpYield = sqrt(J2) + alpha * I1/3.d0 - k
+    !--------------------------------------------------------------------------------------
+    dpYield = dsqrt(J2) + alpha * I1/3.d0 - k
     
     end function dpYield
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     function dpYield1(devStress, J2, alpha)
     !function imports
     
@@ -2542,15 +2546,15 @@
     !variables
     real*8 :: dpYield1(nrowb)
     
-    !---------------------------------------------------------------------------------------
+    !-----------------------------------------
     dpYield1(1) = devStress(1)/2.d0/dsqrt(J2) + alpha/3.d0
     dpYield1(2) = devStress(2)/2.d0/dsqrt(J2) + alpha/3.d0
     dpYield1(3) = devStress(3)/dsqrt(J2)
     dpYield1(4) = devStress(4)/2.d0/dsqrt(J2) + alpha/3.d0
     
     end function dpYield1
-    !***************************************************************************************
-    !***************************************************************************************
+    !*****************************************
+    !*****************************************
     function dpYield2(plasticStress,I1,J2)
     !function imports
     
@@ -2563,7 +2567,7 @@
     !variables
     real*8 dpYield2(nrowb,nrowb)
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     dpYield2(1,1) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(1)*plasticStress(4)-I1*plasticStress(4)+3*plasticStress(1)*plasticStress(2)-I1*plasticStress(2)-6*plasticStress(1)**2+2*I1*plasticStress(1)+12*J2))/3.6d+1
     dpYield2(1,2) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(1)*plasticStress(4)-I1*plasticStress(4)-6*plasticStress(1)*plasticStress(2)+2*I1*plasticStress(2)+3*plasticStress(1)**2-I1*plasticStress(1)-6*J2))/3.6d+1
     dpYield2(1,3) = -(J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(1)-I1)*plasticStress(3))/6.0d+0
@@ -2585,9 +2589,9 @@
     dpYield2(4,4) = (J2**((-3.0d+0)/2.0d+0)*(3*plasticStress(2)*plasticStress(4)+3*plasticStress(1)*plasticStress(4)-2*I1*plasticStress(4)+6*plasticStress(2)**2-5*I1*plasticStress(2)+12*plasticStress(3)**2+6*plasticStress(1)**2-5*I1*plasticStress(1)+2*I1**2))/3.6d+1
 
     end function dpYield2
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, h, alpha)
+    !**************************************************************************************
+    !**************************************************************************************
+    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, k, alpha, onlyF)
     !function imports
     
     !variables import
@@ -2595,13 +2599,14 @@
     implicit none
     !variables input
     real*8 :: fYield, fYield1(nrowb), fYield2(nrowb,nrowb)
-    real*8 :: efStress(nrowb), p, biotCoef, h, alpha
+    real*8 :: efStress(nrowb), p, biotCoef, k, alpha
+    logical :: onlyF
     
     !variables
     real*8 :: plasticStress(nrowb), devStress(nrowb), traceD3
     real*8 :: I1, J2
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
     plasticStress = calcDPPlasticStress(efStress, p, biotCoef)
     
@@ -2611,14 +2616,17 @@
     !calculates auxiliary values for the f function
     I1 = calcInvariantI1(plasticStress)
     J2 = calcDevInvariantJ2(devStress)
+
+    if (dabs(J2) < 1d-38) J2 = 1d-38
     
-    fYield = dpYield(I1, J2, h, alpha)
+    fYield = dpYield(I1, J2, k, alpha)
+    if (onlyF) return
     fYield1 = dpYield1(devStress, J2, alpha)
     fYield2 = dpYield2(plasticStress, I1, J2)
     
     end subroutine dpGrads
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     subroutine calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
     !function imports
     
@@ -2632,7 +2640,7 @@
     real*8 :: hInvQIxi(nrowb,nrowb)
     integer :: i,j
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     do j=1,nrowb
         do i=1,nrowb
             hInvQIxi(I,J) = cbbarm1(i,j) + hgamma*fYield2(i,j)
@@ -2641,8 +2649,8 @@
     call compQixi(qixi,hInvQIxi,nrowb)
     
     end subroutine calcQixiM1
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE SGTAGRAD(GRAD,GRAD2,TENSAO,POISSON,NROWB)
     !
     !..... PROGRAM TO COMPUTE GRADIENT (grad) AND HESSIAN (grad2)
@@ -2713,8 +2721,8 @@
     RETURN
     !
     END SUBROUTINE SGTAGRAD
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE BASGRAD(BNABLA,BHESSI,TENSAO,NROWB)
     !
     !..... PROGRAM TO COMPUTE GRADIENT (BNABLA) AND HESSIAN (BHESSI)
@@ -2776,8 +2784,8 @@
     RETURN
     !
     END SUBROUTINE BASGRAD
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE FMCGRAD(FNABLA,FHESSI,TENSAO,POISSON,NROWB)
     !
     !..... PROGRAM TO COMPUTE GRADIENT (FNABLA) AND HESSIAN (FHESSI)
@@ -2819,8 +2827,8 @@
     RETURN
     !
     END SUBROUTINE FMCGRAD
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE COMPQIXI(QIXI,HINVQIXI,NROWB)
     !
     !.... PROGRAM TO COMPUTE INVERSE OF HINVQIXI MATRIX
@@ -2885,8 +2893,8 @@
 2000 FORMAT(A15,4(1PE10.2,2X))
     !
     END SUBROUTINE COMPQIXI
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE TRIALS(EPTRIAL,HGAMMA,QIXIGRAD,QIXI,RESIDUO, GRAD,FYIELD,CBBARM1,NROWB)
     !
     use mMalha,            only: multab
@@ -2956,18 +2964,12 @@
     DO 100 I=1,NROWB
         EPTRIAL(I) = EPTRIAL(I) + DPLAS(I)
 100 CONTINUE
-    !
-    !.... COMPUTE QIXIGRAD (SIMO PAG.175, EQUATION 4.3.19)
-    !
-    DO 120 I=1,NROWB
-        QIXIGRAD(I) = QIXIGRAD(I)*DSQRT(DENOMIN)
-120 CONTINUE
 
     RETURN
     !
     END SUBROUTINE TRIALS
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     SUBROUTINE STRSS4PLAST(x, conecNodaisElem)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR CREEP MODEL
@@ -3111,8 +3113,8 @@
 5000 FORMAT(I4,2X,I1,2X,40(1PE15.8,2X))
     !
     END SUBROUTINE STRSS4PLAST
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     subroutine incrementMechanicElasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, stress, stressS, stressTotal, p, pInit, isUndrained)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
@@ -3143,7 +3145,7 @@
     real*8 :: tolNewton
     logical :: converged
 
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
 
     ! allocate the required matrices
     if(.not.allocated(fExtT)) allocate(fExtT(ndofD, nnp))
@@ -3221,9 +3223,9 @@
     deallocate(dDis)
 
     end subroutine incrementMechanicElasticSolution
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, epsP, stress, stressS, trStrainP, stressTotal, p, pInit, elementIsPlast, isUndrained)
+    !**************************************************************************************
+    !**************************************************************************************
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, isUndrained)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -3231,9 +3233,10 @@
     implicit none
     !variables input
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
-    real*8 :: x(nsd, nnp), curT, u(ndofD,nnp), epsP(nrowb, nintD, nel)
+    real*8 :: x(nsd, nnp), curT, u(ndofD,nnp), strainP(nrowb, nintD, nel), prevStrainP(nrowb,nintD,nel)
     real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), trStrainP(nintD,nel), stressTotal(nrowB, nintD,nel)
     real*8 :: p(1,nnp), pInit(1,nnp)
+    real*8 :: biotP(:,:,:)
     real*8 :: elementIsPlast(nel)
     integer :: isUndrained
 
@@ -3253,7 +3256,7 @@
     real*8 :: tolNewton
     logical :: converged
 
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     
 
     ! allocate the required matrices
@@ -3270,13 +3273,13 @@
     tolNewton = 1.0e-6
 
     write(*,*) "Incremento plastico"
-    call geoSetup(nel,nrowb,nintd,iopt, isUndrained)
+    call geoSetup(nel,nrowb,nintd,iopt, isUndrained, biotP)
 
     !compute the new external force vector, and split into two, a dirichlet and a neumann one
     call splitBoundaryCondition(idDesloc,gmF,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
     
     !Init stress tensor and other variables
-    call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, trStrainP, stressTotal, hmTTG, elementIsPlast, p, pInit, isUndrained)
+    call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained)
 
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3319,7 +3322,7 @@
         u = u + dDis
 
         !updates the plastic strain, and the stress at each gauss point
-        call pos4plast(x, conecNodaisElem, u, epsP, stress, stressS, trStrainP, stressTotal, hmTTG, elementIsPlast, p, pInit, isUndrained)
+        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained)
 
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3333,8 +3336,8 @@
 1400 format ("u(", I2,",",I2,")")
 
     end subroutine incrementMechanicPlasticSolution
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     subroutine calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
     !function import
     use mFuncoesDeForma, only: shgq, shlq
@@ -3365,7 +3368,7 @@
     integer :: curElement, l, i, j
     integer :: gnn
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     if (.not.allocated(fIntLoc)) allocate(fIntLoc(ndofD, nen))
     if (.not.allocated(tempVect)) allocate(tempVect(ndofD, nen))
     fIntJ = 0.d0
@@ -3416,8 +3419,8 @@
     end do
     
     end subroutine calcInternalForce
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     subroutine montarEstruturasDadosDeslocamentoSkyline(conecNodaisElem, nen, nel)
     !function imports
     use mMalha, only:formlm
@@ -3425,7 +3428,7 @@
     ! variable input
     integer :: nen, nel, conecNodaisElem(nen, nel)
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     !generation of lm array
     call formlm(idDesloc,conecNodaisElem,lmD,ndofD,ned2,nen,nel)
     
@@ -3443,8 +3446,8 @@
     brhsD = 0.d0
     
     end subroutine montarEstruturasDadosDeslocamentoSkyline
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     function calcTotalStress(efStress, p, biotCoef)
     !function imports
     
@@ -3460,7 +3463,7 @@
     real*8 :: identI(nrowb)
     integer :: k
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     identI = (/ 1., 1., 0., 1. /)
     
     do k = 1, nrowb
@@ -3468,8 +3471,8 @@
     end do
     
     end function calcTotalStress
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     function calcDPPlasticStress(efStress, p, biotCoef)
     !function imports
     
@@ -3485,7 +3488,7 @@
     real*8 :: identI(nrowb)
     integer :: k
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     identI = (/ 1., 1., 0., 1. /)
     
     ! terzagui, i.e., plastic incompressibility.
@@ -3495,8 +3498,8 @@
     end do
     
     end function calcDPPlasticStress
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     function calcInvariantI1(stress)
     !function imports
     
@@ -3509,12 +3512,12 @@
     !variables
     real*8 :: calcInvariantI1
     
-    !------------------------------------------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------
     calcInvariantI1 = stress(1) + stress(2) + stress(4)
     
     end function calcInvariantI1
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     function calcDevInvariantJ2(devStress)
     !function imports
     
@@ -3527,11 +3530,10 @@
     !variables
     real*8 :: calcDevInvariantJ2
     
-    !------------------------------------------------------------------------------------------------------------------------------------
-    calcDevInvariantJ2 = (devStress(1)*devStress(1)+devStress(2)*devStress(2) &
-                        & + devStress(4)*devStress(4) + 2.0D0*devStress(3)*devStress(3)) / 2
+    !--------------------------------------------------------------------------------------
+    calcDevInvariantJ2 = (devStress(1)*devStress(1)+devStress(2)*devStress(2) + devStress(4)*devStress(4) + 2.0D0*devStress(3)*devStress(3)) / 2.d0
     
     end function calcDevInvariantJ2
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
+    !**************************************************************************************
+    !**************************************************************************************
     end module mGeomecanica
