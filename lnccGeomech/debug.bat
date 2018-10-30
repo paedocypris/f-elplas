@@ -5,6 +5,8 @@ if not defined vsOn (
    set vsOn=true
 )
 
-cd %cwd%
+pushd "lnccGeomech\data\BiotSix"
 
 devenv /debugexe "..\..\bin\lnccGeomech.exe"
+
+popd

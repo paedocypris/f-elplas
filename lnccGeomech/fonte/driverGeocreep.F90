@@ -39,10 +39,11 @@
 
     !processa o escoamento
     !call processamentoOneWayPlast()
-    call processamentoTwoWayElast()
-    !call processamentoTwoWayPlast(1) !silva
+    !call processamentoTwoWayElast()
+    call processamentoTwoWayPlast(1) !silva
     !call processamentoTwoWayPlast(2) !kim
-    !call processamentoTwoWayPlast(3) !erick
+    call processamentoTwoWayPlast(3) !erick
+    call processamentoTwoWayPlast(4) !fss
 
     !
     call fecharArquivosBase()
@@ -883,7 +884,8 @@
     real*8, allocatable :: stressTotal(:,:,:)
     real*8, allocatable :: strainP(:,:,:), prevStrainP(:,:,:)
     real*8, allocatable :: biotP(:,:,:)
-    real*8,allocatable :: elementIsPlast(:)
+    real*8, allocatable :: prevBiotP(:,:,:), prevTangentMatrix(:,:,:)
+    real*8, allocatable :: elementIsPlast(:)
 
     real*8 :: uNorm, pNorm
     logical :: converged
@@ -917,6 +919,8 @@
     allocate(prevStrainP(nrowb,nintD,numel))
     allocate(biotP(nrowb,nintD,numel))
     allocate(elementIsPlast(numel))
+    allocate(prevTangentMatrix(16,nintD,numel))
+    allocate(prevBiotP(nrowb,nintD,numel))
 
     outFileUnit = 5513
 
@@ -980,6 +984,11 @@
 
                 open(unit=outFileUnit, file="out/debugFiles/logErick.txt", status='replace')
                 write (outFileUnit,*) filename
+            else if (plastType == 4) then
+                filename = "plastSolution2wayFSS"
+
+                open(unit=outFileUnit, file="out/debugFiles/logFSS.txt", status='replace')
+                write (outFileUnit,*) filename
             end if
         end if
     else if (isPlast == 0) then
@@ -1006,7 +1015,10 @@
 
             prevStressS = stressS
             prevTrStrainP = trStrainP
-
+            if (plastType == 4) then
+                prevTangentMatrix = hmTTG
+                prevBiotP = biotP
+            end if
             ! begin split loop
             converged = .false.
             elementIsPlast = 0.d0
@@ -1016,6 +1028,11 @@
                     pNorm = 1.0
                     uNorm = 1.0
                 else
+                    if (plastType == 4) then
+                        hmTTG = prevTangentMatrix
+                        biotP = prevBiotP
+                    end if
+
                     call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, biotP, out2waySource, plastType)
                 end if
 
@@ -1034,13 +1051,13 @@
                     pNorm = calcRelErrorMatrix(prevPIt,p,hgNdof, numnp)
                     uNorm = calcRelErrorMatrix(prevUDifIt,uDif,ndofD, numnp)
 
-                    write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
-
                     if (pNorm < 1.0d-6 .and. uNorm < 1.0d-6) then
                         converged = .true.
                         exit
                     end if
                 end if
+
+                write(*,*) "k=", k, "pNorm=", pNorm, "uNorm=", uNorm
 
                 prevPIt = p
                 prevUDifIt = uDif
@@ -1094,7 +1111,8 @@
     deallocate(prevStrainP)
     deallocate(biotP)
     deallocate(elementIsPlast)
-
+    deallocate(prevTangentMatrix)
+    deallocate(prevBiotP)
 
     end subroutine processamento
     !************************************************************************************************************************************

@@ -2842,7 +2842,7 @@
     
     poroL(curElement) = poro0(curElement) &
                     & + trStrainP & ! plastic porosity
-                    & + biotCoefficient*(trStrain - trStrainP) + (pressure-pressureInit)*nInv !elastic component
+                    & + biotCoefficient*(trStrain - trStrainP) + (pressure-pressureInit) * nInv !elastic component
     poroE(curElement) = poroL(curElement) / (1 + trStrain)
     
     end subroutine updatePorosity

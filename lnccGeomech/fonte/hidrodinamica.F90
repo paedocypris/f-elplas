@@ -225,10 +225,10 @@
 
                 betaTotalCompressibility = totalCompressibility(curElement, matrixBulkEP)
                 psi = calcBiotCoefficient(curElement)/matrixBulkEP
-            else if (plastType == 3) then
+            else if (plastType == 3 .or. plastType == 4) then
                 matrixBulkEP = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
 
-                betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1/3.d0*traceTensor(biotP(1:4,l,curElement),4)/matrixBulkEP - biotCoeff/matrixBulk
+                betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1.d0/3.d0*traceTensor(biotP(1:4,l,curElement),4)/matrixBulkEP - biotCoeff/matrixBulk
                 psi = calcBiotCoefficient(curElement)/matrixBulk + 1.d0/matrixBulkEP - 1.d0/matrixBulk
             end if
 
@@ -257,7 +257,7 @@
                 djn = shg(nrowsh,j,l)
 
                 ! source terms
-                elementF(nj) = elementF(nj) + (betaTotalCompressibility * djn * prevPLInt) * cl !B \csi^(n-1)
+                elementF(nj) = elementF(nj) + (betaTotalCompressibility * prevPLInt) * djn * cl !B \csi^(n-1)
                 if (way == 2) then
                     out2waySource(l, curElement) = (-psi) * (stressS(l,curElement) - prevStressS(l,curElement)) * djn * cl
                     
