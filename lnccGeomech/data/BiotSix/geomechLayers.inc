@@ -20,7 +20,7 @@
 1.00D+3
 }
 *mean_oil_density_reservoir_region{
-1.00E+3
+1.00D+3
 }
 *mean_water_saturation_reservoir_region{
 1.0D0
@@ -60,7 +60,7 @@ ELASTIC
 1.00d+3
 }
 *mean_oil_density_rift_under_region{
-0.88e+3
+0.88d+3
 }
 *mean_water_saturation_rift_under_region{
 1.0d0
@@ -78,7 +78,7 @@ ELASTIC
 0.05d+0
 }
 *epMisesYieldSurface_rift_under_region{
-  +3.55e+8
+  +3.55d+8
 }
 *epMohrCoulombPhi_rift_under_region{
 1
@@ -102,10 +102,10 @@ ELASTIC
 7.5d+09
 }
 *mean_water_density_right_side_burden{
-1.0e3
+1.0d3
 }
 *mean_oil_density_right_side_burden{
-0.88e+3
+0.88d+3
 }
 *mean_water_saturation_right_side_burden{
 0.2d0
@@ -126,7 +126,7 @@ ELASTIC
 0.25d+0
 }
 *epMisesYieldSurface_right_side_burden{
-  +3.55e+8
+  +3.55d+8
 }
 *epMohrCoulombPhi_right_side_burden{
 1
@@ -174,7 +174,7 @@ ELASTIC
 0.00d+0
 }
 *epMisesYieldSurface_saline_cap_region{
-  +3.55e+8
+  +3.55d+8
 }
 *epMohrCoulombPhi_saline_cap_region{
 1
@@ -201,10 +201,10 @@ ELASTIC
 7.5d+09
 }
 *mean_water_density_left_side_burden{
-1.0e3
+1.0d3
 }
 *mean_oil_density_left_side_burden{
-0.88e+3
+0.88d+3
 }
 *mean_water_saturation_left_side_burden{
 0.2d0
@@ -222,7 +222,7 @@ ELASTIC
 0.25d+0
 }
 *epMisesYieldSurface_left_side_burden{
-  +3.55e+8
+  +3.55d+8
 }
 *epMohrCoulombPhi_left_side_burden{
 1
@@ -268,7 +268,7 @@ ELASTIC
 0.1d+0
 }
 *epMisesYieldSurface_post_salt_region{
-  +3.55e+8
+  +3.55d+8
 }
 *epMohrCoulombPhi_post_salt_region{
 1

@@ -17,7 +17,7 @@ GODUNOV
 350
 }
 *tolerance_for_creep_convergence{
-1.0E-2
+1.0D-2
 }
 *tolerancePlasticYield{
     1.0D-6

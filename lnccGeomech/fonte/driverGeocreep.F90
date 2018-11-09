@@ -40,10 +40,10 @@
     !processa o escoamento
     !call processamentoOneWayPlast()
     !call processamentoTwoWayElast()
-    call processamentoTwoWayPlast(1) !silva
+    !call processamentoTwoWayPlast(1) !silva
     !call processamentoTwoWayPlast(2) !kim
-    call processamentoTwoWayPlast(3) !erick
-    call processamentoTwoWayPlast(4) !fss
+    call processamentoTwoWayPlast(3) !fss implícito
+    !call processamentoTwoWayPlast(4) !fss explícito
 
     !
     call fecharArquivosBase()
@@ -859,7 +859,7 @@
 
     !function imports
     use mHidrodinamicaGalerkin, only:montarEstruturasDadosPressaoSkyline
-    use mHidrodinamicaGalerkin, only: incrementFlowPressureSolutionOneWay, incrementFlowPressureSolutionTwoWay
+    use mHidrodinamicaGalerkin, only: incrementFlowPressureSolution
     use mGeomecanica, only: incrementMechanicPlasticSolution, montarEstruturasDadosDeslocamentoSkyline
     use mGeomecanica, only: incrementMechanicElasticSolution
     use mPropGeoFisica, only: lerPropriedadesFisicas
@@ -980,14 +980,14 @@
                 open(unit=outFileUnit, file="out/debugFiles/logKim.txt", status='replace')
                 write (outFileUnit,*) filename
             else if (plastType == 3) then
-                filename = "plastSolution2wayErick"
+                filename = "plastSolution2wayFSSImplicit"
 
-                open(unit=outFileUnit, file="out/debugFiles/logErick.txt", status='replace')
+                open(unit=outFileUnit, file="out/debugFiles/logFSSImplicit.txt", status='replace')
                 write (outFileUnit,*) filename
             else if (plastType == 4) then
-                filename = "plastSolution2wayFSS"
+                filename = "plastSolution2wayFSSExplicit"
 
-                open(unit=outFileUnit, file="out/debugFiles/logFSS.txt", status='replace')
+                open(unit=outFileUnit, file="out/debugFiles/logFSSExplicit.txt", status='replace')
                 write (outFileUnit,*) filename
             end if
         end if
@@ -1015,25 +1015,26 @@
 
             prevStressS = stressS
             prevTrStrainP = trStrainP
-            if (plastType == 4) then
+            if (plastType == 4 .or. plastType == 2) then
                 prevTangentMatrix = hmTTG
                 prevBiotP = biotP
             end if
+
             ! begin split loop
             converged = .false.
-            elementIsPlast = 0.d0
             do k = 1, 500
                 if (way == 1 .or. k == 1) then
-                    call incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, vDarcy, vDarcyNodal)
+                    call incrementFlowPressureSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, u, strainP, prevStrainP, p, prevP, pInit, stress, stressTotal, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, biotP, out2waySource, 1, plastType, elementIsPlast)
                     pNorm = 1.0
                     uNorm = 1.0
                 else
-                    if (plastType == 4) then
+                    ! treat tangent modules explicitly (kim)
+                    if (plastType == 4 .or. plastType == 2) then
                         hmTTG = prevTangentMatrix
                         biotP = prevBiotP
                     end if
 
-                    call incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, biotP, out2waySource, plastType)
+                    call incrementFlowPressureSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, deltaT, u, strainP, prevStrainP, p, prevP, pInit, stress, stressTotal, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, hmTTG, biotP, out2waySource, 2, plastType, elementIsPlast)
                 end if
 
                 if (isPlast == 1) then

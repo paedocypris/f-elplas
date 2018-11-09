@@ -2044,7 +2044,7 @@
     !
     DATA ROOT3D2/1.224744871391589D0/
     !
-    MINIMO = 0E00
+    MINIMO = 0D00
     if(tipo==1) then
         if(trim(reserv)=='reservatorio')    numPontos=numelReserv
         if(trim(reserv)=='dominioCompleto') numPontos=numel

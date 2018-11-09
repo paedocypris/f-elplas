@@ -1035,6 +1035,7 @@
                     exit
                 end if
             else
+                elementIsPlast(nel) = 0.d0
                 Cep = cbbar
                 biotP(1:nrowb,l,nel) = biotCoef*identI(1:nrowb)
             end if
@@ -3159,7 +3160,7 @@
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     dDis = 0.d0
     
-    tolNewton = 1.0e-6
+    tolNewton = 1.0D-6
     write (*,*) "Incremento elástico"
 
     !compute the new external force vector, and split into two, a dirichlet and a neumann one
@@ -3270,7 +3271,7 @@
 
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     
-    tolNewton = 1.0e-6
+    tolNewton = 1.0d-6
 
     write(*,*) "Incremento plastico"
     call geoSetup(nel,nrowb,nintd,iopt, isUndrained, biotP)

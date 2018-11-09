@@ -2,6 +2,5 @@
 #build/
 lnccGeomech/bin
 lnccGeomech/Debug
-.vscode
 .vs
 lnccGeomech/data/*/out

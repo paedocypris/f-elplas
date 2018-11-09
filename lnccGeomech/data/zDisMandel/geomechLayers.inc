@@ -20,7 +20,7 @@
 1.00D+3
 }
 *mean_oil_density_reservoir_region{
-1.00E+3
+1.00D+3
 }
 *mean_water_saturation_reservoir_region{
 1.0D0
@@ -105,7 +105,7 @@ ELASTIC
 7.5d+09
 }
 *mean_water_density_right_side_burden{
-1.0e3
+1.0D3
 }
 *mean_oil_density_right_side_burden{
 0.88e+3
@@ -201,7 +201,7 @@ ELASTIC
 7.5d+09
 }
 *mean_water_density_left_side_burden{
-1.0e3
+1.0D3
 }
 *mean_oil_density_left_side_burden{
 0.88e+3

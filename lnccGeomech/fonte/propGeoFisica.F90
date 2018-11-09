@@ -193,7 +193,7 @@
     aux = (dimx-xlx)
     aux1= (dimy-xly)
     if(nsd==3) aux2= (dimz-xlz)
-    tol = 1.0e-08
+    tol = 1.0d-08
     !
     if(nsd==2) then
         if(aux.gt.tol.or.aux1.gt.tol)then
@@ -447,7 +447,7 @@
     aux = (dimx-xlx)
     aux1= (dimy-xly)
     if(nsd==3) aux2= (dimz-xlz)
-    tol = 1.0e-08
+    tol = 1.0d-08
     !
     if(nsd==2) then
         if(aux.gt.tol.or.aux1.gt.tol)then
@@ -1052,7 +1052,7 @@
     aux = (hx-cdx)
     aux1= (hy-cdy)
     if(nsd==3) aux2= (hz-cdz)
-    tol = 1.0e-08
+    tol = 1.0d-08
     !
     if(nsd==2) then
         if(aux.gt.tol.or.aux1.gt.tol)then
@@ -1069,7 +1069,7 @@
     aux = (dimx-xlx)
     aux1= (dimy-xly)
     if(nsd==3) aux2= (dimz-xlz)
-    tol = 1.0e-08
+    tol = 1.0d-08
     !
     if(nsd==2) then
         if(aux.gt.tol.or.aux1.gt.tol)then
@@ -2274,7 +2274,7 @@
         !
         !.... Bloco
         !
-        u(i)=1.0e-14
+        u(i)=1.0d-14
 
         ! ! bloquinho1
         xi=100.00d0-0.001; xf=250d0+0.001
@@ -2282,7 +2282,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-12
+                u(i)=1.0d-12
                 !         print*, i, u(i)
             end if
         end if
@@ -2293,7 +2293,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-10
+                u(i)=1.0d-10
                 !        print*, i, u(i)
             end if
         end if
@@ -2304,7 +2304,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-10
+                u(i)=1.0d-10
                 !        print*, i, u(i)
             end if
         end if
@@ -2315,7 +2315,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-11
+                u(i)=1.0d-11
                 !        print*, i, u(i)
             end if
         end if!
@@ -2327,7 +2327,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-18
+                u(i)=1.0d-18
                 !        print*, i, u(i)
             end if
         end if
@@ -2338,7 +2338,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-09
+                u(i)=1.0d-09
                 !        print*, i, u(i)
             end if
         end if
@@ -2350,7 +2350,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-09
+                u(i)=1.0d-09
                 !        print*, i, u(i)
             end if
         end if
@@ -2361,7 +2361,7 @@
 
         if(xx.gt.xi.and.xx.lt.xf) then
             if(yy.gt.yi.and.yy.lt.yf) then
-                u(i)=1.0e-10
+                u(i)=1.0d-10
                 !        print*, i, u(i)
             end if
         end if

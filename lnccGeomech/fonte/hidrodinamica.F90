@@ -301,70 +301,78 @@
     end subroutine solveGalerkinPressao
     !************************************************************************************************************************************
     !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, way, plastType)
+    subroutine incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, u, strainP, prevStrainP, p, prevP, pInit, stress, stressTotal, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, way, plastType, elementIsPlast)
+    ! function imports
+    use mGeomecanica, only: pos4plast
+
     implicit none
     ! variables input
     integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
     real*8 :: x(nsd,nnp), curT, deltaT
-    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
-    real*8 :: stressS(:,:), prevStressS(:,:)
+    real*8 :: u(:,:), strainP(:,:,:), prevStrainP(:,:,:)
+    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp), pInit(hgNdof,nnp)
+    real*8 :: stress(:,:,:), stressTotal(:,:,:), stressS(4,nel), prevStressS(:,:) 
     real*8 :: trStrainP(:,:), prevTrStrainP(:,:)
     real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
     real*8 :: out2waySource(:,:)
     real*8 :: tangentMatrix(:,:,:)
     real*8 :: biotP(:,:,:)
     integer :: way, plastType
+    real*8 :: elementIsPlast(:)
+
+    !variables
+    real*8 :: prevPIt(hgNdof,nnp)
+    real*8 :: fixedStressS(4,nel)
+
+    real*8 :: tolNewton
+    real*8 :: error
+    integer :: j
+    logical :: converged
+
+    real*8, external :: calcRelErrorMatrix
     
     !------------------------------------------------------------------------------------------------------------------------------------
     ! mount equation system
-    call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, biotP, out2waySource, way, plastType)
-    
-    !solve
-    call solveGalerkinPressao(nnp, p)
+    tolNewton = 1.0d-6
+    write(*,*) "Incremento hidrodinamico"
+
+    fixedStressS = stressS
+    converged = .false.
+    do j = 1, 50
+        call montarSistemaEquacoesPressao(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, fixedStressS, prevStressS, trStrainP, prevTrStrainP, tangentMatrix, biotP, out2waySource, way, plastType)
+        
+        !solve
+        call solveGalerkinPressao(nnp, p)
+
+        if (way == 1 .or. plastType .ne. 3) then
+            exit
+        end if
+
+        if (j > 1) then
+            error = calcRelErrorMatrix(prevPIt, p, hgNdof, nnp)
+            write(*,*) "erro do passo hidrodinamico: ", error
+
+            if (error < tolNewton) then
+                converged = .true.
+                exit
+            end if
+        end if
+
+        prevPIt = p
+
+        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, tangentMatrix, biotP, elementIsPlast, p, pInit, 0)
+
+    end do
+
+    if ((way == 2) .and. plastType == 3 .and. (converged .eqv. .false.)) then
+        write(*,*) "hidrodynamic iteration didn't converged"
+        return
+    end if
     
     !process darcy velocity
     call calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy, vDarcyNodal)
     
     end subroutine incrementFlowPressureSolution
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionOneWay(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, vDarcy, vDarcyNodal)
-    ! variables input
-    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp), curT, deltaT
-    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
-    real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
-    
-    !variables
-    real*8 :: stressS(1,1), prevStressS(1,1)
-    real*8 :: trStrainP(1,1), prevTrStrainP(1,1)
-    real*8 :: out2waySource(1,1)
-    real*8 :: tangentMatrix(1,1,1)
-    real*8 :: biotP(1,1,1)
-    
-    !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, 1, 1)
-    
-    end subroutine incrementFlowPressureSolutionOneWay
-    !************************************************************************************************************************************
-    !************************************************************************************************************************************
-    subroutine incrementFlowPressureSolutionTwoWay(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, plastType)
-    ! variables input
-    integer :: conecNodaisElem(nen, nel), nen, nel, nnp, nsd
-    real*8 :: x(nsd,nnp), curT, deltaT
-    real*8 :: p(hgNdof,nnp), prevP(hgNdof,nnp)
-    real*8 :: stressS(:,:), prevStressS(:,:)
-    real*8 :: trStrainP(:,:), prevTrStrainP(:,:)
-    real*8 :: vDarcy(:,:), vDarcyNodal(:,:)
-    real*8 :: out2waySource(:,:)
-    real*8 :: tangentMatrix(:,:,:)
-    real*8 :: biotP(:,:,:)
-    integer :: plastType
-    
-    !------------------------------------------------------------------------------------------------------------------------------------
-    call incrementFlowPressureSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, deltaT, p, prevP, stressS, prevStressS, trStrainP, prevTrStrainP, vDarcy, vDarcyNodal, tangentMatrix, biotP, out2waySource, 2, plastType)
-    
-    end subroutine incrementFlowPressureSolutionTwoWay
     !************************************************************************************************************************************
     !************************************************************************************************************************************
     subroutine calcDarcyVelocity(conecNodaisElem, nen, nel, nnp, nsd, p, vDarcy, vDarcyNodal)
