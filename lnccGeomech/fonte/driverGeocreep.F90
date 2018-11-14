@@ -43,7 +43,8 @@
     !call processamentoTwoWayPlast(1) !silva
     !call processamentoTwoWayPlast(2) !kim
     call processamentoTwoWayPlast(3) !fss implícito
-    !call processamentoTwoWayPlast(4) !fss explícito
+    call processamentoTwoWayPlast(4) !fss explícito
+    call processamentoTwoWayPlast(5) !fss implícito single step
 
     !
     call fecharArquivosBase()
@@ -862,6 +863,7 @@
     use mHidrodinamicaGalerkin, only: incrementFlowPressureSolution
     use mGeomecanica, only: incrementMechanicPlasticSolution, montarEstruturasDadosDeslocamentoSkyline
     use mGeomecanica, only: incrementMechanicElasticSolution
+    use mGeomecanica, only: initMechParameters
     use mPropGeoFisica, only: lerPropriedadesFisicas
 
     !variables input
@@ -950,10 +952,9 @@
     stressTotal = 0.d0
     elementIsPlast = 0.d0
     if (initStress == 1) then
+        call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
         if (isPlast == 1) then
             call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0)
-        else if (isPlast == 0) then
-            call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
         end if
     end if
     uInit = u
@@ -989,6 +990,11 @@
 
                 open(unit=outFileUnit, file="out/debugFiles/logFSSExplicit.txt", status='replace')
                 write (outFileUnit,*) filename
+            else if (plastType == 5) then
+                filename = "plastSolution2wayFSSImplicitSS"
+
+                open(unit=outFileUnit, file="out/debugFiles/logFSSImplicitSS.txt", status='replace')
+                write (outFileUnit,*) filename
             end if
         end if
     else if (isPlast == 0) then
@@ -1005,6 +1011,8 @@
 
     !time loop
     currentTimeStepPrint = 1
+
+    call initMechParameters(numel,biotP)
 
     do i = 1, hgNTimeSteps
         deltaT = hgDts(i)

@@ -225,7 +225,7 @@
 
                 betaTotalCompressibility = totalCompressibility(curElement, matrixBulkEP)
                 psi = calcBiotCoefficient(curElement)/matrixBulkEP
-            else if (plastType == 3 .or. plastType == 4) then
+            else if (plastType == 3 .or. plastType == 4 .or. plastType == 5) then
                 matrixBulkEP = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
 
                 betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1.d0/3.d0*traceTensor(biotP(1:4,l,curElement),4)/matrixBulkEP - biotCoeff/matrixBulk
@@ -344,7 +344,7 @@
         !solve
         call solveGalerkinPressao(nnp, p)
 
-        if (way == 1 .or. plastType .ne. 3) then
+        if (way == 1 .or. (plastType == 2 .or. plastType == 4 .or. plastType == 5)) then
             exit
         end if
 

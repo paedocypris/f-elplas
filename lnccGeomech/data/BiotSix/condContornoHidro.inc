@@ -1,5 +1,5 @@
 *pressao_inicial_fluxo{
-     6.0d7
+    6.0d7
 }
 
 *codigos_cond_contorno_fluxo{
@@ -11,7 +11,7 @@
          2
 }
 
-# Press„o prescrita nas bordas esquerda e direita
+# Press√£o prescrita nas bordas esquerda e direita
 *valores_cond_contorno_fluxo{
          1         2     0.0d0
                          0.0d0
@@ -50,5 +50,5 @@
 
 *tabelaTempos{
         1
-        30          3.0d0
+        30          2.0d0
 }

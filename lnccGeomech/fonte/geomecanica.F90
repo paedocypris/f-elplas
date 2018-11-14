@@ -876,6 +876,7 @@
     call shlq(shld,wd,nintd,nen)
     !
     stressLEff = 0.0d0
+    elementIsPlast = 0.d0
     !
     do nel=1,numel
         if (isUndrained == 1) then
@@ -954,7 +955,7 @@
                 ePInit(k)  = prevStrainP(k,l,nel)
             end do
             
-            call tang2qx(tangentMatrix(1:16,l,nel),qixi)
+            qixi = cbbar
             
             !.... part 1 from box 4.1 simo-hughes compute predictors
             
@@ -1035,7 +1036,6 @@
                     exit
                 end if
             else
-                elementIsPlast(nel) = 0.d0
                 Cep = cbbar
                 biotP(1:nrowb,l,nel) = biotCoef*identI(1:nrowb)
             end if
@@ -3160,7 +3160,7 @@
     if(.not.allocated(dDis)) allocate(dDis(ndofD, nnp))
     dDis = 0.d0
     
-    tolNewton = 1.0D-6
+    tolNewton = 1.0d-6
     write (*,*) "Incremento elástico"
 
     !compute the new external force vector, and split into two, a dirichlet and a neumann one
@@ -3173,7 +3173,7 @@
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
 
     converged = .false.
-    do j = 1, 15
+    do j = 1, 30
         alhsD = 0.d0
         brhsD = 0.d0
         dDis = 0.d0
@@ -3215,7 +3215,7 @@
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
     end do
-    if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
+    if (converged.eqv..false.) write(*,*) '**************Newton method not converged.***********'
 
     
     deallocate(fExtT)
@@ -3286,7 +3286,7 @@
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
 
     converged = .false.
-    do j = 1, 50
+    do j = 1, 100
         alhsD = 0.d0
         brhsD = 0.d0
         dDis = 0.d0
@@ -3328,7 +3328,7 @@
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
     end do
-    if (converged.eqv..false.) write(*,*) 'Newton method not converged.'
+    if (converged.eqv..false.) write(*,*) '******************Newton method not converged.********************'
 
 
 1100 format ("u(", I1,",",I1")")
@@ -3535,6 +3535,19 @@
     calcDevInvariantJ2 = (devStress(1)*devStress(1)+devStress(2)*devStress(2) + devStress(4)*devStress(4) + 2.0D0*devStress(3)*devStress(3)) / 2.d0
     
     end function calcDevInvariantJ2
+    !**************************************************************************************
+    !**************************************************************************************
+    subroutine initMechParameters(nel,biotP)
+    implicit none
+
+    !variables input
+    integer :: nel
+    real*8 :: biotP(nrowb,nintD,nel)
+
+    !--------------------------------------------------------------------------------------
+    call geosetup(nel, nrowb, nintd, iopt, 0, biotP)
+
+    end subroutine
     !**************************************************************************************
     !**************************************************************************************
     end module mGeomecanica
