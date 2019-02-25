@@ -43,8 +43,8 @@
     !call processamentoTwoWayPlast(1) !silva
     !call processamentoTwoWayPlast(2) !kim
     call processamentoTwoWayPlast(3) !fss implícito
-    call processamentoTwoWayPlast(4) !fss explícito
-    call processamentoTwoWayPlast(5) !fss implícito single step
+    ! call processamentoTwoWayPlast(4) !fss explícito
+    ! call processamentoTwoWayPlast(5) !fss implícito single step
 
     !
     call fecharArquivosBase()
