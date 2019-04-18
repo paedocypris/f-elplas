@@ -2609,7 +2609,7 @@
     
     !--------------------------------------------------------------------------------------
     ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
-    plasticStress = calcDPPlasticStress(efStress, p, biotCoef)
+    plasticStress = calcDPPlasticStress(efStress, p, biotCoef, k/alpha)
     
     !calculates the deviator of the stress tensor
     call devTensor(devStress,traceD3,plasticStress,nrowb)
@@ -2625,7 +2625,7 @@
     fYield1 = dpYield1(devStress, J2, alpha)
     fYield2 = dpYield2(plasticStress, I1, J2)
     
-    end subroutine dpGrads
+    end subroutine dpGrads 
     !**************************************************************************************
     !**************************************************************************************
     subroutine calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
@@ -3474,7 +3474,7 @@
     end function calcTotalStress
     !**************************************************************************************
     !**************************************************************************************
-    function calcDPPlasticStress(efStress, p, biotCoef)
+    function calcDPPlasticStress(efStress, p, biotCoef, h)
     !function imports
     
     !variables import
@@ -3483,6 +3483,7 @@
     !variables input
     real*8 :: efStress(nrowB)
     real*8 :: p, biotCoef
+    real*8 :: h
     
     !variables
     real*8 :: calcDPPlasticStress(nrowb)
@@ -3493,8 +3494,9 @@
     identI = (/ 1., 1., 0., 1. /)
     
     ! terzagui, i.e., plastic incompressibility.
+    h = h
     do k = 1, nrowb
-        !calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
+        ! calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
         calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))
     end do
     

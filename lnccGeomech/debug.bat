@@ -5,7 +5,7 @@ if not defined vsOn (
    set vsOn=true
 )
 
-pushd "lnccGeomech\data\biotSix"
+pushd "lnccGeomech\data\biotSixR"
 
 devenv /debugexe "..\..\bin\lnccGeomech.exe"
 
