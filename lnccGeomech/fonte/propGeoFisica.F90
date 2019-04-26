@@ -124,228 +124,6 @@
     !
     !=======================================================================
     !
-    SUBROUTINE MAPEIARESERVATORIO(permk,perm,conecNodaisElem,x,xlx,xly,xlz, &
-        nelemx,nelemy,nelemz,nelem,nen,nsd)
-    !
-    !     MAPEA O CAMPO DE PERMEABILIDADES NO DOMINIO DE SIMULACAO
-    !
-    use mMalha,            only: numel
-    !
-    implicit none
-    !
-    integer :: nelemx,nelemy,nelemz,nelem,nen,nsd
-    integer,dimension(nen,*)  :: conecNodaisElem
-    real(8),dimension(nsd,*)  :: x
-    real(8),dimension(*)      :: perm,permk
-    !
-    integer :: nel,i,NBLOCKX,NBLOCKY
-    real(8) :: xlx,xly,xlz,TOL
-    real(8) :: cdx,cdy,cdz,aux,aux1,aux2,X1,X2,Y1,Y2
-    REAL(8),DIMENSION(NSD) :: POINTINF,POINTSUP,CENTRO
-    REAL(8) :: XPOS,YPOS
-    !
-    TOL=1E-6
-    XPOS=0.0D0
-    YPOS=0.0D0
-    !
-    if(nsd==2) then
-        nelzReserv=1
-        nelemz=1
-    endif
-    !
-    !     definicacao do tamanlhos dos elementos
-    !     Campo de permeabilidades
-    !
-    cdx=xlx/nelemx
-    cdy=xly/nelemy
-    if(nsd==3)cdz=xlz/nelemz
-    !
-    !     Impressao dos parametros
-    !
-    IF(nsd==2)THEN
-        write(*,800)dimx,dimy,nelxReserv,nelyReserv
-        write(*,890)xlx,xly,nelemx,nelemy
-        write(*,891)hx,hy,cdx,cdy
-    ELSE
-        write(*,900)dimx,dimy,dimz,nelxReserv,nelyReserv,nelzReserv
-        write(*,990)xlx,xly,xlz,nelemx,nelemy,nelemz
-        write(*,991)hx,hy,hz,cdx,cdy,cdz
-    END IF
-    !
-    !     verificacao da consistencia
-    !
-    aux = (hx-cdx)
-    aux1= (hy-cdy)
-    if(nsd==3) aux2= (hz-cdz)
-    !
-    if(nsd==2) then
-        if(aux.gt.tol.or.aux1.gt.tol)then
-            write(*,110)
-            stop 300
-        end if
-    else
-        if(aux.gt.tol.or.aux1.gt.tol)then
-            write(*,110)
-            stop 300
-        end if
-    end if
-    !
-    aux = (dimx-xlx)
-    aux1= (dimy-xly)
-    if(nsd==3) aux2= (dimz-xlz)
-    tol = 1.0d-08
-    !
-    if(nsd==2) then
-        if(aux.gt.tol.or.aux1.gt.tol)then
-            write(*,111)
-            stop 305
-        end if
-    else
-        if(aux.gt.tol.or.aux1.gt.tol.or.aux2.gt.tol)then
-            write(*,111)
-            stop 305
-        end if
-    endif
-    CALL ENCONTRARLIMITESRESERVATORIO(POINTINF,POINTSUP)
-    !
-    !     loop nos elementos
-    !
-    nelem=nelxReserv*nelyReserv
-    !
-    DO NEL=1,NUMEL
-        X1=X(1,conecNodaisElem(1,NEL))+TOL
-        X2=X(1,conecNodaisElem(3,NEL))-TOL
-        Y1=X(2,conecNodaisElem(1,NEL))+TOL
-        Y2=X(2,conecNodaisElem(3,NEL))-TOL
-        IF(X1.GE.POINTINF(1))THEN
-            IF(X2.LE.POINTSUP(1))THEN
-                IF(Y1.GE.POINTINF(2))THEN
-                    IF(Y2.LE.POINTSUP(2))THEN
-                        CENTRO(1)=(X2+X1)*0.5D0
-                        CENTRO(2)=(Y1+Y2)*0.5D0
-                        I=0
-                        DO NBLOCKY=1,nelemy
-                            YPOS = POINTINF(2)+REAL(NBLOCKY-1)*CDY
-                            DO NBLOCKX=1,nelemx
-                                I=I+1
-                                XPOS = POINTINF(1)+REAL(NBLOCKX-1)*CDX
-                                IF((CENTRO(1).GE.XPOS).AND.(CENTRO(1).LE.(XPOS+CDX)))THEN
-                                    IF((CENTRO(2).GE.YPOS).AND.(CENTRO(2).LE.(YPOS+CDY)))THEN
-                                        PERMK(NEL) = PERM(I)
-                                        exit
-                                    END IF
-                                END IF
-                            END DO
-                        END DO
-                    END IF
-                END IF
-            END IF
-        END IF
-    END DO
-    !      STOP
-    !
-    !
-800 format(/,                            &
-        '##############################',/, &
-        'TAMANHO DO RESERVATORIO:',/,'Lx=', &
-        f10.5,2x,'Ly=',f10.5,/,             &
-        'MALHA:',/,'nx=',i7,' ny=',i7,/,    &
-        '##############################')
-    !
-890 format(/,                              &
-        '##############################',/,   &
-        'TAMANHO DO CAMPO ALEATORIO:',/,'Lx=',&
-        f10.5,2x,'Ly=',f10.5,/,               &
-        'MALHA:',/,'nx=',i7,' ny=',i7,/,      &
-        '##############################')
-    !
-891 format(/,                            &
-        '##############################',/, &
-        'Tamanho do elemento:',/,'hx=',     &
-        f10.5,2x,'hy=',f10.5,/, &
-        '##############################',/, &
-        'Tamanho do bloco geologico:',/,'gx=', &
-        f10.5,2x,'gy=',f10.5,/,&
-        '##############################',/)
-
-900 format(/,                            &
-        '##############################',/, &
-        'TAMANHO DO RESERVATORIO:',/,'Lx=', &
-        f10.5,2x,'Ly=',f10.5,2x,'Lz=',f10.5,/,&
-        'MALHA:',/,'nx=',i7,' ny=',i7,' nz=',i7,/,    &
-        '##############################')
-    !
-990 format(/,                              &
-        '##############################',/,   &
-        'TAMANHO DO CAMPO ALEATORIO:',/,'Lx=',&
-        f10.5,2x,'Ly=',f10.5,2x,'Lz=',f10.5,/,&
-        'MALHA:',/,'nx=',i7,' ny=',i7,' nz=',i7,/,&
-        '##############################')
-    !
-991 format(/,                            &
-        '##############################',/, &
-        'Tamanho do elemento:',/,'hx=',     &
-        f10.5,2x,'hy=',f10.5,2x,'hz=',f10.5,/, &
-        '##############################',/, &
-        'Tamanho do bloco geologico:',/,'gx=', &
-        f10.5,2x,'gy=',f10.5,2x,'gz=',f10.5,/,&
-        '##############################',/)
-
-110 format('####################################',/, &
-        'INCONSISTENCIA NO TAMANHO DOS BLOCOS',/, &
-        'GEOLOGICOS: MALHA COMPUTACIONAL     ',/, &
-        'MAIS GROSSEIRA QUE A MALHA GEOLOGICA',/, &
-        '####################################',/)
-
-111 format('####################################',/, &
-        'INCONSISTENCIA NO TAMANHO DOS       ',/, &
-        'DOMINIOS: O DOMINIO GEOLOGICO DEVE  ',/, &
-        'SER MAIOR OU IGUAL AO DOMINIO       ',/, &
-        '####################################',/)
-    !
-    return
-    !
-    END SUBROUTINE MAPEIARESERVATORIO
-
-    !
-    !=======================================================================
-    !
-    SUBROUTINE ENCONTRARLIMITESRESERVATORIO(POINTINF,POINTSUP)
-    !
-    USE mMalha, only: x,nsd, conecNodaisElem
-    USE mMalha, only: numelReserv
-    !     USE mPropGeoFisica, only: GEOFORM
-    IMPLICIT NONE
-    !
-    INTEGER :: NO,NELEMI,NELEMF
-    REAL(8),DIMENSION(NSD) :: POINTINF,POINTSUP
-    REAL(8) :: AUXMAX,AUXMIN
-    REAL(8) :: DIMRESERVX,DIMRESERVY
-
-    !
-    AUXMAX=-1E20
-    AUXMIN=1E20
-    !
-    NELEMI=1
-    NELEMF=numelReserv
-    !
-    NO=conecNodaisElem(1,NELEMI)
-    POINTINF(1)=X(1,NO)
-    POINTINF(2)=X(2,NO)
-    NO=conecNodaisElem(3,NELEMF)
-    POINTSUP(1)=X(1,NO)
-    POINTSUP(2)=X(2,NO)
-    !
-    DIMRESERVX=POINTSUP(1)-POINTINF(1)
-    DIMRESERVY=POINTSUP(2)-POINTINF(2)
-    WRITE(*,*)'COORDENADA INICIAL DO RESERVATORIO:',POINTINF
-    WRITE(*,*)'COORDENADA FINAL DO RESERVATORIO..:',POINTSUP
-    WRITE(*,*)'DIMENSOES DO RESERVATORIO.........:',DIMRESERVX,DIMRESERVY
-    !
-    END SUBROUTINE ENCONTRARLIMITESRESERVATORIO
-    !
-    !=======================================================================
-    !
     SUBROUTINE MAPEIADOMINIO(permk,perm,conecNodaisElem,x,xlx,xly,xlz, &
         nelemx,nelemy,nelemz,nelem,nen,nsd,YX1,YX2)
     !
@@ -430,6 +208,7 @@
     !
     aux = (AUX-cdx)
     aux1= (AUX1-cdy)
+    aux2=0.d0
     if(nsd==3) aux2= (hz-cdz)
     !
     if(nsd==2) then
@@ -460,7 +239,7 @@
             stop 305
         end if
     endif
-    !      CALL ENCONTRARLIMITESRESERVATORIO(POINTINF,POINTSUP)
+
     POINTINF(1)=XLEFT
     POINTINF(2)=YBOTTOM
     POINTSUP(1)=XRIGHT
@@ -513,20 +292,6 @@
         END DO
     END DO
     !
-800 format(/,                            &
-        '##############################',/, &
-        'TAMANHO DO RESERVATORIO:',/,'Lx=', &
-        f10.5,2x,'Ly=',f10.5,/,             &
-        'MALHA:',/,'nx=',i7,' ny=',i7,/,    &
-        '##############################')
-    !
-890 format(/,                              &
-        '##############################',/,   &
-        'TAMANHO DO CAMPO ALEATORIO:',/,'Lx=',&
-        f10.5,2x,'Ly=',f10.5,/,               &
-        'MALHA:',/,'nx=',i7,' ny=',i7,/,      &
-        '##############################')
-    !
 891 format(/,                            &
         '##############################',/, &
         'Tamanho do elemento:',/,'hx=',     &
@@ -558,8 +323,6 @@
         'Tamanho do bloco geologico:',/,'gx=', &
         f10.5,2x,'gy=',f10.5,2x,'gz=',f10.5,/,&
         '##############################',/)
-    !
-100 FORMAT('POSICAO X:',F10.5,/,'POSICAO Y:',F10.5)
     !
 110 format('####################################',/, &
         'INCONSISTENCIA NO TAMANHO DOS BLOCOS',/, &
@@ -1051,6 +814,7 @@
     !
     aux = (hx-cdx)
     aux1= (hy-cdy)
+    aux2=0.d0
     if(nsd==3) aux2= (hz-cdz)
     tol = 1.0d-08
     !
@@ -1112,7 +876,7 @@
         !
         xx=0.d0
         yy=0.d0
-        if(nsd==3)zz=0.d0
+        zz=0.d0
         do i=1,nen
             no = conecNodaisElem(i,nel)
             xx=xx+x(1,no)
@@ -1395,6 +1159,8 @@
     xf=xcbloco_phi+xlbloco_phi/2.d0
     yi=ycbloco_phi-ylbloco_phi/2.d0
     yf=ycbloco_phi+ylbloco_phi/2.d0
+    zi = 0.d0
+    zf = 0.d0
     if(nsd==3) zi=zcbloco_phi-zlbloco_phi/2.d0
     if(nsd==3) zf=zcbloco_phi+zlbloco_phi/2.d0
 
@@ -1403,6 +1169,7 @@
         !
         xx=x(1,i)
         yy=x(2,i)
+        zz = 0.d0
         if(nsd==3) zz=x(3,i)
         !
         u(i)=phiinicial
@@ -1594,6 +1361,7 @@
 
     !--------------------------------------------------------------------------------------
     geoindic = 0.0d0
+    geoloc = 0.0d0
     lastregion = 3*nsd
 
     select case (task)
@@ -1709,7 +1477,7 @@
             end if
         end do
         geoindic = geoloc
-        case default
+    case default
         
         write(*,*)  "Hmmmm, I don't know"
     end select
@@ -2001,6 +1769,7 @@
         CURVSURF = TRAMO7(TRNL)
         RETURN
     ENDIF
+    CURVSURF = 0.d0
     !
     END FUNCTION
     !
@@ -2488,6 +2257,7 @@
         &     'FRONT_RESERV','BASE_CAPROCK','BACK__RESERV'/
     !------------------------------------------------------------------------------------------------------------------------------------
     lastRegion = 3*nsd
+    getRegionIndex = 0
     do i=1,lastRegion
         if (refgeo(i).eq.geoform(curElement)) then
             getRegionIndex = i

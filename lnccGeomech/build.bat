@@ -1,31 +1,28 @@
 @echo off
 
-if not defined vsOn (
-    call "C:\Program Files (x86)\Intel\Composer XE 2015\bin\compilervars.bat" intel64 vs2010
-   set vsOn=true
-)
-
 setlocal
 SET me=%~n0
 
 set obj_folder="lnccGeomech\bin"
 
-set "flags_DEBUG=/c /warn:all /nologo /Z7 /Od /traceback /gen-interfaces /warn:interfaces /check /Qtrapuv /fpe:0"
+
+REM set "flags_DEBUG=/c /warn:all /nologo /Z7 /Od /traceback /gen-interfaces /warn:interfaces /check /Qtrapuv /fpe:0"
+set "flags_DEBUG=-c -Wall -Wconversion -g -fbacktrace -fbounds-check -ffpe-trap=zero,overflow -ffree-line-length-512 -Og"
 
 if not exist %obj_folder% mkdir %obj_folder%
 pushd %obj_folder%
-ifort %flags_DEBUG% ..\fonte\variaveisGlobais.F90
-ifort %flags_DEBUG% ..\fonte\malha.F90
-ifort %flags_DEBUG% ..\fonte\leituraEscrita.F90
-ifort %flags_DEBUG% ..\fonte\funcoesDeForma.F90
-ifort %flags_DEBUG% ..\fonte\utilitarios.F90
-ifort %flags_DEBUG% ..\fonte\mInputReader.F90
-ifort %flags_DEBUG% ..\fonte\propGeoFisica.F90
-ifort %flags_DEBUG% ..\fonte\solverGaussSkyline.F90
-ifort %flags_DEBUG% ..\fonte\leituraEscritaSimHidroGeoMec.F90
-ifort %flags_DEBUG% ..\fonte\geomecanica.F90
-ifort %flags_DEBUG% ..\fonte\hidrodinamica.F90
-ifort %flags_DEBUG% ..\fonte\driverGeocreep.F90
+gfortran %flags_DEBUG% ..\fonte\variaveisGlobais.F90
+gfortran %flags_DEBUG% ..\fonte\malha.F90
+gfortran %flags_DEBUG% ..\fonte\leituraEscrita.F90
+gfortran %flags_DEBUG% ..\fonte\funcoesDeForma.F90
+gfortran %flags_DEBUG% ..\fonte\utilitarios.F90
+gfortran %flags_DEBUG% ..\fonte\mInputReader.F90
+gfortran %flags_DEBUG% ..\fonte\propGeoFisica.F90
+gfortran %flags_DEBUG% ..\fonte\solverGaussSkyline.F90
+gfortran %flags_DEBUG% ..\fonte\leituraEscritaSimHidroGeoMec.F90
+gfortran %flags_DEBUG% ..\fonte\geomecanica.F90
+gfortran %flags_DEBUG% ..\fonte\hidrodinamica.F90
+gfortran %flags_DEBUG% ..\fonte\driverGeocreep.F90
 
-ifort /nologo /debug:all /exe:lnccGeomech.exe variaveisGlobais.obj malha.obj leituraEscrita.obj funcoesDeForma.obj utilitarios.obj mInputReader.obj propGeoFisica.obj solverGaussSkyline.obj leituraEscritaSimHidroGeoMec.obj geomecanica.obj hidrodinamica.obj driverGeocreep.obj
+gfortran -g variaveisGlobais.o malha.o leituraEscrita.o funcoesDeForma.o utilitarios.o mInputReader.o propGeoFisica.o solverGaussSkyline.o leituraEscritaSimHidroGeoMec.o geomecanica.o hidrodinamica.o driverGeocreep.o -o lnccGeomech.exe
 popd
