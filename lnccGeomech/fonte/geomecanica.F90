@@ -762,7 +762,7 @@
     END SUBROUTINE
     !**************************************************************************************
     !**************************************************************************************
-    subroutine pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, biotP, elementIsPlast, pressure, pInit, isUndrained)
+    subroutine pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, biotP, elementIsPlast, pressure, pInit, isUndrained, plastType)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
@@ -795,6 +795,7 @@
     real*8 :: pressure(1,numnp)
     real*8 :: pInit(1,numnp)
     integer :: isUndrained
+    integer :: plastType
     
     !variables
     logical quad
@@ -950,7 +951,7 @@
             stressLEff = matmul(cbbar, elasticStrain)
             
             !.... ... compute yield function:
-            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha)
+            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, plastType)
             
             if (fyield.ge.tolyield) then
                 elementIsPlast(nel) = 1.d0
@@ -974,7 +975,7 @@
                     stressLEff = matmul(cbbar, elasticStrain)
                     
                     !.... ... compute the yield function, its gradient and hessian (drucker-prager):
-                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, .false.)
+                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, .false., plastType)
                     
                     !.... ... residual computation
                     do k=1,nrowb
@@ -2461,7 +2462,7 @@
     END SUBROUTINE GRADS
     !**************************************************************************************
     !**************************************************************************************
-    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, k, alpha)
+    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, k, alpha, plastType)
     !function imports
     
     !variables import
@@ -2471,12 +2472,13 @@
     real*8 :: fYield, efStress(nrowb)
     real*8 :: p, biotCoef
     real*8 :: k, alpha
+    integer :: plastType
     
     !variables
     real*8 :: dummyFYield1(nrowb), dummyFYield2(nrowb,nrowb)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call dpGrads(fYield, dummyFYield1, dummyFYield2, efStress, p, biotCoef, k, alpha, .true.)
+    call dpGrads(fYield, dummyFYield1, dummyFYield2, efStress, p, biotCoef, k, alpha, .true., plastType)
     
     end subroutine dpYieldEfStress
     !**************************************************************************************
@@ -2555,7 +2557,7 @@
     end function dpYield2
     !**************************************************************************************
     !**************************************************************************************
-    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, k, alpha, onlyF)
+    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, k, alpha, onlyF, plastType)
     !function imports
     
     !variables import
@@ -2565,6 +2567,7 @@
     real*8 :: fYield, fYield1(nrowb), fYield2(nrowb,nrowb)
     real*8 :: efStress(nrowb), p, biotCoef, k, alpha
     logical :: onlyF
+    integer :: plastType
     
     !variables
     real*8 :: plasticStress(nrowb), devStress(nrowb), traceD3
@@ -2572,7 +2575,7 @@
     
     !--------------------------------------------------------------------------------------
     ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
-    plasticStress = calcDPPlasticStress(efStress, p, biotCoef)
+    plasticStress = calcDPPlasticStress(plastType, efStress, p, biotCoef, k/alpha)
     
     !calculates the deviator of the stress tensor
     call devTensor(devStress,traceD3,plasticStress,nrowb)
@@ -3178,7 +3181,7 @@
     end subroutine incrementMechanicElasticSolution
     !**************************************************************************************
     !**************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, isUndrained)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, isUndrained, plastType)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -3192,6 +3195,7 @@
     real*8 :: biotP(:,:,:)
     real*8 :: elementIsPlast(nel)
     integer :: isUndrained
+    integer :: plastType
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
@@ -3232,7 +3236,7 @@
     call splitBoundaryCondition(idDesloc,gmF,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
     
     !Init stress tensor and other variables
-    call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained)
+    call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained, plastType)
 
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3275,7 +3279,7 @@
         u = u + dDis
 
         !updates the plastic strain, and the stress at each gauss point
-        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained)
+        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained, plastType)
 
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3420,15 +3424,16 @@
     end function calcTotalStress
     !**************************************************************************************
     !**************************************************************************************
-    function calcDPPlasticStress(efStress, p, biotCoef)
+    function calcDPPlasticStress(plastType, efStress, p, biotCoef, h)
     !function imports
     
     !variables import
     
     implicit none
     !variables input
+    integer :: plastType
     real*8 :: efStress(nrowB)
-    real*8 :: p, biotCoef
+    real*8 :: p, biotCoef, h
     
     !variables
     real*8 :: calcDPPlasticStress(nrowb)
@@ -3440,8 +3445,11 @@
     
     ! terzagui, i.e., plastic incompressibility.
     do k = 1, nrowb
-        !calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
-        calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))
+        if (plastType == 2) then
+            calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))
+        else
+            calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
+        end if
     end do
     
     end function calcDPPlasticStress

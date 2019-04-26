@@ -360,7 +360,7 @@
 
         prevPIt = p
 
-        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, tangentMatrix, biotP, elementIsPlast, p, pInit, 0)
+        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, tangentMatrix, biotP, elementIsPlast, p, pInit, 0, plastType)
 
     end do
 
