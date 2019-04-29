@@ -501,7 +501,7 @@
     integer*4 position, number_of_lines, current_position
     character(len=200) file_lines(:)
     character(50) keyword, formated_keyword
-    character(len=120) file_line
+    character(len=200) file_line
     integer*4 i, keyword_len
 
     keyword = "include"
@@ -529,7 +529,7 @@
     integer*4 function findKeyword(keyword)
     implicit none
     character(50) keyword, formated_keyword
-    character(len=120) file_line
+    character(len=200) file_line
     integer*4 i, keyword_len
     do i=1, number_of_lines, 1
         file_line = file_lines(i)

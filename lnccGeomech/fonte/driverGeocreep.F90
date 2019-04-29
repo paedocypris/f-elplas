@@ -41,7 +41,7 @@
     !call processamentoOneWayPlast()
     !call processamentoTwoWayElast()
     !call processamentoTwoWayPlast(1) !silva
-    !call processamentoTwoWayPlast(2) !kim
+    call processamentoTwoWayPlast(2) !kim
     call processamentoTwoWayPlast(3) !fss implícito
     ! call processamentoTwoWayPlast(4) !fss explícito
     ! call processamentoTwoWayPlast(5) !fss implícito single step
@@ -252,48 +252,6 @@
     !inicializa variáveis de drucker prager
     call initDPProperties
     !
-1000 format(20a4)
-3000 format(//&
-        ' input data print code . . . . . . . . . . .(iprtin) = ',i10//5x,&
-        '    eq. 0, print nodal and element input data          ',   /5x,&
-        '    eq. 1, do not print nodal and element input data   ',   /5x, &
-        ' number of space dimensions  . . . . . . . .(nsd   ) = ',i10)
-4000 format(5x,&
-        ' number of nodal points  . . . . . . . . .  (numnp ) = ',i10//5x,&
-        ' number of Lados         . . . . . . . . .(numLados) = ',i10//5x,&
-        ' number of nodal degrees-of-freedom  . . . (ndofP ) = ',i10//5x,&
-        ' number of nodal degrees-of-freedom  . . . (ndofV ) = ',i10//5x,&
-        ' number of nodal degrees-of-freedom  . . . (ndofD ) = ',i10//5x,&
-        ' number of load vectors  . . . . . . . . . (nlvectP) = ',i10//5x,&
-        ' number of load vectors  . . . . . . . . . (nlvectV) = ',i10//5x,&
-        ' number of load vectors  . . . . . . . . . (nlvectD) = ',i10//5x)
-5000 FORMAT(5X,  &
-        &' MESH DATA FOR RESERVOIR AND OVERBUDEN DOMAINS:     '//5X,     &
-        &'  ELEMENTS IN X-DIRECTION GLOBAL DOMAIN. . (NELX ) = ',I10//5X, &
-        &'  ELEMENTS IN Y-DIRECTION GLOBAL DOMAIN. . (NELY ) = ',I10//5X, &
-        &'  ELEMENTS IN Z-DIRECTION GLOBAL DOMAIN. . (NELZ ) = ',I10//5X, &
-        &'  NODAL POINTS FOR GLOBAL DOMAIN . . . . . (NUMNP) = ',I10//5X, &
-        &'  ELEMENTS IN X-DIRECTION RESERVOIR. . . . (NELX1) = ',I10//5X, &
-        &'  ELEMENTS IN Y-DIRECTION RESERVOIR. . . . (NELY1) = ',I10//5X, &
-        &'  ELEMENTS IN Z-DIRECTION RESERVOIR. . . . (NELZ1) = ',I10//5X, &
-        &'  NODAL POINTS FOR RESERVOIR . . . . . . . (NUMNP1)= ',I10//5X)
-    !
-6000 FORMAT(5X,  &
-        &' MESH STRUCTURE AND READ INPUT DATA OPTIONS:           '//5X, &
-        &' Reservoir Fine Mesh and External Gross  (IrregMesh) = ',I2/5X,&
-        &'    eq. 0, Not Read External Files                     ',  /5x,&
-        &'    eq. 1, Read Files with Coordinates and Conectivies ',  //5x,&
-        &' Read Geomechanical Dirichlet Conditions (Dirichlet) = ',I2/5X,&
-        &'    eq. 0, Not Read External Files                     ',  /5x,&
-        &'    eq. 1, Read External File                          ',  //5x,&
-        &' Read Geomechanical Neumann   Conditions (Neumann  ) = ',I2/5X,&
-        &'    eq. 0, Not Read External Files                     ',  /5x,&
-        &'    eq. 1, Read External File                          ',  //5x,&
-        &' Multiply Sea Load on Neumann Conditions (I4SeaLoad) = ',I2/5X,&
-        &'    eq. 0, Not Multiply by External Load               ',   /5x,&
-        &'    eq. 1, Multiply by External Load                   ',  //)
-9001 FORMAT("Solvers escolhidos para a solucao do sistema de equacoes: Hidro:",A7, ", Geo:", A7)
-    !
     end subroutine preprocessador_DS
     !
     !**** new *******************************************************************
@@ -355,7 +313,6 @@
 200 CONTINUE
     !
     RETURN
-4500 FORMAT(I8,X,40(1PE15.8,2X))
     !
     END SUBROUTINE
     !
@@ -417,8 +374,7 @@
 100 CONTINUE
     !
     VELNORM = XMAXIMO
-    !
-4000 FORMAT(i5,2x,2(1PE15.8,2x))
+
     END FUNCTION
     !
     !**** NEW **********************************************************************
@@ -647,48 +603,7 @@
     !
     return
     !
-1000 format(//,&
-        ' two/three-n o d e    e l e m e n t s ',//,5x,&
-        ' element type number . . . . . . . . . . (ntype ) = ',i10,//5x,&
-        ' number of elements  . . . . . . . . . . (numel ) = ',i10,//5x,&
-        ' number of element material sets . . . . (numat ) = ',i10,//5x,&
-        ' number of element nodes . . . . . . . . (nen   ) = ',i10,//5x,&
-        ' number of integration points. . . . . . (npint  ) = ',i10)
 1001 FORMAT(' hx= ',F12.5,2X,'hy= ',F12.5,2X,' hz= ',F12.5)
-1500 FORMAT(I10)
-4000 format(///,&
-        ' m a t e r i a l   s e t   d a t a             ',  //5x,&
-        ' number of material sets . . . . . . .(numat ) = ',i10,//,2x,&
-        & 'set',4x,'Kx ',4x,'Ky',4x,'Kz')
-4500 FORMAT(27I8)
-5000 format(i10,5x,5f10.0)
-6000 format(2x,i3,1x,5(1x,1pe11.4))
-7000 format(8f10.0)
-8000 format(///,&
-        ' g r a v i t y   v e c t o r   c o m p o n e n t s     ',//5x,&
-        ' exemplo 1. . . . . . . . . . . . . .  = ',      1pe15.8,//5x,&
-        ' exemplo 2 . . . . . . . . . . . . . . = ',      1pe15.8,//5x,&
-        ' exemplo 3............................ = ',      1pe15.8,//)
-9000 format('Calculo das velocidades nodais' //&
-        ' e q u a t i o n    s y s t e m    d a t a              ',  //5x,&
-        ' number of equations . . . . . . . . . . . . (neq    ) = ',i8//5x,&
-        ' number of terms in left-hand-side matrix  . (nalhs  ) = ',i12//5x,&
-        ' mean half bandwidth . . . . . . . . . . . . (meanbw ) = ',i8//5x,&
-        ' memoria necessaria para a matriz do sistema  (Mbytes)  = ',e10.2)
-9002 FORMAT( "Tempo de pre-processamento da Velocidade para solver externo",f12.5)
-9003 FORMAT( "Tempo de pre-processamento da Geomecanic para solver externo",f12.5)
-9500 FORMAT(5X,  &
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **  CONECTIVITIES STRUCTURE:                        **',/5X,&
-        &' **  OBTAINED FROM ', A30 ,                     '    **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X)
     !
     END  SUBROUTINE
     !
@@ -954,7 +869,7 @@
     if (initStress == 1) then
         call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
         if (isPlast == 1) then
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0, plastType)
         end if
     end if
     uInit = u
@@ -1046,7 +961,7 @@
                 end if
 
                 if (isPlast == 1) then
-                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0)
+                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0, plastType)
                 else if (isPlast == 0) then
                     call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
                 end if

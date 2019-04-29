@@ -230,14 +230,6 @@
     !
     return
     !
-2000 format(5(1pe15.8,2x))
-2222 format('elemento (nel)=',i5,2x,' gauss point (l)=',i2/5x   &
-        &' c11, c21, c31, c41 =',4(1pe9.2,2x)/5x,                    &
-        &' c12, c22, c32, c42 =',4(1pe9.2,2x)/5x,                    &
-        &' c13, c23, c33, c43 =',4(1pe9.2,2x)/5x,                    &
-        &' c14, c24, c34, c44 =',4(1pe9.2,2x)//)
-3333 format('elmnt (nel)=',i5,x,'gauss pt (l)=',i2,2x,4(1pe9.2,2x))
-    !
     end subroutine bbarmtrx_plast
     !
     !**** new *********************
@@ -413,9 +405,6 @@
 
     RETURN
     !
-2000 FORMAT(5(1PE15.8,2X))
-4500 FORMAT(I8,X,40(1PE15.8,2X))
-    !
     END SUBROUTINE
     !
     !**** NEW FOR 3D GEOMECHANICAL COUPLING *************************************
@@ -467,8 +456,6 @@
     ENDIF
     !
     RETURN
-1000 FORMAT('NEL = ',I5,1X,40(1PE15.8,2X))
-1001 FORMAT(I5,1X,40(1PE15.8,2X))
     !
     END SUBROUTINE
     !
@@ -530,11 +517,7 @@
     CBBAR(3,1) = CBBAR(1,3)
     CBBAR(3,2) = CBBAR(2,3)
     !
-100 CONTINUE
-    !
     RETURN
-    !
-2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE
     !**************************************************************************************
@@ -589,11 +572,9 @@
     CBBARM1(3,1) = CBBARM1(1,3)
     CBBARM1(3,2) = CBBARM1(2,3)
     !
-100 CONTINUE
+    CONTINUE
     !
     RETURN
-    !
-2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE SETCBBM1
     !**************************************************************************************
@@ -618,6 +599,7 @@
     INTEGER :: L, I, J
     real*8, external :: coldot
     !
+    TEMP2 = 0.d0
     CALL CLEAR(SHGBAR,3*NEN)
     !
     VOLINV = 1.0D0/COLDOT(W,DET,NINT)
@@ -780,7 +762,7 @@
     END SUBROUTINE
     !**************************************************************************************
     !**************************************************************************************
-    subroutine pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, biotP, elementIsPlast, pressure, pInit, isUndrained)
+    subroutine pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, curStress, curStressS, curTrStrainP, curStressTotal, tangentMatrix, biotP, elementIsPlast, pressure, pInit, isUndrained, plastType)
     !
     !.... PROGRAM TO UPDATE STRESS FOR NON-LINEAR plasticity MODEL
     !
@@ -813,6 +795,7 @@
     real*8 :: pressure(1,numnp)
     real*8 :: pInit(1,numnp)
     integer :: isUndrained
+    integer :: plastType
     
     !variables
     logical quad
@@ -968,7 +951,7 @@
             stressLEff = matmul(cbbar, elasticStrain)
             
             !.... ... compute yield function:
-            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha)
+            call dpYieldEfStress(fYield,stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, plastType)
             
             if (fyield.ge.tolyield) then
                 elementIsPlast(nel) = 1.d0
@@ -992,7 +975,7 @@
                     stressLEff = matmul(cbbar, elasticStrain)
                     
                     !.... ... compute the yield function, its gradient and hessian (drucker-prager):
-                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, .false.)
+                    call dpGrads(fYield, fYield1, fYield2, stressLEff, pressureIntPoint, biotCoef, dpK, dpAlpha, .false., plastType)
                     
                     !.... ... residual computation
                     do k=1,nrowb
@@ -1360,8 +1343,6 @@
     !
     RETURN
     !
-2000 FORMAT(5(1PE15.8,2X))
-    !
     END SUBROUTINE
     !
     !*** NEW *** FOR STOCHASTIC YOUNG MODULUS *******************************
@@ -1394,8 +1375,6 @@
     TANGENT(16) = QMATR4X4(4,4)
     !
     RETURN
-    !
-2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE
     !
@@ -1460,8 +1439,6 @@
     QMATR4X4(4,4) = TANGENT(16)
     !
     RETURN
-    !
-2000 FORMAT(5(1PE15.8,2X))
     !
     END SUBROUTINE
     !
@@ -1691,7 +1668,6 @@
     !
     RETURN
     !
-2000 FORMAT(I5,2X,40(1PE15.8,2X))
 3000 FORMAT(2X,5(F25.15,2x))
 4000 FORMAT(2X,40(1PE15.8,2X))
     !
@@ -1803,8 +1779,6 @@
     ENDIF
     !
     RETURN
-1000 FORMAT(2X,40(1PE15.8,2X))
-4500 FORMAT(I8,X,i4,x,40(1PE15.8,2X))
     !
     END SUBROUTINE
     !
@@ -1874,8 +1848,6 @@
     ENDIF
     !
     RETURN
-1000 FORMAT(2X,40(1PE15.8,2X))
-4500 FORMAT(I8,X,i4,x,40(1PE15.8,2X))
     !
     END SUBROUTINE
     !
@@ -1904,6 +1876,8 @@
         HIDROSTAT = PRSRLINEAR(Z1,Z2,RHOEQ,BULKEQ,G)
         RETURN
     ENDIF
+
+    HIDROSTAT = 0.d0
     !
     RETURN
     !
@@ -2074,8 +2048,6 @@
     !
     RETURN
     !
-4000 FORMAT(2X,40(1PE15.8,2X))
-    !
     END SUBROUTINE
     !
     !**** NEW **** FOR VISCOELASTICITY ***************************************
@@ -2231,8 +2203,6 @@
 700 CONTINUE
     !
     RETURN
-    !
-4000 FORMAT(2X,40(1PE15.8,2X))
     !
     END SUBROUTINE POS4STRS
     !**************************************************************************************
@@ -2489,16 +2459,10 @@
     !
     RETURN
     !
-2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X  &
-        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                  &
-        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                  &
-        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                  &
-        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
-    !
     END SUBROUTINE GRADS
     !**************************************************************************************
     !**************************************************************************************
-    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, k, alpha)
+    subroutine dpYieldEfStress(fYield,efStress,p, biotCoef, k, alpha, plastType)
     !function imports
     
     !variables import
@@ -2508,12 +2472,13 @@
     real*8 :: fYield, efStress(nrowb)
     real*8 :: p, biotCoef
     real*8 :: k, alpha
+    integer :: plastType
     
     !variables
     real*8 :: dummyFYield1(nrowb), dummyFYield2(nrowb,nrowb)
     
     !------------------------------------------------------------------------------------------------------------------------------------
-    call dpGrads(fYield, dummyFYield1, dummyFYield2, efStress, p, biotCoef, k, alpha, .true.)
+    call dpGrads(fYield, dummyFYield1, dummyFYield2, efStress, p, biotCoef, k, alpha, .true., plastType)
     
     end subroutine dpYieldEfStress
     !**************************************************************************************
@@ -2592,7 +2557,7 @@
     end function dpYield2
     !**************************************************************************************
     !**************************************************************************************
-    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, k, alpha, onlyF)
+    subroutine dpGrads(fYield, fYield1, fYield2, efStress, p, biotCoef, k, alpha, onlyF, plastType)
     !function imports
     
     !variables import
@@ -2602,6 +2567,7 @@
     real*8 :: fYield, fYield1(nrowb), fYield2(nrowb,nrowb)
     real*8 :: efStress(nrowb), p, biotCoef, k, alpha
     logical :: onlyF
+    integer :: plastType
     
     !variables
     real*8 :: plasticStress(nrowb), devStress(nrowb), traceD3
@@ -2609,7 +2575,7 @@
     
     !--------------------------------------------------------------------------------------
     ! calculates the effective plastic stress for the drucker prager model (dormieux(2006) pag.225)
-    plasticStress = calcDPPlasticStress(efStress, p, biotCoef, k/alpha)
+    plasticStress = calcDPPlasticStress(plastType, efStress, p, biotCoef, k/alpha)
     
     !calculates the deviator of the stress tensor
     call devTensor(devStress,traceD3,plasticStress,nrowb)
@@ -2891,8 +2857,6 @@
     !
     RETURN
     !
-2000 FORMAT(A15,4(1PE10.2,2X))
-    !
     END SUBROUTINE COMPQIXI
     !**************************************************************************************
     !**************************************************************************************
@@ -3104,15 +3068,6 @@
     !      stop
     RETURN
     !
-2222 FORMAT('ELEMENTO (NEL)=',I5,2X,' GAUSS POINT (L)=',I2/5X  &
-        &' C11, C21, C31, C41 =',4(1PE9.2,2X)/5X,                  &
-        &' C12, C22, C32, C42 =',4(1PE9.2,2X)/5X,                  &
-        &' C13, C23, C33, C43 =',4(1PE9.2,2X)/5X,                  &
-        &' C14, C24, C34, C44 =',4(1PE9.2,2X)//)
-4000 FORMAT(2X,40(1PE15.8,2X))
-4001 FORMAT('nel=',I5,x,'gauss=',I1,x,'I',i1,2X,40(1PE15.8,2X))
-5000 FORMAT(I4,2X,I1,2X,40(1PE15.8,2X))
-    !
     END SUBROUTINE STRSS4PLAST
     !**************************************************************************************
     !**************************************************************************************
@@ -3226,7 +3181,7 @@
     end subroutine incrementMechanicElasticSolution
     !**************************************************************************************
     !**************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, isUndrained)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, isUndrained, plastType)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -3240,6 +3195,7 @@
     real*8 :: biotP(:,:,:)
     real*8 :: elementIsPlast(nel)
     integer :: isUndrained
+    integer :: plastType
 
     ! Variables
     real*8, allocatable :: fExtT(:,:), fIntJ(:,:) !fExtT - external force at time T, fIntJ - internal Force at newton iteration J
@@ -3280,7 +3236,7 @@
     call splitBoundaryCondition(idDesloc,gmF,fExtDirichlet,fExtNeumann,ndofD,nnp,nlvectD)
     
     !Init stress tensor and other variables
-    call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained)
+    call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained, plastType)
 
     !computes the internal force
     call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
@@ -3323,18 +3279,12 @@
         u = u + dDis
 
         !updates the plastic strain, and the stress at each gauss point
-        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained)
+        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, hmTTG, biotP, elementIsPlast, p, pInit, isUndrained, plastType)
 
         !computes the internal force
         call calcInternalForce(x, conecNodaisElem, nen, nel, nnp, nsd, stress, fIntJ)
     end do
     if (converged.eqv..false.) write(*,*) '******************Newton method not converged.********************'
-
-
-1100 format ("u(", I1,",",I1")")
-1200 format ("u(", I1,",",I2")")
-1300 format ("u(", I2,",",I1")")
-1400 format ("u(", I2,",",I2,")")
 
     end subroutine incrementMechanicPlasticSolution
     !**************************************************************************************
@@ -3474,16 +3424,16 @@
     end function calcTotalStress
     !**************************************************************************************
     !**************************************************************************************
-    function calcDPPlasticStress(efStress, p, biotCoef, h)
+    function calcDPPlasticStress(plastType, efStress, p, biotCoef, h)
     !function imports
     
     !variables import
     
     implicit none
     !variables input
+    integer :: plastType
     real*8 :: efStress(nrowB)
-    real*8 :: p, biotCoef
-    real*8 :: h
+    real*8 :: p, biotCoef, h
     
     !variables
     real*8 :: calcDPPlasticStress(nrowb)
@@ -3496,8 +3446,11 @@
     ! terzagui, i.e., plastic incompressibility.
     h = h
     do k = 1, nrowb
-        ! calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
-        calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))
+        if (plastType == 2) then
+            calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))
+        else
+            calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))/ (1 + p/h)
+        end if
     end do
     
     end function calcDPPlasticStress

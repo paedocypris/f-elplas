@@ -795,7 +795,7 @@
         norma= norma + res(i) * res(i)
     enddo
     norma = dsqrt(norma)
-    write(*,'(a,1pe12.4,a)'), "r=Au-b, norma do residuo da solucao, r=" , norma
+    write(*,'(a,1pe12.4,a)') i, "r=Au-b, norma do residuo da solucao, r=" , norma
 
     end subroutine
     !**** new **********************************************************************

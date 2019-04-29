@@ -305,8 +305,6 @@
     call readTensorFlagKeyword(keyword_name, permInicial, nsd, ierr)
 
     !
-1000 FORMAT(A6)
-    !
     end subroutine lerDataIn_DS
 
     !===========================================================================
@@ -672,8 +670,6 @@
     !
     RETURN
     !
-1000 FORMAT(A18)
-    !
     END SUBROUTINE lerGeoMechParam_DS
     !
     !===========================================================================
@@ -724,8 +720,6 @@
     call readIntegerKeywordValue(keyword_name, IBBAR, IBBAR, ierr)
     !
     RETURN
-    !
-1000 FORMAT(A6)
     !
     END SUBROUTINE lerNumericParam_DS
     !
@@ -1777,23 +1771,6 @@
 
     RETURN
     !
-1000 FORMAT(I10)
-1500 FORMAT(2X,40(1PE15.8,2X))
-2000 FORMAT(6x,i12,10x,3(1pe15.8,2x))
-3700 FORMAT(35X,1PE15.8)
-5000 FORMAT(5X,  &
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **  COORDINATES MESH STRUCTURE:                     **',/5X,&
-        &' **  OBTAINED FROM ', A30 ,                     '    **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X)
-    !
     END SUBROUTINE
     !
     !**** NEW ** MODIFIED FOR IRREGULAR MESH ***********************************
@@ -1906,23 +1883,6 @@
     !
     RETURN
     !
-1000 FORMAT(I10)
-1500 FORMAT(2X,40(1PE15.8,2X))
-2000 FORMAT(6x,i12,10x,3(1pe15.8,2x))
-3700 FORMAT(35X,1PE15.8)
-5000 FORMAT(5X,  &
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **  COORDINATES MESH STRUCTURE:                     **',/5X,&
-        &' **  OBTAINED FROM ', A30 ,                     '    **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' **                                                  **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X,&
-        &' ** ** ** ** ** ** ** ** *** ** ** ** ** ** ** ** ** **',/5X)
-    !
     END SUBROUTINE
     !
     !**** NEW **** MODIFIED FOR IRREGULAR MESH  *****************
@@ -1957,8 +1917,6 @@
     !
     RETURN
     !
-1000 FORMAT(I10)
-1010 FORMAT(A12)
 
     !
     END SUBROUTINE
@@ -2180,7 +2138,6 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     CLOSE(ARQUIVO)
 100 FORMAT(F10.5)
-200 FORMAT(E15.7)
 300 FORMAT(I5)
     !
     END SUBROUTINE escreverArqParaview_vetor
@@ -2329,8 +2286,6 @@
     ENDDO
     !
     CLOSE(ARQUIVO)
-100 FORMAT(F10.5)
-200 FORMAT(E15.7)
 300 FORMAT(I5)
     !
     END SUBROUTINE escreverArqParaview_escalar
@@ -2714,7 +2669,6 @@
     RETURN
     !
 1900 FORMAT(2X,6(1PE15.8,2X))
-1901 FORMAT(a12,x,6(1PE15.8,2X))
 2000 FORMAT(27I6)
     !
     END SUBROUTINE
@@ -2827,8 +2781,6 @@
     RETURN
     !
 1900 FORMAT(2X,6(1PE15.8,2X))
-1902 FORMAT(I8,2X,6(1PE15.8,2X))
-1901 FORMAT(a12,x,6(1PE15.8,2X))
 2000 FORMAT(27I6)
     !
     END SUBROUTINE
@@ -3951,13 +3903,13 @@
     write(124, "('VARIABLE',/,'scalar per element:', 2x, 'Saturacao', 2x, 'solucao.***' )")
     write(124, *)
     write(124, "('TIME',/,'time set: 1')")
-    write(124, "('number of steps:', i10)"), steps
-    write(124, "('filename start number:', i10)"), numInicial
-    write(124, "('filename increment:', i10)"), incremento
+    write(124, "('number of steps:', i10)") steps
+    write(124, "('filename start number:', i10)") numInicial
+    write(124, "('filename increment:', i10)") incremento
     write(124, "('time values:')")
 
     do i=1, steps+1
-        write(124, *), incTempo
+        write(124, *) incTempo
         incTempo=incTempo+1.0
     end do
 

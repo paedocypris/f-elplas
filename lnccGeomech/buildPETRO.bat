@@ -10,10 +10,14 @@ SET me=%~n0
 
 set obj_folder="lnccGeomech\bin"
 
+
 set "flags_DEBUG=/c /warn:all /nologo /Z7 /Od /traceback /gen-interfaces /warn:interfaces /check /Qtrapuv /fpe:0"
 
 if not exist %obj_folder% mkdir %obj_folder%
 pushd %obj_folder%
+
+del /q .\*
+
 ifort %flags_DEBUG% ..\fonte\variaveisGlobais.F90
 ifort %flags_DEBUG% ..\fonte\malha.F90
 ifort %flags_DEBUG% ..\fonte\leituraEscrita.F90

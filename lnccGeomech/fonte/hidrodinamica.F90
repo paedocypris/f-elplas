@@ -225,7 +225,7 @@
 
                 betaTotalCompressibility = totalCompressibility(curElement, matrixBulkEP)
                 psi = calcBiotCoefficient(curElement)/matrixBulkEP
-            else if (plastType == 3 .or. plastType == 4 .or. plastType == 5) then
+            else
                 matrixBulkEP = calcBulkFromMatrix(tangentMatrix(1:16,l,curElement))
 
                 betaTotalCompressibility = totalCompressibility(curElement, matrixBulk) + 1.d0/3.d0*traceTensor(biotP(1:4,l,curElement),4)/matrixBulkEP - biotCoeff/matrixBulk
@@ -360,7 +360,7 @@
 
         prevPIt = p
 
-        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, tangentMatrix, biotP, elementIsPlast, p, pInit, 0)
+        call pos4plast(x, conecNodaisElem, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, tangentMatrix, biotP, elementIsPlast, p, pInit, 0, plastType)
 
     end do
 

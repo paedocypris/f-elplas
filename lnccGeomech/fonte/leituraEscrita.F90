@@ -81,39 +81,6 @@
 !
 !**** new *******************************************************************
 !
-      subroutine printp(a,idiag,neq,nsq,*)
-      use mGlobaisEscalares
-!
-!.... program to print array d after Crout factorization 
-!        a = u(transpose) * d * u
-!
-      implicit none
-!
-!.... remove above card for single precision operation
-!
-      integer :: neq, nsq, iecho
-      real*8 :: a(*)
-      integer :: idiag(*)
-!
-      integer :: n, i
-!
-      do 100 n=1,neq
-         if (mod(n,50).eq.1) write(iecho,1000) nsq
-         write(iecho,1000)
-         i = idiag(n)
-         write(iecho,2000) n,a(i)
-  100 continue
-!
-      return 1
-!
- 1000 format('1',' array d of factorization',/&
-     ' a = u(transpose) * d * u ',                                //5x,&
-     ' time sequence number   . . . . . . . . . . . . (nsq) = ',i10//5x)
- 2000 format(1x,i10,4x,1pe20.8)
-      end subroutine
-!
-!**** new *******************************************************************
-!
       subroutine prntel(mat,conectElem,nen,numel,tipo)
       implicit none
 !

@@ -1599,6 +1599,8 @@
             onemr=one-r
             oneps=one+s
             onems=one-s
+            onemssq=one-s*s
+            onemrsq=one-r*r
             shl2(1,5,l)=-oneps
             shl2(2,5,l)=zero
             shl2(3,5,l)=-r
@@ -2381,10 +2383,6 @@
     real(8), parameter :: zero=0.d0,pt5=0.5d0
     real(8), parameter :: r1=0.d0,w1=2.d0
     real(8), parameter :: r2=0.577350269189626d0,w2=1.d0
-    real(8), parameter :: r3a=0.774596669241483d00
-    real(8), parameter :: w3a=0.555555555555556d00
-    real(8), parameter :: r3b=0.d00
-    real(8), parameter :: w3b=0.888888888888889d00
     real(8) :: r,s,t
 
     !

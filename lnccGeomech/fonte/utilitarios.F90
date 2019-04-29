@@ -76,13 +76,12 @@
     nn = 0
     !
     do 100 n=1,numnp
-        write(icode,2000) n,(dva(i,n),i=1,ndof)
+        write(icode,1000) n,(dva(i,n),i=1,ndof)
 100 continue
     !
     return
     !
-1000 format('1',11a4//1x,'node',6(11x,'dof',i1)/)
-2000 format(1x,i10,2x,6(1pe30.10,2x))
+1000 format(1x,i10,2x,6(1pe30.10,2x))
     end subroutine
 
     !
@@ -105,7 +104,7 @@
     lzero = .true.
     !
     do 100 i=1,n
-        if (a(i).ne.0.0d0) then
+        if (abs(a(i)) < 1.0d-20) then
             lzero = .false.
             return
         endif
@@ -208,7 +207,7 @@
 
     write(num,'(f20.4)') tempo
     !     labelAux="t="//ADJUSTL(num)
-    labelAux="t="//num
+    labelAux="t=" // trim(num)
     do i = 1, 21
         if(labelAux(i:i) .ne. ' ') then
             label(i:i) = labelAux(i:i)
@@ -883,7 +882,7 @@
     matrixNorm = 0
     do j = 1, nj
         do i = 1, ni
-        	matrixNorm = matrixNorm + a(i,j)*a(i,j)
+            matrixNorm = matrixNorm + a(i,j)*a(i,j)
         end do
     end do
     
@@ -925,7 +924,7 @@
             end if
             
             temp = (a(i,j)-b(i,j))/den
-        	calcRelErrorMatrix = calcRelErrorMatrix + temp*temp
+            calcRelErrorMatrix = calcRelErrorMatrix + temp*temp
         end do
     end do
     calcRelErrorMatrix = dsqrt(calcRelErrorMatrix)/count
@@ -941,7 +940,7 @@
     !
     integer :: l1,l2,ll,n,i,j,k,l,ls
     real*8 :: c
-    real*8 :: part, ti, tf, tfAnt, tempoProc, tempoProcTotEst, somaTempoProcTotEst
+    real*8 :: part, ti, tfAnt, somaTempoProcTotEst
     integer :: cont
 
     write(*,*) "..... Resolvendo o Sistema Pressao 3D, solver interno"
@@ -991,23 +990,6 @@
     end do
     x=r
 
-    contains
-    subroutine estimativasDeDesempenho()
-
-    if(mod(n,int(part*ns)) == 0) then
-        cont = cont + 1
-        call timing(tf)
-        tempoProc           = tf - tfAnt
-        tempoProcTotEst     = ns * tempoProc/(part*ns)
-        somaTempoProcTotEst = somaTempoProcTotEst + tempoProcTotEst
-        write(*,*)' n = ', n
-        write(*,*) int(part*ns), 'iteracoes, tempo =', tempoProc
-        write(*,*)' tempo total     (inst.) estimado =', tempoProc *      ns  / (part*ns)
-        write(*,*)' tempo decorrido (inst.) estimado =', tempoProc *       n  / (part*ns)
-        write(*,*)' tempo restante  (inst.) estimado =', tempoProc * (ns - n) / (part*ns)
-        tfAnt=tf
-    end if
-    end subroutine estimativasDeDesempenho
     end subroutine solverGaussBanda
     
     function traceTensor(tensor, nrowb)
