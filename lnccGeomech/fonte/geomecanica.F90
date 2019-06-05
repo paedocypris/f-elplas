@@ -2593,7 +2593,7 @@
     fYield1 = dpYield1(devStress, J2, alpha)
     fYield2 = dpYield2(plasticStress, I1, J2)
     
-    end subroutine dpGrads
+    end subroutine dpGrads 
     !**************************************************************************************
     !**************************************************************************************
     subroutine calcQixiM1(qixi,cbbarm1,hGamma,fYield2)
@@ -3446,6 +3446,7 @@
     identI = (/ 1., 1., 0., 1. /)
     
     ! terzagui, i.e., plastic incompressibility.
+    h = h
     do k = 1, nrowb
         if (plastType == 2) then
             calcDPPlasticStress(k) = (efStress(k) + (1 - biotCoef) * p * identI(k))

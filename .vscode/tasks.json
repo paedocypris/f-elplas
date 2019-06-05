@@ -59,7 +59,7 @@
         {
             "label": "debug",
             "type": "shell",
-            "command": "${workspaceRoot}\\lnccGeomech\\debug.bat",
+            "command": "${workspaceRoot}\\lnccGeomech\\debugPETRO.bat",
             "presentation": {
                 "reveal": "never"
             }
