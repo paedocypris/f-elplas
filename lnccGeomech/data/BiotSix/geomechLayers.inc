@@ -35,10 +35,10 @@
 77.3649D+7
 }
 *epMohrCoulombPhi_reservoir_region{
-30
+60
 }
 *epMohrCoulombC_reservoir_region{
-2.D+7
+2.D+8
 }
 *stress-strain_relation_reservoir_region{
 ELASTIC

@@ -9,8 +9,9 @@
             "request": "launch",
             "name": "Debug BiotSix",
             "target": "${workspaceRoot}/lnccGeomech/bin/lnccGeomech.exe",
-            "cwd": "${workspaceRoot}/lnccGeomech/data/BiotSix",
-            "valuesFormatting": "disabled"
+            "cwd": "${workspaceFolder}/lnccGeomech/data/BiotSix",
+            "valuesFormatting": "disabled",
+            "terminal": ""
         }
     ]
 }

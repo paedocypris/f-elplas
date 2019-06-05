@@ -41,7 +41,7 @@
     !call processamentoOneWayPlast()
     !call processamentoTwoWayElast()
     !call processamentoTwoWayPlast(1) !silva
-    call processamentoTwoWayPlast(2) !kim
+    ! call processamentoTwoWayPlast(2) !kim
     call processamentoTwoWayPlast(3) !fss implícito
     ! call processamentoTwoWayPlast(4) !fss explícito
     ! call processamentoTwoWayPlast(5) !fss implícito single step
@@ -869,7 +869,7 @@
     if (initStress == 1) then
         call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
         if (isPlast == 1) then
-            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0, plastType)
+            call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, prevP, pInit, biotP, elementIsPlast, 0, plastType)
         end if
     end if
     uInit = u
@@ -961,7 +961,7 @@
                 end if
 
                 if (isPlast == 1) then
-                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, 0, plastType)
+                    call incrementMechanicPlasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, prevP, pInit, biotP, elementIsPlast, 0, plastType)
                 else if (isPlast == 0) then
                     call incrementMechanicElasticSolution(conecNodaisElem, nen, numel, numnp, nsd, x, t, u, stress, stressS, stressTotal, p, pInit, 0)
                 end if

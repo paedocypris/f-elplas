@@ -73,7 +73,7 @@
     !
     !**** new **********************
     !
-    subroutine bbarmtrx_plast(x, conecnodaiselem, disDirichlet, alhsd, brhsd, idiagd, lmd, tangentMatrix, pressure)
+    subroutine bbarmtrx_plast(x, conecnodaiselem, disDirichlet, alhsd, brhsd, idiagd, lmd, tangentMatrix, biotP, pressure, prevPressure)
     !
     !.... program to calculate stifness matrix and force array for the
     !        stoke's displacement  element and
@@ -101,11 +101,12 @@
     integer :: idiagd(neqD)
     integer :: lmd(ned2,nen,numel)
     real*8 :: tangentMatrix(nrowb2,nintD, numel)
-    real*8 :: pressure(1,numnp)
+    real*8 :: biotP(nrowb,nintD,numel)
+    real*8 :: pressure(1,numnp), prevPressure(1,numnp)
     
     !variables
-    real(8) :: xl(nesd,nen), disL(ned2,nen), pL(1,nen)
-    real*8 :: pLInt, densTotal
+    real(8) :: xl(nesd,nen), disL(ned2,nen), pL(1,nen), prevPL(1,nen)
+    real*8 :: pLInt, prevPLInt, densTotal
     real(8) :: elresfd(nee2), eleffmd(nee2,nee2)
     real*8 :: biotCoef
     !
@@ -146,6 +147,7 @@
         call local(conecNodaisElem(1,nel),x,xl,nen,nsd,nesd)
         call local(conecNodaisElem(1,nel),disDirichlet,disl,nen,ndofd,ned2)
         call local(conecNodaisElem(1,nel),pressure,pL,nen,1,1)
+        call local(conecNodaisElem(1,nel),prevPressure,prevPL,nen,1,1)
         
         quad = .true.
         if (conecnodaiselem(3,nel).eq.conecnodaiselem(4,nel)) quad = .false.
@@ -173,6 +175,7 @@
             
             !calculate the pressure at the integration point
             pLInt = dot_product(shgD(nrowsh,1:nen,l), pL(1,1:nen))
+            prevPLInt = dot_product(shgD(nrowsh,1:nen,l), prevPL(1,1:nen))
             
             !
             !.... ...upload b-bar matrix at node j
@@ -201,12 +204,11 @@
                 end do
                 
                 ! calc pressure contribution
-                
                 elresfd(ned2*j-1) = elresfd(ned2*j-1) &
-                    &                  + biotCoef * pLInt * shgD(1,j,l) * c1 & ! calc pressure contribution
+                    &                  + dot_product(biotP(:,l,nel),bbarj(:,1)) * (pLInt-prevPLInt) * c1 & ! calc pressure contribution
                     &                  + densTotal * grav(1) * shgD(nrowsh,j,l) * c1   ! calc gravity contribution
                 elresfd(ned2*j) = elresfd(ned2*j) &
-                    &                  + biotCoef * pLInt * shgD(2,j,l) * c1 & ! calc pressure contribution
+                    &                  + dot_product(biotP(:,l,nel),bbarj(:,2)) * (pLInt-prevPLInt) * c1 & ! calc pressure contribution
                     &                  + densTotal * grav(2) * shgD(nrowsh,j,l) * c1     ! calc gravity contribution
             end do
         end do
@@ -3181,7 +3183,7 @@
     end subroutine incrementMechanicElasticSolution
     !**************************************************************************************
     !**************************************************************************************
-    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, pInit, biotP, elementIsPlast, isUndrained, plastType)
+    subroutine incrementMechanicPlasticSolution(conecNodaisElem, nen, nel, nnp, nsd, x, curT, u, strainP, prevStrainP, stress, stressS, trStrainP, stressTotal, p, prevP, pInit, biotP, elementIsPlast, isUndrained, plastType)
     !function imports
     use mSolverGaussSkyline, only: solverGaussSkyline
     use mLeituraEscritaSimHidroGeoMec, only: escreverArqParaviewIntermed_CampoVetorial, escreverArqParaviewIntermed_CampoEscalar
@@ -3191,7 +3193,7 @@
     integer :: nen, nel, nnp, nsd, conecNodaisElem(nen, nel)
     real*8 :: x(nsd, nnp), curT, u(ndofD,nnp), strainP(nrowb, nintD, nel), prevStrainP(nrowb,nintD,nel)
     real*8 :: stress(nrowB,nintD,nel), stressS(nintD, nel), trStrainP(nintD,nel), stressTotal(nrowB, nintD,nel)
-    real*8 :: p(1,nnp), pInit(1,nnp)
+    real*8 :: p(1,nnp), prevP(1,nnp), pInit(1,nnp)
     real*8 :: biotP(:,:,:)
     real*8 :: elementIsPlast(nel)
     integer :: isUndrained
@@ -3262,7 +3264,7 @@
         end if
         
         ! compute the tangential stiffness matrix, and fill brhsd with the dirichlet node info
-        call bbarmtrx_plast(x, conecNodaisElem, fExtDirichlet, alhsD, brhsD, idiagD, lmD, hmTTG, p)
+        call bbarmtrx_plast(x, conecNodaisElem, fExtDirichlet, alhsD, brhsD, idiagD, lmD, hmTTG, biotP, p, prevP)
         
         error = dsqrt(dot_product(brhsD,brhsD))/neqD
         write(*,*) "erro do passo mecanico: ", error

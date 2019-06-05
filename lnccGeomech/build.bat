@@ -24,5 +24,5 @@ gfortran %flags_DEBUG% ..\fonte\geomecanica.F90
 gfortran %flags_DEBUG% ..\fonte\hidrodinamica.F90
 gfortran %flags_DEBUG% ..\fonte\driverGeocreep.F90
 
-gfortran -g variaveisGlobais.o malha.o leituraEscrita.o funcoesDeForma.o utilitarios.o mInputReader.o propGeoFisica.o solverGaussSkyline.o leituraEscritaSimHidroGeoMec.o geomecanica.o hidrodinamica.o driverGeocreep.o -o lnccGeomech.exe
+gfortran -g variaveisGlobais.o malha.o leituraEscrita.o funcoesDeForma.o utilitarios.o mInputReader.o propGeoFisica.o solverGaussSkyline.o leituraEscritaSimHidroGeoMec.o geomecanica.o hidrodinamica.o driverGeocreep.o -o "/home/rsilva/projects/lnccProgram/lnccGeomech.out"
 popd
