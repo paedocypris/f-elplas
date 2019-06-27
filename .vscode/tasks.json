@@ -14,7 +14,10 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "lnccGeomech/build.sh",
+            "command": "make",
+            "options": {
+                "cwd": "${workspaceFolder}\\lnccGeomech"
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -57,11 +60,11 @@
             }
         },
         {
-            "label": "debug",
+            "label": "clean",
             "type": "shell",
-            "command": "${workspaceRoot}\\lnccGeomech\\debugPETRO.bat",
-            "presentation": {
-                "reveal": "never"
+            "command": "make clean",
+            "options": {
+                "cwd": "${workspaceFolder}\\lnccGeomech"
             }
         }
     ]

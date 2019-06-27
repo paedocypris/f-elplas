@@ -8,8 +8,8 @@
             "type": "gdb",
             "request": "launch",
             "name": "Debug BiotSix",
-            "target": "${workspaceRoot}/lnccGeomech/bin/lnccGeomech.exe",
-            "cwd": "${workspaceFolder}/lnccGeomech/data/BiotSix",
+            "target": "/mnt/c/Users/rsilva/projects/programming/f-elplas/lnccGeomech/bin/plasprog",
+            "cwd": "/mnt/c/Users/rsilva/projects/programming/f-elplas/lnccGeomech/data/BiotSix",
             "valuesFormatting": "disabled",
             "terminal": ""
         }
