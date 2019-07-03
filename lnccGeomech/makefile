@@ -2,7 +2,7 @@
 compiler	:=	gfortran	
 
 # compiler flags:
-cflags	= -c -Wall -Wconversion -g -fbacktrace -fbounds-check -ffpe-trap=zero,overflow -ffree-line-length-512 -Og
+cflags	= -c -Wall -Wconversion -g -fbacktrace -fbounds-check -ffpe-trap=zero,overflow -ffree-line-length-512 -O0
 lflags	= -g
 
 # program name
