@@ -3,4 +3,4 @@
 lnccGeomech/bin
 lnccGeomech/Debug
 .vs
-lnccGeomech/data/*/out
+lnccGeomech/data/*/out/*.vtk

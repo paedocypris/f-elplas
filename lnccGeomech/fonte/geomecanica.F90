@@ -18,7 +18,7 @@
     !     *       NON-LINEAR AND B-BAR FEM IMPLEMENTATION                   *
     !     *       FORMULATION JESUS ALEXEI - UFF-LNCC                       *
     !     *                                                                 *
-    !     *                      MODIFY ON 30/11/2015                       *
+    !     *                     MODIFY ON 30/11/2015                       *
     !     *                                                                 *
     !**** new module **********
     !
