@@ -5,63 +5,23 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Biot Six",
+            "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/mnt/c/Users/rsilva/projects/programming/f-elplas/lnccGeomech/bin/plasprog",
+            "program": "${workspaceFolder}/lnccGeomech/bin/plasprog",
             "args": [],
-            "stopAtEntry": true,
-            "cwd": "/mnt/c/Users/rsilva/projects/programming/f-elplas/lnccGeomech/data/BiotSix",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/lnccGeomech/data/BiotSix",
             "environment": [],
-            "externalConsole": true,
+            "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "internalConsoleOptions": "openOnSessionStart",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
                 }
-            ],
-            "pipeTransport": {
-                "pipeCwd": "",
-                "pipeProgram": "c:\\windows\\sysnative\\bash.exe",
-                "pipeArgs": ["-c"],
-                "debuggerPath": "/usr/bin/gdb"
-            },
-            "sourceFileMap": {
-                "/mnt/c": "${env:systemdrive}/"
-            }
-        },
-        {
-            "name": "KimSilva",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "/mnt/c/Users/rsilva/projects/programming/f-elplas/lnccGeomech/bin/plasprog",
-            "args": [],
-            "stopAtEntry": true,
-            "cwd": "/mnt/c/Users/rsilva/projects/programming/f-elplas/lnccGeomech/data/zDisKimSilva",
-            "environment": [],
-            "externalConsole": true,
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "pipeTransport": {
-                "pipeCwd": "",
-                "pipeProgram": "c:\\windows\\sysnative\\bash.exe",
-                "pipeArgs": ["-c"],
-                "debuggerPath": "/usr/bin/gdb"
-            },
-            "sourceFileMap": {
-                "/mnt/c": "${env:systemdrive}/"
-            }
+            ]
         }
     ]
 }
